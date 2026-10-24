@@ -18,7 +18,7 @@ export const CORE = ["domain", "contracts", "observability", "csv-ingestion", "e
 export const NEVER_PUBLISHED = ["azure-auth", "azure-arm", "azure-execution"];
 const CORE_NAME = "@hybridcloudworks/migration-core";
 const UI_NAME = "@hybridcloudworks/migration-ui";
-const REPO = "https://github.com/saulpatinojr/HCW-AzMigrateOrchestrator_App";
+const REPO = "https://github.com/saulpatinojr/HCW-MigrateOrchestrator_App";
 const OUT = join(ROOT, "dist-packages");
 
 const isShipped = (f) => !/\.test\.(js|d\.ts)$/.test(f) && !f.endsWith(".map") && !f.endsWith(".tsbuildinfo");

@@ -1,6 +1,6 @@
 # AGENTS.md — guidance for coding agents (Copilot coding agent, Codex, Claude)
 
-This is `saulpatinojr/HCW-AzMigrateOrchestrator_App`: the upstream product — engine, rules, CLI, UI components and the Azure
+This is `saulpatinojr/HCW-MigrateOrchestrator_App`: the upstream product — engine, rules, CLI, UI components and the Azure
 appliance (ADR-0028). It publishes `@hybridcloudworks/migration-core` and `@hybridcloudworks/migration-ui`; the slim web-front
 edition `saulpatinojr/HCW-AzMigrateOrchestrator_Addon` consumes them.
 

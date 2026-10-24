@@ -7,7 +7,7 @@ body:
     attributes:
       value: |
         Thank you for reporting this. Please do not paste secrets, tokens, customer inventories or real tenant or subscription IDs.
-        Security problems go through the private route in [SECURITY.md](https://github.com/saulpatinojr/HCW-AzMigrateOrchestrator_App/blob/main/SECURITY.md), not here.
+        Security problems go through the private route in [SECURITY.md](https://github.com/saulpatinojr/HCW-MigrateOrchestrator_App/blob/main/SECURITY.md), not here.
   - type: textarea
     id: what-happened
     attributes:

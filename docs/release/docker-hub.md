@@ -15,15 +15,15 @@ skipped, not failed.
 ## Owner steps (once)
 
 1. In Docker Home, under the `hybridcloudworks` organization, create an OIDC connection for this repository that trusts
-   `saulpatinojr/HCW-AzMigrateOrchestrator_App` on tag refs (`refs/tags/v*`) and workflow `publish-images.yml`, and copy
+   `saulpatinojr/HCW-MigrateOrchestrator_App` on tag refs (`refs/tags/v*`) and workflow `publish-images.yml`, and copy
    its connection ID (a UUID). [VERIFY the exact page: Docker Home, organization settings, OIDC connections.]
 2. Set the repository variables. PowerShell, with the connection ID on the clipboard:
 
    ```powershell
-   gh variable set DOCKERHUB_CONNECTION --repo saulpatinojr/HCW-AzMigrateOrchestrator_App --body (Get-Clipboard); gh variable set DOCKERHUB_ENABLED --repo saulpatinojr/HCW-AzMigrateOrchestrator_App --body true
+   gh variable set DOCKERHUB_CONNECTION --repo saulpatinojr/HCW-MigrateOrchestrator_App --body (Get-Clipboard); gh variable set DOCKERHUB_ENABLED --repo saulpatinojr/HCW-MigrateOrchestrator_App --body true
    ```
 
-   Success: `gh variable list --repo saulpatinojr/HCW-AzMigrateOrchestrator_App` prints both names.
+   Success: `gh variable list --repo saulpatinojr/HCW-MigrateOrchestrator_App` prints both names.
 3. Run the workflow for the current tag from the Actions tab (`publish-images`, **Run workflow**), or push the next `v*` tag.
    Success: the run summary ends with one line of the form `docker.io/hybridcloudworks/hcw-app-migration-appliance@sha256:…`,
    and `docker pull` of that reference succeeds anonymously.
