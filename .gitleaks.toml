@@ -1,5 +1,5 @@
 # gitleaks configuration (security.yml secret-scan). Extends the default rules.
-title = "HCW-AzMigrateOrchestrator_App"
+title = "HCW-MigrateOrchestrator_App"
 
 [extend]
 useDefault = true

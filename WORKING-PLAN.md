@@ -11,7 +11,7 @@ Publish this project as two public repositories (ADR-0027) that together support
 
 The owner selected:
 
-- Two repositories (2026-10-04, ADR-0027 then ADR-0028): `saulpatinojr/HCW-AzMigrateOrchestrator_App` is the **upstream product** — the appliance plus the engine, rules, CLI and UI components it is built on, freestanding; `saulpatinojr/HCW-AzMigrateOrchestrator_Addon` is the **downstream slim web-front edition** (CSV lab API, site integration), also freestanding, consuming the upstream's published packages. Updates flow downstream when the edition's own tests pass against a new upstream release.
+- Two repositories (2026-10-04, ADR-0027 then ADR-0028): `saulpatinojr/HCW-MigrateOrchestrator_App` is the **upstream product** — the appliance plus the engine, rules, CLI and UI components it is built on, freestanding; `saulpatinojr/HCW-AzMigrateOrchestrator_Addon` is the **downstream slim web-front edition** (CSV lab API, site integration), also freestanding, consuming the upstream's published packages. Updates flow downstream when the edition's own tests pass against a new upstream release.
 - Reuse the existing Hostinger VPS for the public lab API.
 - Start the Azure appliance with authenticated read-only assessment.
 - Keep appliance assessments session-only; no durable database initially.
@@ -23,7 +23,7 @@ The existing website is https://hybridcloudworks.com and its repository is https
 
 | Component | Home | Source of truth |
 | --- | --- | --- |
-| Engine packages, rules, CLI, UI components, appliance API/web/worker, `azure-*` packages, appliance Terraform, canonical ADRs, this plan | Public `saulpatinojr/HCW-AzMigrateOrchestrator_App` (upstream) | `_App` repository |
+| Engine packages, rules, CLI, UI components, appliance API/web/worker, `azure-*` packages, appliance Terraform, canonical ADRs, this plan | Public `saulpatinojr/HCW-MigrateOrchestrator_App` (upstream) | `_App` repository |
 | Lab API, lab web harness, browser e2e, lab Terraform, Coder template, partner and website-integration docs | Public `saulpatinojr/HCW-AzMigrateOrchestrator_Addon` (downstream) | `_Addon` repository |
 | Website page `/tools/migration` framing the downstream pane | Existing Azure Static Web Apps website | Website repository |
 | CSV lab API | Existing Hostinger VPS, behind host-native Caddy | Lab image from `_Addon` (built on the published core); host configuration in website repository |

@@ -2,14 +2,14 @@
 
 **Appliance and migration intelligence core — the upstream product.**
 
-[![ci](https://github.com/saulpatinojr/HCW-AzMigrateOrchestrator_App/actions/workflows/ci.yml/badge.svg)](https://github.com/saulpatinojr/HCW-AzMigrateOrchestrator_App/actions/workflows/ci.yml)
-[![security](https://github.com/saulpatinojr/HCW-AzMigrateOrchestrator_App/actions/workflows/security.yml/badge.svg)](https://github.com/saulpatinojr/HCW-AzMigrateOrchestrator_App/actions/workflows/security.yml)
-[![release](https://img.shields.io/github/v/release/saulpatinojr/HCW-AzMigrateOrchestrator_App?label=release)](https://github.com/saulpatinojr/HCW-AzMigrateOrchestrator_App/releases)
+[![ci](https://github.com/saulpatinojr/HCW-MigrateOrchestrator_App/actions/workflows/ci.yml/badge.svg)](https://github.com/saulpatinojr/HCW-MigrateOrchestrator_App/actions/workflows/ci.yml)
+[![security](https://github.com/saulpatinojr/HCW-MigrateOrchestrator_App/actions/workflows/security.yml/badge.svg)](https://github.com/saulpatinojr/HCW-MigrateOrchestrator_App/actions/workflows/security.yml)
+[![release](https://img.shields.io/github/v/release/saulpatinojr/HCW-MigrateOrchestrator_App?label=release)](https://github.com/saulpatinojr/HCW-MigrateOrchestrator_App/releases)
 [![node](https://img.shields.io/badge/node-%3E%3D26-339933?logo=node.js&logoColor=white)](docs/adr/ADR-0029-node-26-runtime-floor.md)
-[![packages](https://img.shields.io/badge/packages-migration--core%20%C2%B7%20migration--ui%20as%20release%20assets-6f42c1?logo=github)](https://github.com/saulpatinojr/HCW-AzMigrateOrchestrator_App/releases/latest)
+[![packages](https://img.shields.io/badge/packages-migration--core%20%C2%B7%20migration--ui%20as%20release%20assets-6f42c1?logo=github)](https://github.com/saulpatinojr/HCW-MigrateOrchestrator_App/releases/latest)
 [![live](https://img.shields.io/website?url=https%3A%2F%2Fmigration.lab.hybridcloudworks.com%2Fapi%2Fhealth&label=try%20it%20at%20%2Ftools%2Fmigration&up_message=live&down_message=down)](https://hybridcloudworks.com/tools/migration)
 [![docker hub](https://img.shields.io/badge/docker.io-hybridcloudworks%2Fhcw--app--migration--appliance-2496ED?logo=docker&logoColor=white)](https://hub.docker.com/r/hybridcloudworks/hcw-app-migration-appliance)
-[![license](https://img.shields.io/github/license/saulpatinojr/HCW-AzMigrateOrchestrator_App)](LICENSE)
+[![license](https://img.shields.io/github/license/saulpatinojr/HCW-MigrateOrchestrator_App)](LICENSE)
 [![downstream](https://img.shields.io/badge/downstream-HCW--AzMigrateOrchestrator__Addon-6f42c1?logo=github)](https://github.com/saulpatinojr/HCW-AzMigrateOrchestrator_Addon)
 
 **New here?** Give it an inventory of an Azure environment and it tells you, resource by resource, how each one can be
@@ -37,7 +37,7 @@ explorer components. It builds and runs on its own.
 
 ```mermaid
 flowchart LR
-  subgraph App["saulpatinojr/HCW-AzMigrateOrchestrator_App — upstream product"]
+  subgraph App["saulpatinojr/HCW-MigrateOrchestrator_App — upstream product"]
     E[Engine packages<br/>domain · rules · classification · agents · generators]
     U[UI components<br/>packages/ui]
     C[amo CLI]
@@ -61,7 +61,7 @@ flowchart LR
 
 | Repository | Role | Publishes |
 |---|---|---|
-| **`HCW-AzMigrateOrchestrator_App`** (this one) | Upstream: engine, rules, CLI, UI components, appliance. Freestanding. | `@hybridcloudworks/migration-core`, `@hybridcloudworks/migration-ui`, CLI binaries, appliance image |
+| **`HCW-MigrateOrchestrator_App`** (this one) | Upstream: engine, rules, CLI, UI components, appliance. Freestanding. | `@hybridcloudworks/migration-core`, `@hybridcloudworks/migration-ui`, CLI binaries, appliance image |
 | [`HCW-AzMigrateOrchestrator_Addon`](https://github.com/saulpatinojr/HCW-AzMigrateOrchestrator_Addon) | Downstream: the slim web-front edition — CSV lab API and the pane framed at hybridcloudworks.com/tools/migration. Freestanding in deployment; depends on the two package tarballs attached to this repository's GitHub Release of each `v*` tag, pinned by URL and integrity hash and adopted through its `core-update` workflow. | Lab image |
 
 **Updates flow downstream.** Every release here is picked up by the addon's `core-update` workflow, which installs the
@@ -86,7 +86,7 @@ docker compose -f docker-compose.appliance.yml up --build
 PowerShell: `npm ci; npm test; npm run rules:validate; node apps/cli/dist/main.js assess --csv samples/resources-csv/sample-resources.csv --out .\out --region westus3 --zip`
 
 No Node at run time: download `amo-linux-x64`, `amo-darwin-arm64` or `amo-windows-x64.exe` and its `SHA256SUMS-*.txt` from
-the [latest release](https://github.com/saulpatinojr/HCW-AzMigrateOrchestrator_App/releases/latest), then
+the [latest release](https://github.com/saulpatinojr/HCW-MigrateOrchestrator_App/releases/latest), then
 `./amo-linux-x64 assess --csv inventory.csv --out ./out --region westus3`.
 
 ## Repository map

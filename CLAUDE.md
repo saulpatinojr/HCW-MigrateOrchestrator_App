@@ -1,6 +1,6 @@
 # CLAUDE.md — working agreement for Claude Code in this repository
 
-This is `saulpatinojr/HCW-AzMigrateOrchestrator_App`, the **upstream product** (ADR-0028): the migration intelligence core
+This is `saulpatinojr/HCW-MigrateOrchestrator_App`, the **upstream product** (ADR-0028): the migration intelligence core
 (`packages/*`), the rule corpus (`rules/`), the `amo` CLI, the explorer UI components and the Azure appliance. It publishes
 `@hybridcloudworks/migration-core` and `@hybridcloudworks/migration-ui` (assembled by `scripts/assemble-packages.mjs` into
 `dist-packages/`). The slim web-front edition `saulpatinojr/HCW-AzMigrateOrchestrator_Addon` consumes those packages as the tarballs attached to each `v*` GitHub Release (pinned by URL and integrity hash) at exact

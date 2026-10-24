@@ -25,7 +25,7 @@ Trusted publishing can only be configured on a package that already exists, so t
 with a short-lived login session, never with a stored token:
 
 ```bash
-git clone https://github.com/saulpatinojr/HCW-AzMigrateOrchestrator_App.git && cd HCW-AzMigrateOrchestrator_App
+git clone https://github.com/saulpatinojr/HCW-MigrateOrchestrator_App.git && cd HCW-MigrateOrchestrator_App
 git checkout v0.2.1
 npm ci && npm run build && npm run packages:verify
 npm login
@@ -42,7 +42,7 @@ On npmjs.com → package → Settings → Trusted Publisher → GitHub Actions:
 | Field | Value |
 |---|---|
 | Organization or user | `saulpatinojr` |
-| Repository | `HCW-AzMigrateOrchestrator_App` |
+| Repository | `HCW-MigrateOrchestrator_App` |
 | Workflow filename | `publish-npm.yml` |
 | Environment | leave empty |
 

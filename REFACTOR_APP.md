@@ -4,7 +4,7 @@
 |---|---|
 | Date | 2026-10-10 |
 | Program | HCW App-to-AddOn initiative |
-| Repository role | `saulpatinojr/HCW-AzMigrateOrchestrator_App`, upstream product, read-only during the program |
+| Repository role | `saulpatinojr/HCW-MigrateOrchestrator_App`, upstream product, read-only during the program |
 | Rule | This file is the only file the program adds to this repository. Every other change below is an instruction for the owner to implement; nothing else in the tree was touched. |
 | Implementation target | This repository's next release, `v0.3.0` |
 | Baseline read | commit `ef4a515` (v0.2.1); every line number below refers to that commit |
