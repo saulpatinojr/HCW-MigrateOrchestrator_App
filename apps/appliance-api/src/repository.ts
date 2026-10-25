@@ -2,6 +2,7 @@ import { createRequire } from "node:module";
 import type { Assessment } from "@amo/domain";
 import type { TokenCredential } from "@amo/azure-auth";
 import type { TrackedOperation } from "@amo/azure-execution";
+import { embedsPassword } from "./database-url.js";
 
 /** Scope for Microsoft Entra authentication to Azure Database for PostgreSQL. */
 export const POSTGRES_ENTRA_SCOPE = "https://ossrdbms-aad.database.windows.net/.default";
@@ -126,7 +127,7 @@ export interface PoolFactory { (config: { connectionString: string; ssl?: { reje
 export async function repositoryFromEnv(env: NodeJS.ProcessEnv = process.env, credential: TokenCredential | null = null, poolFactory?: PoolFactory): Promise<AssessmentRepository> {
   if (!env.DATABASE_URL) return new InMemoryRepository();
   const local = /localhost|127\.0\.0\.1|@postgres[:/]/.test(env.DATABASE_URL);
-  if (/password=|:\/\/[^/]*:[^@]+@/.test(env.DATABASE_URL) && !local) throw new Error("DATABASE_URL must not embed a password for non-local hosts; use Entra authentication for PostgreSQL (docs/deployment/enterprise.md)");
+  if (embedsPassword(env.DATABASE_URL) && !local) throw new Error("DATABASE_URL must not embed a password for non-local hosts; use Entra authentication for PostgreSQL (docs/deployment/enterprise.md)");
   if (!local && !credential) throw new Error("Azure Database for PostgreSQL requires a TokenCredential for Entra authentication (AMO_CREDENTIAL_KIND)");
   const factory: PoolFactory = poolFactory ?? ((cfg) => new (require_pg().Pool)(cfg) as unknown as SqlClient);
   const pool = factory({ connectionString: env.DATABASE_URL, ssl: /sslmode=require/.test(env.DATABASE_URL) ? { rejectUnauthorized: true } : undefined, ...(local ? {} : { password: pgEntraPasswordProvider(credential!) }) });
