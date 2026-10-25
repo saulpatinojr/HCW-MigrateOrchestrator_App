@@ -10,9 +10,10 @@ import { FixtureDiscoveryProvider, type DiscoveryProvider } from "@amo/azure-dis
 import { ResourceGraphDiscoveryProvider, MoveValidator, ScopeInventory } from "@amo/azure-arm";
 import { credentialFromEnv, refuseUnsupportedIdentityEnv, EntraTokenValidator, StaticTokenCredential, type TokenCredential } from "@amo/azure-auth";
 import { ResourceMoverClient, type MoverAction } from "@amo/azure-execution";
-import { gate, isAllowed, APPROVAL_REQUIRED_OPERATIONS, type Principal, type AuthorizationLevel, type ApprovalOperation } from "@amo/authorization";
+import { gate, APPROVAL_REQUIRED_OPERATIONS, type Principal, type AuthorizationLevel, type ApprovalOperation } from "@amo/authorization";
 import { createLogger, type Logger } from "@amo/observability";
 import { InMemoryRepository, type AssessmentRepository } from "./repository.js";
+import { FORBIDDEN_MESSAGE, levelAllows } from "./route-levels.js";
 export * from "./repository.js";
 
 export interface EnterpriseConfig {
@@ -45,9 +46,29 @@ export function assertProductionConfig(cfg: EnterpriseConfig, env: NodeJS.Proces
   if (missing.length) throw new Error(`refusing to start in production: Entra ID sign-in is not configured (missing ${missing.join(" and ")}); set them as described in docs/deployment/enterprise.md`);
 }
 
-export function principalFromClaims(claims: { oid?: string; roles?: string[] } | null): Principal | null {
+/**
+ * The Entra app roles the API recognises, highest first, and the authorization level each grants (ADR-0031). Role values
+ * are matched exactly (case-sensitive), as Entra issues them in the `roles` claim. The lowest role is `Migration.Read` (assess only);
+ * a token with none of these roles is not a principal at all.
+ */
+export const APP_ROLE_LEVELS: ReadonlyArray<readonly [role: string, level: AuthorizationLevel]> = [
+  ["Migration.Execute.Destructive", "destructive-execution"],
+  ["Migration.Execute", "controlled-execution"],
+  ["Migration.Plan", "planning"],
+  ["Migration.Read", "discovery"],
+];
+
+/**
+ * Maps validated token claims to a principal. Fails closed (ticket #46, ADR-0031): no object id, no `roles` array, or no
+ * recognised app role gives `null`, and the API answers 403. A signed-in user without a role gets no access, not
+ * "discovery". A `roles` claim that is not an array of strings counts as no roles (a string would otherwise match by
+ * substring).
+ */
+export function principalFromClaims(claims: { oid?: string; roles?: unknown } | null): Principal | null {
   if (!claims?.oid) return null;
-  const level: AuthorizationLevel = claims.roles?.includes("Migration.Execute.Destructive") ? "destructive-execution" : claims.roles?.includes("Migration.Execute") ? "controlled-execution" : claims.roles?.includes("Migration.Plan") ? "planning" : "discovery";
+  const held = new Set(Array.isArray(claims.roles) ? claims.roles.filter((r): r is string => typeof r === "string") : []);
+  const level = APP_ROLE_LEVELS.find(([role]) => held.has(role))?.[1];
+  if (!level) return null;
   return { id: claims.oid, edition: "enterprise", grantedLevel: level, approvals: new Set() };
 }
 
@@ -90,8 +111,17 @@ export function createEnterpriseApi(cfg: EnterpriseConfig, deps: ApplianceDeps):
       if (!deps.validator) return fail(401, "unauthenticated", "Entra ID sign-in not configured (AMO_ENTRA_TENANT_ID, AMO_ENTRA_CLIENT_ID); see docs/deployment/enterprise.md");
       const v = await deps.validator.validate(req.headers.authorization);
       if (!v.ok) return fail(401, "unauthenticated", v.reason);
-      const principal = principalFromClaims(v.claims)!;
       const actor = v.claims.oid;
+      // A valid token is not enough: it must carry an app role (ADR-0031). A token with no role and one with an
+      // unrecognised role get the same answer, on every route below.
+      const principal = principalFromClaims(v.claims);
+      if (!principal) {
+        log.warn("request refused: token has no recognised app role", { oid: actor });
+        return fail(403, "forbidden", "no application role assigned: ask an administrator to assign you one of the Migration.* app roles (docs/deployment/enterprise.md, section 2)");
+      }
+
+      // Minimum level for the route, from one table, before any body is read or any repository is touched (ADR-0031).
+      if (!levelAllows(principal, url.pathname)) return fail(403, "forbidden", FORBIDDEN_MESSAGE);
 
       if (url.pathname === "/api/me") return send(200, { oid: actor, level: principal.grantedLevel, roles: v.claims.roles });
 
@@ -101,7 +131,6 @@ export function createEnterpriseApi(cfg: EnterpriseConfig, deps: ApplianceDeps):
         return send(200, { homeTenantId: cfg.tenantId, subscriptions: subs, delegatedCount: subs.filter((x) => x.delegated).length });
       }
       if (url.pathname === "/api/assessments" && req.method === "POST") {
-        if (!isAllowed(principal, "discovery")) return fail(403, "forbidden", "discovery level required");
         const body = (await readJson(req)) as { scope?: { kind: "subscription" | "management-group" | "resource-group"; id: string }; intent?: Record<string, unknown>; destinationSubscriptionId?: string };
         if (!body.scope?.id) return fail(400, "scope_required", "scope {kind,id} required");
         const intent: Record<string, unknown> = { ...(body.intent ?? {}) };
@@ -125,7 +154,6 @@ export function createEnterpriseApi(cfg: EnterpriseConfig, deps: ApplianceDeps):
         if (!item || item.ownerOid !== actor) return fail(404, "not_found", "assessment not found");
         if (!m[2]) return send(200, { assessment: item.assessment });
         // Authenticated evidence: ARM validateMoveResources for the native-move candidates.
-        if (!isAllowed(principal, "validation")) return fail(403, "forbidden", "validation level required");
         if (!moveValidator) return fail(503, "not_configured", "no Azure credential configured");
         const body = (await readJson(req)) as { targetResourceGroupId?: string };
         if (!body.targetResourceGroupId) return fail(400, "target_required", "targetResourceGroupId required");
@@ -144,7 +172,6 @@ export function createEnterpriseApi(cfg: EnterpriseConfig, deps: ApplianceDeps):
       }
 
       if (url.pathname === "/api/approvals" && req.method === "POST") {
-        if (!isAllowed(principal, "controlled-execution")) return fail(403, "forbidden", "controlled-execution level required to record approvals");
         const body = (await readJson(req)) as { operation?: ApprovalOperation; targetKey?: string; note?: string };
         if (!body.operation || !APPROVAL_REQUIRED_OPERATIONS.includes(body.operation) || !body.targetKey) return fail(400, "invalid", "operation and targetKey required");
         const rec = { id: randomUUID(), operation: body.operation, targetKey: body.targetKey, approvedBy: actor, approvedAt: new Date().toISOString(), note: body.note ?? null };
@@ -172,7 +199,6 @@ export function createEnterpriseApi(cfg: EnterpriseConfig, deps: ApplianceDeps):
       }
       const ops = url.pathname.match(/^\/api\/operations\/([^/]+)$/);
       if (ops && req.method === "GET") {
-        if (!isAllowed(principal, "planning")) return fail(403, "forbidden", "planning level required");
         return send(200, await repo.operationsFor(decodeURIComponent(ops[1])));
       }
       if (url.pathname.startsWith("/api/execution/")) return fail(403, "approval_required", gate(principal, "production-deploy", url.pathname).reason);
