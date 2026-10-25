@@ -84,8 +84,10 @@ variable "additional_allowed_hosts" {
   description = "Extra host names the API accepts in the Host header (AMO_ALLOWED_HOSTS, ADR-0033), for example a custom domain or a reverse proxy name. The Container App's own address is always listed and is added for you; the API lets any IP address through (DNS rebinding needs a domain name), so the platform's probes keep working. Bare lower-case host names only: no https://, no port, no path, no wildcard. Empty by default. The API reads AMO_ALLOWED_HOSTS from the host allow-list change (refs issue 83, F8); an API image without it ignores the variable."
   default     = []
   validation {
-    condition     = alltrue([for h in var.additional_allowed_hosts : can(regex("^[a-z0-9]([a-z0-9.-]{0,251}[a-z0-9])?$", h))])
-    error_message = "Each additional_allowed_hosts entry must be a bare lower-case host name such as app.example.com: letters, digits, dots and hyphens only, with no scheme, port, path, wildcard or leading or trailing dot."
+    # A name made only of digits and dots is read by the API's URL parser as an IPv4 address (123 becomes 0.0.0.123), so it
+    # would be refused at startup: such a value must be a full dotted quad, or contain a letter.
+    condition     = alltrue([for h in var.additional_allowed_hosts : can(regex("^[a-z0-9]([a-z0-9.-]{0,251}[a-z0-9])?$", h)) && (can(regex("[a-z]", h)) || can(regex("^((25[0-5]|2[0-4][0-9]|1[0-9]{2}|[1-9]?[0-9])[.]){3}(25[0-5]|2[0-4][0-9]|1[0-9]{2}|[1-9]?[0-9])$", h)))])
+    error_message = "Each additional_allowed_hosts entry must be a bare lower-case host name such as app.example.com: letters, digits, dots and hyphens only, with no scheme, port, path, wildcard or leading or trailing dot, and not a number such as 123 (use a name with a letter in it, or a full IPv4 address)."
   }
 }
 variable "app_role_assignments" {

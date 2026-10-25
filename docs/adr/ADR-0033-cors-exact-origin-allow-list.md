@@ -75,7 +75,10 @@ The API implements CORS as an **exact-match allow-list** and nothing broader.
 
 ## Addendum 2026-10-25: Private Network Access, and the host name in Terraform ([issue 83](https://github.com/saulpatinojr/HCW-MigrateOrchestrator_App/issues/83), F9 and F8)
 
-- **F9, Private Network Access.** Chrome sends `Access-Control-Request-Private-Network: true` on a preflight from a public page to a
+- **F9, Private Network Access.** This supports the Private Network Access (PNA) preflight where a browser still sends it; Chrome has since announced
+  Local Network Access permission prompts as its current mechanism, and a correct answer from this API does not replace that browser permission. A browser that
+  implements PNA sends `Access-Control-Request-Private-Network: true` on a preflight (which, per the specification, also carries
+  `Access-Control-Request-Method`) from a public page to a
   private or loopback address and wants `Access-Control-Allow-Private-Network: true` back
   ([Chrome developers, Private Network Access preflights](https://developer.chrome.com/blog/private-network-access-preflight)).
   The API now adds that header, and `Vary: Origin, Access-Control-Request-Private-Network`, only on a preflight from an **allowed

@@ -34,13 +34,14 @@ const KEYED_SECRET_PATTERNS: RegExp[] = [
   /(SharedAccessSignature=)[^;\s]+/gi,
   /(sig=)[A-Za-z0-9%+/=]{20,}/gi,
   // An Authorization header, with or without a scheme word: the credential (an opaque token, "user:password" in Basic
-  // form, anything) is hidden. The scheme word and the separators are bounded.
-  new RegExp(String.raw`(\b(?:proxy-)?authorization["']?[ \t]{0,16}[=:]${SPACE_THEN_VALUE}(?:(?:bearer|basic|negotiate|digest|token)[ \t]{1,16})?)[^\s;,"']{1,4096}`, "gi"),
+  // form, anything) is hidden, to the end of the value however long it is (a length cap would leave the rest of a long credential in
+  // the log). The scheme word and the separators are bounded; the value is consumed once, so the cost stays linear.
+  new RegExp(String.raw`(\b(?:proxy-)?authorization["']?[ \t]{0,16}[=:]${SPACE_THEN_VALUE}(?:(?:bearer|basic|negotiate|digest|token)[ \t]{1,16})?)[^\s;,"']+`, "gi"),
   // A bare "Bearer <opaque token>", as it appears in an error message that quotes a request.
   // The 20-character floor keeps ordinary prose ("Bearer authentication failed") readable.
-  /(\bbearer[ \t]{1,16})[A-Za-z0-9._~+/-]{20,4096}=*/gi,
+  /(\bbearer[ \t]{1,16})[A-Za-z0-9._~+/-]{20,}=*/gi,
   // JSON or object-literal form: "password": "value". The key may carry a prefix or suffix (client_secret, secretKey).
-  /("[A-Za-z0-9_.-]{0,64}(?:password|passwd|pwd|secret|token|api[_-]?key|access[_-]?key|subscription[_-]?key|private[_-]?key)[A-Za-z0-9_.-]{0,64}"[ \t]{0,16}:[ \t]{0,16}")(?:[^"\\]|\\.){1,4096}/gi,
+  /("[A-Za-z0-9_.-]{0,64}(?:password|passwd|pwd|secret|token|api[_-]?key|access[_-]?key|subscription[_-]?key|private[_-]?key)[A-Za-z0-9_.-]{0,64}"[ \t]{0,16}:[ \t]{0,16}")(?:[^"\\]|\\.)+/gi,
   // key=value or key: value, with the key spelled in any of the usual ways.
   new RegExp(String.raw`((?:password|passwd|pwd|secret|token|api[_-]?key|access[_-]?key|subscription[_-]?key|private[_-]?key)[ \t]{0,64}[=:]${SPACE_THEN_VALUE})[^;\s,]+`, "gi"),
 ];

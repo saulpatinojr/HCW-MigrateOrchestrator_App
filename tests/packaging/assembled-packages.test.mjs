@@ -29,8 +29,7 @@ test("no internal @amo/ specifier, Azure endpoint or test file leaks into the pu
     if (!/\.(js|ts|json)$/.test(f)) continue;
     const text = readFileSync(f, "utf8");
     assert.ok(!text.includes("@amo/"), `${f} references @amo/`);
-    // A deliberately strict "appears nowhere" check, not a URL allow-list: any mention of the host fails the test.
-    assert.doesNotMatch(text, /management\.azure\.com/i, `${f} references an Azure endpoint`);
+    assert.ok(!text.includes("management.azure.com"), `${f} references an Azure endpoint`);
   }
 });
 

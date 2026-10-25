@@ -104,6 +104,15 @@ test("property: a planted secret never survives, whatever noise surrounds it", (
   }
 });
 
+test("a very long credential is removed to its end, not cut at a length cap (review of pull request 90)", () => {
+  const long = "x".repeat(10_000) + "TAILMARK";
+  for (const line of [`Authorization: Bearer ${long} done`, `Authorization: ${long} done`, `retrying with Bearer ${long} now`, `{"password":"${long}","n":1}`, `{"client_secret": "${long}"}`]) {
+    const out = redact(line);
+    assert.ok(!out.includes("TAILMARK") && !out.includes("xxxxxxxxxx"), line.slice(0, 30));
+    assert.ok(out.length < 200, "nothing of the long value remains");
+  }
+});
+
 test("redact stays fast on 200k-character adversarial input for every pattern", () => {
   const n = 200_000;
   const rep = (unit: string): string => unit.repeat(Math.ceil(n / unit.length));

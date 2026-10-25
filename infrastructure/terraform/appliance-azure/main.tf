@@ -21,8 +21,10 @@ locals {
   # which is "<app name>.<environment default domain>", plus any custom names. Written from the name and the environment,
   # not from the app's own attributes, because a resource cannot read itself. The API turns its Host check on when this
   # list is not empty (it is off by default, because only the deployment knows its own address) and lets IP addresses pass.
-  api_app_name      = "ca-${local.name}-api"
-  api_allowed_hosts = join(",", concat(["${local.api_app_name}.${azurerm_container_app_environment.app.default_domain}"], var.additional_allowed_hosts))
+  api_app_name = "ca-${local.name}-api"
+  # The short app name is listed too: other container apps in the same environment call it as http://<app name> (Learn,
+  # "Communicate between container apps"), and that is the Host header they send.
+  api_allowed_hosts = join(",", concat([local.api_app_name, "${local.api_app_name}.${azurerm_container_app_environment.app.default_domain}"], var.additional_allowed_hosts))
 
   # Subnet ranges, shared by the subnets and by the network security group rules that name them (ADR-0032).
   aca_subnet_cidr = cidrsubnet(var.vnet_cidr, 4, 0)

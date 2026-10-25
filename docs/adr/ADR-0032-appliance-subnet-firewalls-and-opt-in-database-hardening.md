@@ -109,8 +109,8 @@ in `main.tf`. The ticket's `CKV2_AZURE_31` (NSG on two subnets) is fixed by sect
 
 ### 5. Scanning
 
-- `iac-validate` is unchanged except for one added step, `terraform test`, which runs plan-only tests against mocked providers
-  (`infrastructure/terraform/appliance-azure/tests/appliance.tftest.hcl`): no credentials, nothing applied.
+- `iac-validate` runs `trivy config` at HIGH and CRITICAL (unchanged), plus two steps added since: `terraform test`, which runs plan-only tests against mocked providers
+  (`infrastructure/terraform/appliance-azure/tests/appliance.tftest.hcl` and `hardening.tftest.hcl`: no credentials, nothing applied), and checkov (see the next bullet).
 - `scripts/ci/local-iac-checks.sh` runs `terraform` (fmt, init without a backend, validate, test) with Terraform 1.9.8 and
   `trivy config` at HIGH,CRITICAL in disposable containers pinned by digest (Trivy 0.76.1 by digest, the same pattern as
   the other HCW repositories). It refuses a Docker engine that is not the local one.
@@ -123,8 +123,9 @@ in `main.tf`. The ticket's `CKV2_AZURE_31` (NSG on two subnets) is fixed by sect
 - **Geo-redundant backup is validated against region pairs (added 2026-10-25).** `postgres_geo_redundant_backup_enabled = true` is refused at plan time when
   `location` is one of the regions that Learn's [region pairs page](https://learn.microsoft.com/azure/reliability/regions-paired) shows
   without a pair (Chile Central, Mexico Central, Austria East, Belgium Central, Denmark East, Italy North, Poland Central, Spain
-  Central, Israel Central, Qatar Central, Indonesia Central, Malaysia West, New Zealand North; read 2026-10-25). It is a deny-list so a
-  region that Microsoft pairs later is not blocked by a stale list. Learn also says the choice is possible only at creation,
+  Central, Israel Central, Qatar Central, Indonesia Central, Malaysia West, New Zealand North; read 2026-10-25). It is a deny-list, and the trade-off
+  is explicit: a region that Microsoft newly leaves unpaired, or a name the list does not know, passes the plan and fails at Azure when the server is created, and a listed region
+  that Microsoft pairs later stays refused here until the list is edited (the fix is a one-line change and a test). Learn also says the choice is possible only at creation,
   which is why the default stays `false` and the variable description warns about recreation. The rule reads another variable, which needs Terraform
   1.9 (`required_version` and the CI pin already say 1.9). Tests: `tests/hardening.tftest.hcl`.
 - **Baseline (Trivy 0.76.1, 2026-10-25).** Before this change: 0 findings at HIGH and CRITICAL; 3 at MEDIUM

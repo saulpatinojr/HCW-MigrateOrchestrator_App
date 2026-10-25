@@ -97,6 +97,29 @@ run "additional_allowed_hosts_accepts_bare_lower_case_names" {
   }
 }
 
+run "additional_allowed_hosts_refuses_a_bare_number_the_api_would_read_as_an_ip_address" {
+  command = plan
+
+  variables {
+    additional_allowed_hosts = ["123"]
+  }
+
+  expect_failures = [var.additional_allowed_hosts]
+}
+
+run "additional_allowed_hosts_accepts_a_full_ipv4_address_and_a_name_that_starts_with_digits" {
+  command = plan
+
+  variables {
+    additional_allowed_hosts = ["10.0.0.5", "123.example.com"]
+  }
+
+  assert {
+    condition     = length(var.additional_allowed_hosts) == 2
+    error_message = "A full IPv4 address and a name with letters must be accepted."
+  }
+}
+
 run "additional_allowed_hosts_refuses_schemes_ports_paths_wildcards_and_capitals" {
   command = plan
 
