@@ -26,7 +26,14 @@ skipped, not failed.
    Success: `gh variable list --repo saulpatinojr/HCW-MigrateOrchestrator_App` prints both names.
 3. Run the workflow for the current tag from the Actions tab (`publish-images`, **Run workflow**), or push the next `v*` tag.
    Success: the run summary ends with one line of the form `docker.io/hybridcloudworks/img-mo-appliance-app@sha256:…`,
-   and `docker pull` of that reference succeeds anonymously.
+   and `docker pull` of that reference succeeds anonymously. Then check the attestation of that exact digest, bash or PowerShell:
+
+   ```bash
+   gh attestation verify oci://docker.io/hybridcloudworks/img-mo-appliance-app@sha256:<digest-from-the-run-summary> --repo saulpatinojr/HCW-MigrateOrchestrator_App
+   ```
+
+   Which tags have an image, and how to tell a skipped run from a published one: the README section "Which tags have an
+   appliance image".
 
 ## Failure modes
 

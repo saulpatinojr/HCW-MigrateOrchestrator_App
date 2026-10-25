@@ -111,15 +111,39 @@ the [latest release](https://github.com/saulpatinojr/HCW-MigrateOrchestrator_App
 
 ## Releases and artifacts
 
-A `v*` tag publishes, only after the checks pass:
+A `v*` tag publishes the CLI binaries and the two packages, only after the checks pass. The appliance image is the one
+artifact that does **not** ship with every tag; the next section says exactly which tags have one.
 
 | Artifact | Where | Gate |
 |---|---|---|
-| Appliance image | `docker.io/hybridcloudworks/img-mo-appliance-app` | Built locally, scanned (Trivy, HIGH/CRITICAL fixed), then pushed through the Docker OIDC connection with provenance and SBOM (`docs/release/docker-hub.md`). Deploy by digest, never by tag. **Only while the repository variable `DOCKERHUB_ENABLED` is `true`:** the job was skipped (not failed) for `v0.3.0` and `v0.3.1`, so no image exists for them yet (ticket #42). Terraform refuses any `image_ref` that is not an exact digest |
+| Appliance image | `docker.io/hybridcloudworks/img-mo-appliance-app` | Built locally, scanned (Trivy, HIGH/CRITICAL fixed), then pushed through the Docker OIDC connection with provenance and SBOM (`docs/release/docker-hub.md`). Deploy by digest, never by tag. **Only for a tag pushed while the repository variable `DOCKERHUB_ENABLED` is `true`** (see "Which tags have an appliance image"). Terraform refuses any `image_ref` that is not an exact digest |
 | CLI binaries | GitHub Releases, three platforms, with `SHA256SUMS-*.txt`, signed build provenance and a signed CycloneDX SBOM (`amo-cli-<version>.cdx.json`) | Each binary smoke-tested (`rules validate` + a sample `assess`) |
 | `@hybridcloudworks/migration-core`, `@hybridcloudworks/migration-ui` | GitHub Release assets (`hybridcloudworks-migration-{core,ui}-<version>.tgz`) with signed build provenance and a signed CycloneDX SBOM (`hybridcloudworks-migration-packages-<version>.cdx.json`); the downstream edition pins them by URL and hash. npm publishing is optional ([`docs/release/npm-publishing.md`](docs/release/npm-publishing.md)) | Clean-consumer gate (`npm run packages:verify`) against the packed tarballs before release and again against the released tarballs |
 
 The GitHub Release is created by one job, as a draft, and made public only after the files and their attestations have been checked; the tag, the package version and `main` must agree before the release workflow builds anything. The release, npm and image workflows start from the same tag and run independently of each other (npm can publish even if the release run fails), each with its own version check first. How to rehearse a release without publishing, how to cut one and what to do when a step fails: [`docs/release/README.md`](docs/release/README.md) (design: ADR-0034).
+
+### Which tags have an appliance image
+
+An image exists for a `v*` tag only if the `publish-images` workflow ran (not "skipped") for that tag. It runs only when the
+repository variable `DOCKERHUB_ENABLED` is `true` when the tag is pushed; with it unset the job is skipped, not failed.
+State on 2026-10-25 (ticket #42):
+
+| Tag | Appliance image on Docker Hub |
+|---|---|
+| `v0.2.0`, `v0.2.1` | None. These were pushed to GitHub Container Registry, before the move to Docker Hub on 2026-10-10 (`docs/release/docker-hub.md`) |
+| `v0.3.0`, `v0.3.1` | None. `publish-images` was skipped for both because the variable was not set (the tags exist and cannot be changed) |
+| The next `v*` tag | Yes, if `DOCKERHUB_ENABLED` is still `true` and `DOCKERHUB_CONNECTION` still holds the Docker OIDC connection ID. Both were set on 2026-10-25. This is the first Docker Hub image: the repository `hybridcloudworks/img-mo-appliance-app` exists, is public and holds no image yet |
+
+To check a tag yourself: open the [publish-images runs](https://github.com/saulpatinojr/HCW-MigrateOrchestrator_App/actions/workflows/publish-images.yml)
+and confirm the run for that tag says "success" and ends with a line `docker.io/hybridcloudworks/img-mo-appliance-app@sha256:...`;
+then check the signature of that exact digest (PowerShell or bash, with the digest from the run summary):
+
+```bash
+gh attestation verify oci://docker.io/hybridcloudworks/img-mo-appliance-app@sha256:<digest-from-the-run-summary> --repo saulpatinojr/HCW-MigrateOrchestrator_App
+```
+
+If the run for a tag says "skipped", that tag has no image: use the latest tag that has one, or the owner steps in
+[`docs/release/docker-hub.md`](docs/release/docker-hub.md).
 
 Actions are pinned to commit SHAs; Dependabot keeps them current.
 
