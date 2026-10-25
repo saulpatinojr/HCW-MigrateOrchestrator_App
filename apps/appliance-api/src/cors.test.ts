@@ -256,3 +256,31 @@ test("the Origin header is never reflected unvalidated, and there is no wildcard
   assert.equal(answers[0].headers["access-control-allow-origin"], undefined);
   assert.equal(answers[2].headers["access-control-allow-origin"], APP);
 });
+
+test("the role check (ADR-0031) runs after the preflight and its 403 is readable by an allowed origin", async () => {
+  const base = await start(APP);
+  // a preflight carries no token, so it is answered before any role check
+  const pre = await call(base, "OPTIONS", "/api/approvals", { origin: APP, "access-control-request-method": "POST", "access-control-request-headers": "authorization,content-type" });
+  assert.equal(pre.status, 204);
+  assert.equal(pre.headers["access-control-allow-origin"], APP);
+  // a valid token with no application role: 403 on every protected route, and an allowed origin can read the refusal
+  for (const [method, path] of [["GET", "/api/me"], ["GET", "/api/scopes"], ["GET", "/api/assessments"], ["POST", "/api/approvals"]] as const) {
+    const noRole = await call(base, method, path, { origin: APP, "content-type": "application/json", ...bearer([]) }, method === "POST" ? "{}" : undefined);
+    assert.equal(noRole.status, 403, `${method} ${path} without a role`);
+    assert.equal(noRole.headers["access-control-allow-origin"], APP, `${method} ${path}: the 403 carries the CORS headers for an allowed origin`);
+    assert.ok(varies(noRole).includes("origin"));
+    assert.ok(!("access-control-allow-credentials" in noRole.headers));
+    const elsewhere = await call(base, method, path, { origin: "https://evil.example.test", "content-type": "application/json", ...bearer([]) }, method === "POST" ? "{}" : undefined);
+    assert.equal(elsewhere.status, 403);
+    assert.ok(!("access-control-allow-origin" in elsewhere.headers), "a disallowed origin gets the 403 without CORS headers");
+  }
+  // a role that is too low for the route: 403 with the CORS headers; a high enough role: 200
+  const tooLow = await call(base, "POST", "/api/approvals", { origin: APP, "content-type": "application/json", ...bearer(["Migration.Read"]) }, "{}");
+  assert.equal(tooLow.status, 403);
+  assert.equal(tooLow.headers["access-control-allow-origin"], APP);
+  const enough = await call(base, "GET", "/api/me", { origin: APP, ...bearer(["Migration.Read"]) });
+  assert.equal(enough.status, 200);
+  assert.equal(enough.headers["access-control-allow-origin"], APP);
+  // without a token the answer is still 401, with the CORS headers
+  assert.equal((await call(base, "GET", "/api/me", { origin: APP })).status, 401);
+});
