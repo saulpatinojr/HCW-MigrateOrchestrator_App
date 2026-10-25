@@ -6,8 +6,9 @@
  * library only; it calls the GitHub CLI (`gh`), authenticated by GH_TOKEN in the workflow.
  *
  *   check-files           the directory holds exactly the files a release carries, none empty
- *   verify-attestations   `gh attestation verify` the provenance and the CycloneDX SBOM of every binary and tarball, and
- *                         insist that each came from THIS workflow file, on THIS ref, at THIS commit. Without those three,
+ *   verify-attestations   `gh attestation verify` the provenance and the CycloneDX SBOM of every binary and tarball, and the
+ *                         provenance of the checksum files and the two SBOMs (so all ten files are bound, not only five),
+ *                         and insist that each came from THIS workflow file, on THIS ref, at THIS commit. Without those three,
  *                         "some attestation for this file exists in this repository" would be enough, and a dry-run
  *                         attestation of the same bytes would satisfy a real release.
  *   publish               create the GitHub Release as a DRAFT with every file, check that the draft holds exactly those
@@ -50,7 +51,18 @@ export const allNames = (version) => {
   const a = expectedAssets(version);
   return [...a.binaries, ...a.checksums, ...a.tarballs, a.sboms.cli, a.sboms.packages];
 };
+/** Binaries and tarballs: build provenance AND a CycloneDX SBOM attestation each. */
 export const attestedNames = (version) => [...BINARIES, ...expectedAssets(version).tarballs];
+/** Checksum files and the two SBOMs: build provenance only (they are the files a consumer reads, not software; follow-up F7 of issue 83). */
+export const provenanceOnlyNames = (version) => {
+  const a = expectedAssets(version);
+  return [...a.checksums, a.sboms.cli, a.sboms.packages];
+};
+/** Every [file, predicates] pair `verify-attestations` checks: all ten release files are bound to this workflow, ref and commit. */
+export const attestationChecks = (version) => [
+  ...attestedNames(version).map((name) => [name, [PROVENANCE, SBOM]]),
+  ...provenanceOnlyNames(version).map((name) => [name, [PROVENANCE]]),
+];
 
 export const versionOfTag = (tag) => {
   const m = /^v(\d+\.\d+\.\d+)$/.exec(tag);
@@ -88,10 +100,10 @@ export function verifyCommand(path, repo, predicate, workflow, sourceRef, source
 
 export function verifyAttestations({ dir, version, repo, workflow, sourceRef, sourceDigest }, gh = realGh, pause = sleepMs) {
   const problems = [];
-  for (const name of attestedNames(version)) {
+  for (const [name, predicates] of attestationChecks(version)) {
     const path = join(dir, name);
     if (!existsSync(path)) { problems.push(`${path} is missing, so its attestations cannot be verified`); continue; }
-    for (const predicate of [PROVENANCE, SBOM]) {
+    for (const predicate of predicates) {
       const command = verifyCommand(path, repo, predicate, workflow, sourceRef, sourceDigest);
       let result = gh(command);
       for (let i = 1; i < VERIFY_TRIES && result.status !== 0; i++) { pause(VERIFY_PAUSE_MS); result = gh(command); }
@@ -166,7 +178,7 @@ export async function releaseProblems(release, dir, version, { draft }) {
 export function releaseNotes(tag, repo, workflow) {
   const version = versionOfTag(tag);
   return [
-    `Release ${tag}. Every binary and package tarball below has a signed build-provenance attestation and a signed CycloneDX SBOM attestation, made by \`${workflow}\` on \`refs/tags/${tag}\`.`,
+    `Release ${tag}. Every binary and package tarball below has a signed build-provenance attestation and a signed CycloneDX SBOM attestation, made by \`${workflow}\` on \`refs/tags/${tag}\`. The checksum files and the two SBOMs have a signed build-provenance attestation too.`,
     "",
     "Verify a download (GitHub CLI):",
     "",
