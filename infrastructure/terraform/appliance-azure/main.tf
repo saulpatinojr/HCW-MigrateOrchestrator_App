@@ -25,7 +25,7 @@ locals {
   ingress_from_tag = length(var.ingress_allowed_source_prefixes) == 1 && try(var.ingress_allowed_source_prefixes[0], "") == "Internet"
 
   # Ranges that Azure Kubernetes Service and workload-profile Container Apps environments reserve; the subnet range must not
-  # overlap them (Microsoft Learn, "Virtual network configuration"). Terraform has no CIDR-overlap function, so the ranges are
+  # overlap them (Microsoft Learn, "Virtual network configuration"). Terraform lacks a function that tests CIDR overlap, so the ranges are
   # compared as integers: first address and size.
   reserved_cidrs = ["169.254.0.0/16", "172.30.0.0/16", "172.31.0.0/16", "192.0.2.0/24", "100.100.0.0/17", "100.100.128.0/19", "100.100.160.0/19", "100.100.192.0/19"]
   vnet_first     = (((tonumber(split(".", split("/", var.vnet_cidr)[0])[0]) * 256 + tonumber(split(".", split("/", var.vnet_cidr)[0])[1])) * 256 + tonumber(split(".", split("/", var.vnet_cidr)[0])[2])) * 256 + tonumber(split(".", split("/", var.vnet_cidr)[0])[3]))
