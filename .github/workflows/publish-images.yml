@@ -1,5 +1,5 @@
 # Actions are pinned to full commit SHAs (version in the trailing comment); Dependabot (github-actions ecosystem) proposes updates.
-# Appliance image docker.io/hybridcloudworks/hcw-app-migration-appliance (program decision 2026-10-09: Docker Hub only, no GHCR;
+# Appliance image docker.io/hybridcloudworks/hcw-migrateorchestrator (program decision 2026-10-09: Docker Hub only, no GHCR;
 # REFACTOR_APP.md section 7, optional item taken on 2026-10-10). Order matters: build locally -> scan -> push. A failing scan
 # publishes nothing. Deployments reference the digest this run prints, never a tag.
 #
@@ -15,7 +15,7 @@ on:
 permissions:
   contents: read
 env:
-  IMAGE: docker.io/hybridcloudworks/hcw-app-migration-appliance
+  IMAGE: docker.io/hybridcloudworks/hcw-migrateorchestrator
   DOCKERHUB_ORG: hybridcloudworks
 jobs:
   build-scan-publish:

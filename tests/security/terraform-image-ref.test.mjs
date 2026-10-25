@@ -13,7 +13,7 @@ const hcl = block.match(/regex\("((?:[^"\\]|\\.)*)"/)?.[1];
 // Terraform uses RE2; the only construct JavaScript lacks is the POSIX class [:space:].
 const re = new RegExp((hcl ?? "").replace(/\\\\/g, "\\").replace("[:space:]", "\\s"));
 const digest = "a".repeat(64);
-const name = "docker.io/hybridcloudworks/hcw-app-migration-appliance";
+const name = "docker.io/hybridcloudworks/hcw-migrateorchestrator";
 
 test("image_ref is a required variable with no default", () => {
   assert.ok(block, "variable image_ref not found");
