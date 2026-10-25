@@ -12,8 +12,10 @@
 #                                  those very tarballs, and the CycloneDX SBOMs of the CLI and of the packages.
 #   inventory    (contents: read)  gathers every file into one artifact and checks that exactly the expected files exist.
 #   attest       (id-token and attestations: write, no repository write)  signed build provenance and signed CycloneDX SBOM
-#                                  attestations for every binary and tarball, then verifies them (this workflow file, this ref,
-#                                  this commit).
+#                                  attestations for every binary and tarball, and signed build provenance for the checksum files
+#                                  and the two SBOMs. Runs no repository script and has no checkout.
+#   verify-attestations (contents and attestations: read)  verifies them (this workflow file, this ref, this commit) with the
+#                                  repository's own script, in a job that cannot sign anything.
 #   release      (contents: write; a tag only)  the ONLY job that touches the release: verifies the attestations again against
 #                                  the downloaded files, creates the release as a DRAFT with every file, checks that it holds
 #                                  exactly the expected files, and only then makes it public (scripts/release-publish.mjs).
@@ -169,13 +171,12 @@ jobs:
       id-token: write # to get the signing certificate for the attestations
       attestations: write # to store them
     steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-        with: { persist-credentials: false }
-      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
-        with: { node-version: 26, package-manager-cache: false }
+      # This job can sign (id-token) and write attestations, so it runs no script of this repository and does not even check
+      # the repository out: it downloads the files and calls the pinned attest action. Checking the result is the next job.
       - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
         with: { name: release-files, path: release-files }
-      # Build provenance, then the SBOM, for the binaries and for the tarballs: four attestations in all.
+      # Build provenance, then the SBOM, for the binaries and for the tarballs, and build provenance for the checksum files and
+      # the two SBOMs themselves: five attestation steps in all.
       - uses: actions/attest@1e69f48acb82d1966a394da916b4c1698aa569d6 # v4.2.2
         with:
           subject-path: |
@@ -196,6 +197,33 @@ jobs:
         with:
           subject-path: release-files/hybridcloudworks-migration-*.tgz
           sbom-path: release-files/hybridcloudworks-migration-packages-${{ needs.check.outputs.version }}.cdx.json
+      # The checksum files and the two SBOMs are subjects too (review of pull request 79, F7), so the bytes of the files a
+      # consumer reads to check a download are bound to this workflow, this ref and this commit, not only checked by name and size.
+      - uses: actions/attest@1e69f48acb82d1966a394da916b4c1698aa569d6 # v4.2.2
+        with:
+          subject-path: |
+            release-files/SHA256SUMS-linux-x64.txt
+            release-files/SHA256SUMS-darwin-arm64.txt
+            release-files/SHA256SUMS-windows-x64.txt
+            release-files/amo-cli-${{ needs.check.outputs.version }}.cdx.json
+            release-files/hybridcloudworks-migration-packages-${{ needs.check.outputs.version }}.cdx.json
+
+  # Runs the repository's own verification script, so it has no signing or attestation-write permission (review of pull request
+  # 79, F6): it can only read the attestations it checks.
+  verify-attestations:
+    needs: [check, attest]
+    if: github.event_name == 'push' || inputs.attest
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      attestations: read # gh attestation verify
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with: { persist-credentials: false }
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with: { node-version: 26, package-manager-cache: false }
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with: { name: release-files, path: release-files }
       - name: Verify the attestations (provenance, then SBOM) came from this workflow, this ref and this commit
         env:
           GH_TOKEN: "${{ github.token }}"
@@ -208,7 +236,7 @@ jobs:
             --workflow .github/workflows/release-cli.yml --source-ref "$SOURCE_REF" --source-digest "$SOURCE_DIGEST"
 
   release:
-    needs: [check, inventory, attest]
+    needs: [check, inventory, attest, verify-attestations]
     if: github.event_name == 'push' && startsWith(github.ref, 'refs/tags/v')
     runs-on: ubuntu-latest
     permissions:

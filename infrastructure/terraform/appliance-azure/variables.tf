@@ -99,4 +99,8 @@ variable "app_role_assignments" {
     condition     = alltrue([for a in values(var.app_role_assignments) : contains(["Migration.Read", "Migration.Plan", "Migration.Execute", "Migration.Execute.Destructive"], a.role)])
     error_message = "Each role must be exactly Migration.Read, Migration.Plan, Migration.Execute or Migration.Execute.Destructive."
   }
+  validation {
+    condition     = alltrue([for a in values(var.app_role_assignments) : can(regex("^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$", a.principal_object_id))])
+    error_message = "Each principal_object_id must be the object ID (a GUID such as 00000000-0000-0000-0000-000000000000) of the Entra user, group or application, not its name."
+  }
 }

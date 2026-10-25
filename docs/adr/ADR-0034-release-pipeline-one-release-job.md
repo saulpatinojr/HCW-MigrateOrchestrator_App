@@ -22,8 +22,8 @@ checksum files and the two package tarballs the downstream edition pins by URL a
 
 ## Decision
 
-1. **One workflow, one ordered path, one job that touches the release.** `release-cli.yml` has seven jobs: `check`, `sea`,
-   `packages`, `inventory`, `attest`, `release`, `post-release`. Only `release` has `contents: write`. It creates the
+1. **One workflow, one ordered path, one job that touches the release.** `release-cli.yml` has eight jobs: `check`, `sea`,
+   `packages`, `inventory`, `attest`, `verify-attestations`, `release`, `post-release`. Only `release` has `contents: write`. It creates the
    release as a **draft** with every file, checks that the draft holds exactly the expected files (names, upload state, the
    sha256 GitHub reports), and only then makes it public. The draft is judged from `GET /releases/{id}`, re-read up to ten
    times while GitHub is still processing the uploads, never from the list answer; an expected asset with no sha256 digest is a
@@ -31,7 +31,7 @@ checksum files and the two package tarballs the downstream edition pins by URL a
    `scripts/release-publish.mjs`, which has tests. An existing release (draft or public) for the tag is never touched and no
    file is ever replaced (no `--clobber`).
 2. **Permissions per job, minimum scopes.** The workflow level is `contents: read`. Build jobs have nothing more. `attest`
-   has `id-token: write` and `attestations: write` (no repository write). `release` has `contents: write` and
+   has `id-token: write` and `attestations: write` (no repository write) and runs no script of this repository (it does not check the repository out); `verify-attestations` runs the repository script that checks them, with `contents: read` and `attestations: read` only (review of pull request 79, F6). `release` has `contents: write` and
    `attestations: read`. `post-release` has `contents: read` and `attestations: read`. `publish-npm.yml` has `id-token:
    write` only in its `publish` job.
 3. **Attested CycloneDX SBOMs.** `scripts/generate-sbom.mjs` (built on `npm sbom`) writes `amo-cli-<version>.cdx.json` and
@@ -39,7 +39,7 @@ checksum files and the two package tarballs the downstream edition pins by URL a
    with their React peers). `actions/attest` (v4.2.2, the newest stable at 2026-10-25, pinned by SHA) attests build
    provenance and the SBOM for each of the three binaries and each of the two tarballs.
 4. **The attestation check is bound to the tag.** `gh attestation verify` is run with `--signer-workflow`, `--signer-digest
-   <commit>`, `--source-ref refs/tags/<tag>`, `--source-digest <commit>` and `--deny-self-hosted-runners`, for provenance and SBOM, in the `attest` job and again in
+   <commit>`, `--source-ref refs/tags/<tag>`, `--source-digest <commit>` and `--deny-self-hosted-runners`, for provenance and SBOM, in the `verify-attestations` job and again in
    `release` on the downloaded files, and in `post-release` on the files downloaded from the public release. "Some
    attestation of these bytes exists" is not enough: a dry-run attestation of the same bytes must not satisfy a real release.
 5. **The tag guards each workflow.** `scripts/check-release-version.mjs` runs first in `release-cli.yml`, `publish-npm.yml` and
@@ -94,3 +94,29 @@ checksum files and the two package tarballs the downstream edition pins by URL a
 - Open owner decisions, not made here: tightening the tag ruleset's creation rule (admins can bypass it) and turning on
   immutable releases. The downstream edition checks `releases/latest` and pins by URL and hash without verifying attestations.
 - Static and local evidence only: no workflow has run. The first real exercise is the dry run on `main`, then the tag.
+
+## Addendum 2026-10-25: follow-ups F7 and F5, and the image build ([issue 83](https://github.com/saulpatinojr/HCW-MigrateOrchestrator_App/issues/83))
+
+From the independent review of the pull request that introduced this ADR (F6, the split of the verification out of the signing job,
+is described in decisions 2 and 4 above). Decided by the orchestrator under the owner's standing instruction to take the cheap,
+clearly right follow-ups; each is reversible by reverting the workflow change.
+
+- **F7, every release file is bound to the attestation.** The three checksum files and the two SBOMs were only checked by name and
+  size. A fifth `actions/attest` step makes them subjects (build provenance), and `verify-attestations` and `verify-release` now check
+  ten files: provenance and SBOM for the binaries and tarballs, provenance for the checksum files and SBOMs (15 checks in all). An SBOM
+  or checksum file that differs from what the workflow produced fails the release before it is made public. The SBOM predicate is not
+  repeated for those five files: they are metadata about the software, not software.
+- **F5, npm publishes only what was released and attested.** `publish-npm.yml` used to build its own `dist-packages` and publish those,
+  so the tarballs on npm were a second build of the same commit, never compared with the attested ones. It now has a job
+  `release-ready` (read-only) that waits for the release of the tag to be public, downloads it, runs `verify-release` (files, GitHub's
+  digests, attestations bound to `release-cli.yml`, the tag and the commit) and records the sha256 of the two tarballs; `publish`
+  (`id-token: write`, GitHub Environment `npm-publish`) downloads those tarballs, compares the sha256 again and runs
+  `npm publish <tarball> --provenance`. Consequences: npm can no longer publish after a failed release run (it waits up to 45
+  minutes, then stops), and a publish needs a person to approve the Environment, which the owner must create with required reviewers
+  (docs/release/npm-publishing.md, step 4; the trusted-publisher entry on npmjs.com names the environment `npm-publish`). The
+  registry bootstrap had not been done, so changing the entry now costs nothing. Not rehearsable: the wait for a real public release
+  and the publish itself.
+- **Appliance image: one build.** `publish-images.yml` scanned one build and pushed another. It now builds once, pushes that build by
+  digest without a tag, scans that digest, tags it with `docker buildx imagetools create`, then attests the same digest. A failed
+  scan leaves an untagged image under its digest (no tag, no attestation) that is deleted by hand; the alternative of building
+  twice with a cache still produces two images. Not exercised: the workflow is inert until `DOCKERHUB_ENABLED` is set.

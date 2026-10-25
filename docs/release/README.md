@@ -19,8 +19,9 @@ so turning it on later needs no change here).
 
 Three workflows start from the same tag and run **independently** of each other: `release-cli.yml` (this runbook),
 `publish-npm.yml` (optional, section 5) and `publish-images.yml` (the appliance image, skipped while `DOCKERHUB_ENABLED` is not
-`true`). Each runs its own version check first, but none waits for the others: npm can publish even if the release run fails, and
-the image can be pushed even if the release run fails. Look at all of them after a tag.
+`true`). Each runs its own version check first. `release-cli.yml` and `publish-images.yml` do not wait for each other (the image
+can be pushed even if the release run fails); `publish-npm.yml` does wait for the release to be public and verified, so npm never
+gets a package from a failed release run. Look at all of them after a tag.
 
 ## 1. What a release contains
 
@@ -34,7 +35,7 @@ Ten files, nothing more. The workflow refuses to publish if one is missing, extr
 | `amo-cli-<version>.cdx.json` | The SBOM (software bill of materials: the list of what is inside) of the command-line tool, in CycloneDX format |
 | `hybridcloudworks-migration-packages-<version>.cdx.json` | The SBOM of the two packages, as a consumer installs them |
 
-Each of the three binaries and the two tarballs also has two signed attestations stored with GitHub (a statement, signed by
+Each of the three binaries and the two tarballs also has two signed attestations (build provenance and SBOM), and each checksum file and SBOM has one (build provenance), stored with GitHub (a statement, signed by
 GitHub, that "this file was built by this workflow from this commit"): one for how it was built and one for its SBOM.
 [About artifact attestations](https://docs.github.com/actions/security-for-github-actions/using-artifact-attestations/using-artifact-attestations-to-establish-provenance-for-builds).
 
@@ -74,9 +75,9 @@ These happen only on a real tag, so the first real tag is also their first test.
 
 | Not rehearsed | Why | What to look at on the first real tag |
 |---|---|---|
-| The tag run itself starting, and the tag-only jobs `release` and `post-release` | A manual run is not a tag push, and those jobs are tag-only on purpose | The run lists seven jobs, all green |
+| The tag run itself starting, and the tag-only jobs `release` and `post-release` | A manual run is not a tag push, and those jobs are tag-only on purpose | The run lists eight jobs, all green |
 | Creating the draft release, uploading ten files, making it public | Needs `contents: write` and a real tag; a manual run must never have that | The release page lists exactly the ten files |
-| The attestation check bound to `refs/tags/<tag>` | The dry run, even with "attest" ticked, is bound to `refs/heads/main` | `attest` and `release` jobs are green |
+| The attestation check bound to `refs/tags/<tag>` | The dry run, even with "attest" ticked, is bound to `refs/heads/main` | `attest`, `verify-attestations` and `release` jobs are green |
 | The released tarballs passing `packages:verify` | They exist only after publication | `post-release` is green |
 | `gh` flags on the real runner (`release create --draft --verify-tag`, `attestation verify --signer-workflow --signer-digest --source-ref --source-digest --deny-self-hosted-runners`) | They were run against a fake in the tests | No error annotation in `release` |
 | GitHub's rule that a `GITHUB_TOKEN` cannot create or modify a release whose commit changes files under `.github/workflows` compared with `main` ([REST docs, releases](https://docs.github.com/en/rest/releases/releases)) | Only a real `release` job tries to create a release. `check` refuses a tag on a commit that is not the tip of `main` unless `.github/workflows` is identical to the tip's, which is proven by tests on a scratch git repository, not by GitHub | `release` creates the draft without an authorisation error |
@@ -132,7 +133,7 @@ These happen only on a real tag, so the first real tag is also their first test.
    ```
 
 4. **Watch the tag run** in [Actions](https://github.com/saulpatinojr/HCW-MigrateOrchestrator_App/actions/workflows/release-cli.yml).
-   When all seven jobs are green, open the [release page](https://github.com/saulpatinojr/HCW-MigrateOrchestrator_App/releases) and
+   When all eight jobs are green, open the [release page](https://github.com/saulpatinojr/HCW-MigrateOrchestrator_App/releases) and
    check it lists the ten files from section 1.
 5. **Verify one download yourself** (optional but quick), with the same strict flags the pipeline uses. After downloading
    `hybridcloudworks-migration-core-<version>.tgz` from the release page into the current folder, bash:
@@ -183,10 +184,16 @@ Never delete a release asset and upload a replacement: the workflow never replac
 
 `publish-npm.yml` publishes the two packages to the npm registry on a tag, using trusted publishing (no token anywhere), when the
 repository variable `NPM_TRUSTED_PUBLISHING` is `ready`. It runs the same version check first, uses the npm that ships with
-Node 26 (and stops if that is older than 11.5.1), runs the clean-consumer gate, and publishes exactly the packages it gated. Its
+Node 26 (and stops if that is older than 11.5.1), rehearses the build and the clean-consumer gate, then **waits for the GitHub
+Release of the tag to be public**, downloads it and verifies every file's digest and attestation (job `release-ready`), and publishes
+**the released tarballs themselves** (job `publish`), after comparing their sha256 again. So what reaches npm is what the release
+carries and what was attested, and a failed release run publishes nothing. The `publish` job runs in the GitHub Environment
+`npm-publish`; **create it with required reviewers before arming the workflow** (steps in [`npm-publishing.md`](npm-publishing.md),
+step 4: Settings, Environments, New environment, name `npm-publish`, tick Required reviewers, add yourself): without that setup the
+environment is created empty on first use and nobody has to approve. Its
 dry run is Run workflow on `main`: it stops after the gate and publishes nothing. Setup: [`npm-publishing.md`](npm-publishing.md).
-Not rehearsable: the publish itself, and that the registry accepts the OIDC token. It starts from the same tag as the release run but
-does not wait for it (see the top of this page), and a bad publish cannot be undone: a version can never be published again.
+Not rehearsable: the wait for a real public release, the publish itself, and that the registry accepts the OIDC token. It starts from
+the same tag as the release run (see the top of this page), and a bad publish cannot be undone: a version can never be published again.
 Mark it instead, from a trusted machine and an owner login (never a stored token), then ship the next version. The version below is
 an example; use the one that was published:
 

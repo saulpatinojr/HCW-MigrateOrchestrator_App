@@ -365,3 +365,25 @@ run "api_ingress_allows_only_the_named_ranges_when_set" {
     error_message = "Named client ranges must become Allow rules on the container app ingress (the control that limits the public path)."
   }
 }
+
+run "a_principal_object_id_that_is_not_a_guid_is_refused" {
+  command = plan
+
+  variables {
+    app_role_assignments = {
+      me = { principal_object_id = "not-a-guid", role = "Migration.Read" }
+    }
+  }
+
+  expect_failures = [var.app_role_assignments]
+}
+
+run "a_guid_in_upper_case_is_accepted" {
+  command = plan
+
+  variables {
+    app_role_assignments = {
+      me = { principal_object_id = "AAAAAAAA-BBBB-4CCC-8DDD-EEEEEEEEEEEE", role = "Migration.Read" }
+    }
+  }
+}

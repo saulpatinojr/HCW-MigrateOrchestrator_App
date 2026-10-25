@@ -11,8 +11,11 @@ services:
       AMO_DISCOVERY_FIXTURE: "${AMO_DISCOVERY_FIXTURE:-0}"
       AMO_ENTRA_AUDIENCE: "${AMO_ENTRA_AUDIENCE:-}"
       AMO_ALLOWED_ORIGINS: "${AMO_ALLOWED_ORIGINS:-}"
+      # Refuses a request whose Host name is not one of these (DNS rebinding). Change it if you publish another port.
+      AMO_ALLOWED_HOSTS: "${AMO_ALLOWED_HOSTS:-localhost:8081,127.0.0.1:8081,[::1]:8081}"
       DATABASE_URL: "postgres://amo@postgres:5432/amo?sslmode=disable"
-    ports: ["8081:8081"]
+    # Bound to this machine only: the local database below trusts every connection, so the API must not be reachable from the network.
+    ports: ["127.0.0.1:8081:8081"]
     depends_on: [postgres]
     security_opt: ["no-new-privileges:true"]
     cap_drop: ["ALL"]
