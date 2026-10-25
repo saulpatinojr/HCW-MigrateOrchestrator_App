@@ -82,9 +82,9 @@ run_terraform() {
     --entrypoint sh "$TERRAFORM_IMAGE" -c "
       set -e
       cp -R /work/$TF_DIR /scratch/tf && cd /scratch/tf
-      rm -rf .terraform .terraform.lock.hcl
+      rm -rf .terraform
       terraform fmt -check -recursive -diff
-      terraform init -backend=false -input=false
+      terraform init -backend=false -input=false -lockfile=readonly
       terraform validate -no-color
       terraform test -no-color
     " || code=$?

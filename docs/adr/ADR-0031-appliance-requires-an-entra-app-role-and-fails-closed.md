@@ -31,17 +31,38 @@ Both layers, because each covers a failure of the other:
 
    No role, an empty `roles` claim, a role the API does not know, a `roles` claim that is not an array of strings, or a
    missing object id gives no principal, and every protected route answers **403 `forbidden`** before any route logic runs.
-   There is no default level. The lowest role is `Migration.Plan`, which is what the old "discovery" user effectively needed
-   (the web UI and `POST /api/assessments` already required discovery; `validate-move` needed validation). The public routes
-   `/api/health` and `/api/agents` are unchanged. A token that fails validation is still 401.
+   There is no default level. The lowest role is `Migration.Plan`. It is **wider** than what an old role-less "discovery"
+   user had: `planning` also covers validation and artifact generation (for example `validate-move` evidence), which the
+   `discovery` level did not. There is no role below it, so nobody can be given discovery only; whether to add one is
+   listed under "Alternatives considered". The public routes `/api/health` and `/api/agents` are unchanged. A token that
+   fails validation is still 401.
 2. **Entra enforces assignment.** Terraform creates `azuread_service_principal.api` with
    `app_role_assignment_required = true`, so Entra issues a token for the API only to users, groups and applications that
    hold an assigned app role. Assignments are made in the Entra portal (steps in `docs/deployment/enterprise.md`) or
    declaratively with the optional variable `app_role_assignments`, which is empty by default and validated against the
    three roles. Outputs print the enterprise application's object ID and the role IDs.
 
-The azuread provider stays pinned to `~> 3.0` (and azurerm to `~> 4.0`) in `required_providers`; `.terraform.lock.hcl` is not
-committed in this repository and this change does not start doing so.
+The service principal sets `use_existing = true`, so an enterprise application that already exists for the registration (for
+example one created by the portal) is adopted instead of stopping the apply with an import error; the alternative is
+`terraform import azuread_service_principal.api <object id>` before the first apply. It also has
+`lifecycle { prevent_destroy = true }`, because destroying it deletes every role assignment made on it (`terraform destroy`
+of the whole configuration therefore stops, on purpose).
+
+**Provider pinning.** The providers are constrained in `required_providers` (`azuread ~> 3.0`, `azurerm ~> 4.0`) and the
+dependency lock file `infrastructure/terraform/appliance-azure/.terraform.lock.hcl` is now **committed**, with checksums for
+linux (amd64, arm64), macOS (amd64, arm64) and Windows (amd64). I chose to commit it because a constraint alone lets every CI
+run and every administrator pick up a different minor version of a provider that can create and grant roles, and the lock file
+pins the exact version and its checksums, which `terraform init -lockfile=readonly` (now used by `iac-validate` and
+`scripts/ci/local-iac-checks.sh`) verifies. The cost is one more file to keep current: a Dependabot `terraform` entry proposes
+the bumps. Locked versions at the time of writing: azuread 3.10.0, azurerm 4.81.0.
+
+**Who can apply role assignments.** Creating `azuread_app_role_assignment` needs, in Microsoft Graph application permissions,
+`AppRoleAssignment.ReadWrite.All` and `Application.Read.All` (or the Application Administrator directory role, or Privileged
+Role Administrator and similar) for the identity that runs Terraform
+([provider docs](https://registry.terraform.io/providers/hashicorp/azuread/latest/docs/resources/app_role_assignment)).
+**A pipeline that holds that permission can grant itself, or anyone, `Migration.Execute.Destructive`.** For production,
+assign roles by hand in the Entra portal, by a person who is not the pipeline identity, and leave `app_role_assignments` empty
+in the pipeline. Use the variable for a lab or for your own first assignment.
 
 ## Alternatives considered
 
@@ -61,7 +82,7 @@ committed in this repository and this change does not start doing so.
 - A person who could sign in before and had no role now gets 403 until an administrator assigns a role. The web UI shows the
   API's message ("no application role assigned"). **After the first deployment of this change, assign yourself a role** or
   nobody can use the appliance.
-- Role changes reach a user at their next sign-in, because the role is in the token.
+- A new role reaches a user at their next sign-in, because the role is in the token. **Removing a role does not take effect at once:** the API only reads the token, there is no revocation, so a person whose role was removed keeps access until their existing access token expires (the tenant default lifetime is about an hour to an hour and a half, per Microsoft Learn; not measured here). To cut someone off sooner, remove the role and also revoke their sessions in Entra; the API does not check anything beyond the token.
 - Applications (workload identities) can be assigned the roles too, since the roles allow `Application` members.
 - `/api/me` also answers 403 for a roleless token and discloses no level.
 - The role check logs a warning with the caller's object id; it writes no audit event, so a flood of roleless calls cannot
@@ -71,3 +92,22 @@ committed in this repository and this change does not start doing so.
   checks run in `iac-validate` (`terraform test`, mocked providers).
 - **Not verified:** behaviour against a real tenant, that the `roles` claim appears in a real access token for an assigned
   user, and Entra's refusal to issue a token to an unassigned user. Recorded in `VALIDATION.md`.
+
+## Rollback and lock-out
+
+- **Lock-out at apply time.** Turning `app_role_assignment_required` on (or adopting an existing enterprise application that had
+  it off) means everyone who is not assigned a role is refused by Entra from that moment, **including you**. Put your own
+  role in `app_role_assignments` in the same apply (the command is in `docs/deployment/enterprise.md`), or assign yourself in the
+  portal immediately after, before anyone needs the appliance.
+- **Entra setting.** To roll back the Entra half, set `app_role_assignment_required = false` and apply; do **not** remove the
+  `azuread_service_principal` resource, because destroying it deletes the role assignments (hence `prevent_destroy`). The API
+  still answers 403 to a token without a role, which is the intended safe state.
+- **API.** Deploy the previous image digest (`image_ref`). The previous image maps a role-less token to the `discovery` level
+  again, so rolling back the API alone re-opens the gap this ADR closes; roll back only for an outage, and say so in the ticket.
+- **Terraform tests and lock file.** Reverting the lock file reverts the provider versions; run `terraform init` again.
+
+## Unverified, stated plainly
+
+- Entra refusing the sign-in of an unassigned user (and an unassigned application's token request) once assignment is required
+  is Microsoft's documented behaviour and is **unverified live** here; the web page maps `AADSTS50105` on the strength of
+  that documentation and a unit test of the message, not a real redirect.

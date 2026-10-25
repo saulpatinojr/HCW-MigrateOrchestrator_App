@@ -44,11 +44,17 @@ variable "tags" {
 }
 variable "ingress_allowed_source_prefixes" {
   type        = list(string)
-  description = "Who may reach the API over HTTPS (port 443) through the Container Apps subnet firewall: the single value \"Internet\" (the default; the API is public, and every request still needs an Entra token that carries an app role, ADR-0031), or a list of IPv4 CIDR ranges such as your office or VPN addresses, which is stricter. A service tag cannot be mixed with ranges."
+  description = "Who may reach the API over HTTPS (port 443) through the Container Apps subnet firewall: the single value \"Internet\" (the default; the API is public, and every request still needs an Entra token that carries an app role, ADR-0031), or a list of IPv4 CIDR ranges in their network form (for example 203.0.113.0/24 or 198.51.100.7/32, not 203.0.113.7/24) such as your office or VPN addresses, which is stricter. IPv6, 0.0.0.0/0 and a tag mixed with ranges are refused. Provisional until the Container Apps environment type is decided (ADR-0032)."
   default     = ["Internet"]
   validation {
-    condition     = length(var.ingress_allowed_source_prefixes) > 0 && ((length(var.ingress_allowed_source_prefixes) == 1 && try(var.ingress_allowed_source_prefixes[0], "") == "Internet") || alltrue([for p in var.ingress_allowed_source_prefixes : can(cidrhost(p, 0))]))
-    error_message = "ingress_allowed_source_prefixes must be exactly [\"Internet\"] or a non-empty list of CIDR ranges such as \"203.0.113.0/24\". Do not mix \"Internet\" with ranges, and do not use \"*\"."
+    condition = length(var.ingress_allowed_source_prefixes) > 0 && (
+      (length(var.ingress_allowed_source_prefixes) == 1 && try(var.ingress_allowed_source_prefixes[0], "") == "Internet") ||
+      alltrue([
+        for p in var.ingress_allowed_source_prefixes :
+        try(can(regex("^((25[0-5]|2[0-4][0-9]|1[0-9]{2}|[1-9]?[0-9])[.]){3}(25[0-5]|2[0-4][0-9]|1[0-9]{2}|[1-9]?[0-9])/(3[0-2]|[12]?[0-9])$", p)) && cidrhost(p, 0) == split("/", p)[0] && split("/", p)[1] != "0", false)
+      ])
+    )
+    error_message = "ingress_allowed_source_prefixes must be exactly [\"Internet\"] or a non-empty list of IPv4 ranges in network form, such as \"203.0.113.0/24\". Host bits must be zero (203.0.113.7/24 is refused; write 203.0.113.0/24 or 203.0.113.7/32), IPv6 and 0.0.0.0/0 are refused (use \"Internet\" for everyone), and \"Internet\" cannot be mixed with ranges."
   }
 }
 variable "postgres_geo_redundant_backup_enabled" {

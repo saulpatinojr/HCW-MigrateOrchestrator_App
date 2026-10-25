@@ -20,6 +20,9 @@ locals {
   # Subnet ranges, shared by the subnets and by the network security group rules that name them (ADR-0032).
   aca_subnet_cidr = cidrsubnet(var.vnet_cidr, 4, 0)
   db_subnet_cidr  = cidrsubnet(var.vnet_cidr, 4, 1)
+
+  # True when ingress_allowed_source_prefixes is exactly the tag "Internet"; the rule then uses source_address_prefix.
+  ingress_from_tag = length(var.ingress_allowed_source_prefixes) == 1 && try(var.ingress_allowed_source_prefixes[0], "") == "Internet"
 }
 
 resource "azurerm_resource_group" "app" {
@@ -105,6 +108,12 @@ resource "azurerm_subnet" "db" {
 
 # Container Apps subnet. Rules follow "Network security groups for configuring a virtual network in Azure Container Apps"
 # for a consumption-only environment (the type this configuration creates: it has no workload_profile block).
+#
+# PROVISIONAL, NOT VALIDATED (ADR-0032): this group has never been applied, and the environment it protects is not a
+# valid design as written. A consumption-only environment needs a subnet of at least /23 that is NOT delegated, while
+# snet-aca is a /26 delegated to Microsoft.App/environments; and Microsoft documents that locking down inbound traffic
+# with an NSG is not supported for an external workload-profile environment. Which environment type to use is an open
+# owner decision (ADR-0032). The db group below is not affected.
 resource "azurerm_network_security_group" "aca" {
   name                = "nsg-${local.name}-aca"
   location            = var.location
@@ -117,16 +126,18 @@ resource "azurerm_network_security_group" "aca" {
 # valid Microsoft Entra token that carries an app role (ADR-0031). Restrict it with var.ingress_allowed_source_prefixes.
 #trivy:ignore:AVD-AZU-0047
 resource "azurerm_network_security_rule" "aca_allow_https_from_clients" {
-  name                         = "allow-https-from-clients"
-  description                  = "HTTPS to the API from var.ingress_allowed_source_prefixes. Port 80 is deliberately closed so no bearer token goes in clear text."
-  network_security_group_name  = azurerm_network_security_group.aca.name
-  resource_group_name          = azurerm_resource_group.app.name
-  priority                     = 100
-  direction                    = "Inbound"
-  access                       = "Allow"
-  protocol                     = "Tcp"
-  source_port_range            = "*"
-  source_address_prefixes      = var.ingress_allowed_source_prefixes
+  name                        = "allow-https-from-clients"
+  description                 = "HTTPS to the API from var.ingress_allowed_source_prefixes. Port 80 is deliberately closed so no bearer token goes in clear text."
+  network_security_group_name = azurerm_network_security_group.aca.name
+  resource_group_name         = azurerm_resource_group.app.name
+  priority                    = 100
+  direction                   = "Inbound"
+  access                      = "Allow"
+  protocol                    = "Tcp"
+  source_port_range           = "*"
+  # A service tag goes in the singular argument; the plural one accepts ranges only (azurerm docs).
+  source_address_prefix        = local.ingress_from_tag ? "Internet" : null
+  source_address_prefixes      = local.ingress_from_tag ? null : var.ingress_allowed_source_prefixes
   destination_address_prefixes = [local.aca_subnet_cidr]
   destination_port_range       = "443"
 }
@@ -404,6 +415,15 @@ resource "azuread_application" "api" {
 resource "azuread_service_principal" "api" {
   client_id                    = azuread_application.api.client_id
   app_role_assignment_required = true
+  # Adopt a service principal that already exists for this application (for example one created by the portal) instead of
+  # failing; without it, apply stops with an import error. See "Rollback" in ADR-0031.
+  use_existing = true
+
+  # Roll back by setting app_role_assignment_required = false, never by removing this resource: destroying the enterprise
+  # application deletes every role assignment made on it.
+  lifecycle {
+    prevent_destroy = true
+  }
 }
 
 # Optional, declarative role assignments (var.app_role_assignments, empty by default). Anyone not listed there is assigned

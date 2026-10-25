@@ -37,6 +37,8 @@ test("the Entra enterprise application requires an assigned app role", () => {
   const sp = block(main, "resource", "azuread_service_principal", "api");
   assert.equal(attr(sp, "app_role_assignment_required"), "true", "app_role_assignment_required must be true");
   assert.equal(attr(sp, "client_id"), "azuread_application.api.client_id", "the service principal must belong to the API registration");
+  assert.equal(attr(sp, "use_existing"), "true", "an existing service principal must be adopted, not fail the apply");
+  assert.ok(sp.replace(/\s+/g, " ").includes("lifecycle { prevent_destroy = true }"), "destroying the enterprise application deletes every role assignment");
 });
 
 test("the app roles in Terraform and the roles the API recognises are the same set, and none maps below planning", () => {
@@ -96,7 +98,11 @@ test("allow rules are the minimum: HTTPS and probes in, PostgreSQL only from the
   assert.deepEqual(allowed, ["aca_allow_https_from_clients", "aca_allow_load_balancer_probes", "aca_allow_subnet_internal", "db_allow_postgres_from_aca", "db_allow_postgres_within_subnet"]);
   const https = rule("aca_allow_https_from_clients");
   assert.equal(attr(https, "destination_port_range"), '"443"', "only 443 is opened; port 80 stays closed");
-  assert.equal(attr(https, "source_address_prefixes"), "var.ingress_allowed_source_prefixes");
+  // A service tag is only accepted in the singular argument (azurerm docs: the plural one "may not" use tags), so the rule
+  // switches between the two and nulls the other.
+  assert.equal(attr(https, "source_address_prefix"), 'local.ingress_from_tag ? "Internet" : null');
+  assert.equal(attr(https, "source_address_prefixes"), "local.ingress_from_tag ? null : var.ingress_allowed_source_prefixes");
+  assert.ok(main.includes('ingress_from_tag = length(var.ingress_allowed_source_prefixes) == 1 && try(var.ingress_allowed_source_prefixes[0], "") == "Internet"'));
   assert.equal(attr(rule("aca_allow_load_balancer_probes"), "source_address_prefix"), '"AzureLoadBalancer"');
   const pg = rule("db_allow_postgres_from_aca");
   assert.equal(attr(pg, "destination_port_range"), '"5432"');
@@ -128,6 +134,9 @@ test("the ingress source variable defaults to Internet and refuses wildcards and
   const v = block(variables, "variable", "ingress_allowed_source_prefixes");
   assert.equal(attr(v, "default"), '["Internet"]');
   assert.match(v, /cidrhost/);
+  assert.ok(v.includes('split("/", p)[1] != "0"'), "0.0.0.0/0 must be refused (use the Internet tag)");
+  assert.ok(v.includes("25[0-5]|2[0-4][0-9]"), "an IPv4-only pattern is required");
+  assert.ok(v.includes('cidrhost(p, 0) == split("/", p)[0]'), "ranges must be in network form");
   assert.match(v, /"Internet"/);
 });
 
@@ -136,6 +145,11 @@ test("geo-redundant backup is opt-in, defaults off, and is the only thing the fl
   assert.equal(attr(v, "default"), "false");
   assert.match(v, /DESTROY and recreate/, "the variable must warn that switching it on later recreates the database");
   assert.equal(attr(block(main, "resource", "azurerm_postgresql_flexible_server", "db"), "geo_redundant_backup_enabled"), "var.postgres_geo_redundant_backup_enabled");
+});
+
+test("the aca firewall is marked provisional where it is defined", () => {
+  const at = main.indexOf('resource "azurerm_network_security_group" "aca"');
+  assert.match(main.slice(Math.max(0, at - 1200), at), /PROVISIONAL, NOT VALIDATED/);
 });
 
 test("providers stay pinned to a major version and the database stays private", () => {

@@ -24,6 +24,11 @@ run "enterprise_application_requires_an_app_role" {
   }
 
   assert {
+    condition     = azuread_service_principal.api.use_existing == true
+    error_message = "The service principal must adopt an existing one (use_existing = true) instead of failing on an import error."
+  }
+
+  assert {
     condition     = length(azuread_app_role_assignment.api) == 0
     error_message = "No role is assigned unless var.app_role_assignments says so."
   }
@@ -65,8 +70,8 @@ run "aca_subnet_firewall_denies_by_default_and_allows_only_https_probes_and_itse
   }
 
   assert {
-    condition     = azurerm_network_security_rule.aca_allow_https_from_clients.destination_port_range == "443" && azurerm_network_security_rule.aca_allow_https_from_clients.protocol == "Tcp" && azurerm_network_security_rule.aca_allow_https_from_clients.access == "Allow" && azurerm_network_security_rule.aca_allow_https_from_clients.source_address_prefixes == toset(["Internet"]) && azurerm_network_security_rule.aca_allow_https_from_clients.destination_address_prefixes == toset([cidrsubnet("10.60.0.0/22", 4, 0)])
-    error_message = "Ingress must be TCP 443 to the Container Apps subnet from the default source (Internet) only."
+    condition     = azurerm_network_security_rule.aca_allow_https_from_clients.destination_port_range == "443" && azurerm_network_security_rule.aca_allow_https_from_clients.protocol == "Tcp" && azurerm_network_security_rule.aca_allow_https_from_clients.access == "Allow" && azurerm_network_security_rule.aca_allow_https_from_clients.source_address_prefix == "Internet" && azurerm_network_security_rule.aca_allow_https_from_clients.source_address_prefixes == null && azurerm_network_security_rule.aca_allow_https_from_clients.destination_address_prefixes == toset([cidrsubnet("10.60.0.0/22", 4, 0)])
+    error_message = "Ingress must be TCP 443 to the Container Apps subnet from the default source (the Internet tag, in the singular source_address_prefix, because the plural argument does not accept tags)."
   }
 
   assert {
@@ -125,8 +130,8 @@ run "ingress_can_be_limited_to_named_ranges" {
   }
 
   assert {
-    condition     = azurerm_network_security_rule.aca_allow_https_from_clients.source_address_prefixes == toset(["203.0.113.0/24", "198.51.100.7/32"])
-    error_message = "Named client ranges must replace Internet in the ingress rule."
+    condition     = azurerm_network_security_rule.aca_allow_https_from_clients.source_address_prefixes == toset(["203.0.113.0/24", "198.51.100.7/32"]) && azurerm_network_security_rule.aca_allow_https_from_clients.source_address_prefix == null
+    error_message = "Named client ranges must replace Internet in the plural source_address_prefixes and leave the singular one unset."
   }
 }
 
@@ -155,6 +160,46 @@ run "ingress_refuses_internet_mixed_with_ranges" {
 
   variables {
     ingress_allowed_source_prefixes = ["Internet", "203.0.113.0/24"]
+  }
+
+  expect_failures = [var.ingress_allowed_source_prefixes]
+}
+
+run "ingress_refuses_a_range_with_host_bits_set" {
+  command = plan
+
+  variables {
+    ingress_allowed_source_prefixes = ["203.0.113.7/24"]
+  }
+
+  expect_failures = [var.ingress_allowed_source_prefixes]
+}
+
+run "ingress_refuses_ipv6" {
+  command = plan
+
+  variables {
+    ingress_allowed_source_prefixes = ["2001:db8::/32"]
+  }
+
+  expect_failures = [var.ingress_allowed_source_prefixes]
+}
+
+run "ingress_refuses_the_whole_internet_as_a_range" {
+  command = plan
+
+  variables {
+    ingress_allowed_source_prefixes = ["0.0.0.0/0"]
+  }
+
+  expect_failures = [var.ingress_allowed_source_prefixes]
+}
+
+run "ingress_refuses_malformed_ranges" {
+  command = plan
+
+  variables {
+    ingress_allowed_source_prefixes = ["203.0.113.0/33", "010.0.0.0/8", "203.0.113.0", "Internet "]
   }
 
   expect_failures = [var.ingress_allowed_source_prefixes]

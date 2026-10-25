@@ -51,9 +51,21 @@ no "signed in, no role" level (ADR-0031).
 | `Migration.Execute.Destructive` | destructive-execution | + commit (approval `data-cutover`), source deletion workflows (future) |
 
 Two layers enforce this. Terraform sets `app_role_assignment_required = true` on the enterprise application, so Entra
-itself issues no token to anyone who is not assigned a role (Entra refuses the sign-in of an unassigned user,
-and an unassigned application cannot get a token). The API checks the role again in every token, so a token obtained some other way, or an environment where
-the setting was switched off, still gets 403.
+itself should issue no token to anyone who is not assigned a role (Microsoft documents that Entra refuses the sign-in of an
+unassigned user and a token request from an unassigned application; **this has not been verified live here**). The API checks
+the role again in every token, so a token obtained some other way, or an environment where the setting was switched off,
+still gets 403.
+
+**Before you apply: this locks out everyone who has no role, including you.** Enabling "assignment required" (or adopting an
+enterprise application that had it off) takes effect at apply time. Put your own role in `app_role_assignments` in the **same**
+apply (see "Assign roles with Terraform instead" below), or be ready to assign yourself in the Entra portal straight away.
+
+Taking a role away does **not** cut a person off at once. The API only reads the access token, there is no revocation, so
+they keep access until the token they already hold expires (by default about an hour to an hour and a half, per Microsoft
+Learn). To cut someone off sooner, remove the role and revoke their sessions in Entra.
+
+If a person is refused at sign-in because they have no role, the sign-in page of the appliance web now says so and tells them
+to ask an administrator (Entra error code `AADSTS50105`; unverified against a real redirect).
 
 ### Assign a role to a person
 
@@ -92,6 +104,20 @@ Each entry is a label you choose, the person's (or group's, or application's) ob
 Removing an entry removes that assignment on the next apply. A role assigned in the portal and also listed here is
 reported as already existing: keep each person in one place.
 
+**Who may run this, and why production should not.** The identity that runs `terraform apply` needs permission to assign app
+roles: in Microsoft Graph application permissions `AppRoleAssignment.ReadWrite.All` and `Application.Read.All`, or the
+Application Administrator directory role
+([provider documentation](https://registry.terraform.io/providers/hashicorp/azuread/latest/docs/resources/app_role_assignment)).
+**A pipeline that holds that permission can give itself, or anyone, `Migration.Execute.Destructive`.** For production, leave
+`app_role_assignments` empty in the pipeline and assign roles by hand in the portal (steps above), by a person who is not the
+pipeline identity. Use the variable for a lab, or for your own first assignment.
+
+**Provider versions.** `.terraform.lock.hcl` in `infrastructure/terraform/appliance-azure` is committed on purpose: it pins the
+exact `azuread` and `azurerm` versions and their checksums, so every administrator and the CI job use the same providers
+(`terraform init` uses it as is; the CI job runs `init -lockfile=readonly` and fails if it would change). Dependabot proposes
+provider bumps as pull requests that update it. To move a provider yourself, run `terraform init -upgrade` and commit the
+changed lock file. If `init` tells you the lock file does not match, do not delete it; ask why it changed.
+
 Tokens: authorization-code flow with PKCE in the client; the API validates audience `api://` followed by the API registration's Application (client) ID against the tenant
 JWKS. Credentials for Azure calls: managed identity in Container Apps (`AMO_CREDENTIAL_KIND=managed-identity`), workload
 identity federation in CI, Azure CLI for local development. `AMO_*SECRET` / `AZURE_*SECRET` variables abort startup.
@@ -114,17 +140,29 @@ operations recorded by the API and auditing their completion (ADR-0026). Locally
 The two subnets each have a network security group (a firewall for a subnet) with a deny-all-inbound rule at the end, so
 only the traffic below gets in (ADR-0032). Outbound traffic is left at Azure's defaults.
 
+> **Provisional, not validated: the Container Apps group (`snet-aca`).** The database group is a sound design. The
+> Container Apps group is written for a consumption-only Container Apps environment, and that environment as configured is
+> not valid: Microsoft says a consumption-only environment needs a subnet of at least /23 that is **not delegated**, while
+> `snet-aca` is a /26 delegated to `Microsoft.App/environments`. Microsoft also says locking down inbound traffic with an NSG
+> is **not supported** for an external workload-profile environment, the other type. Which environment type to use is an open
+> decision for the owner, with both options and what each changes written up in ADR-0032 ("Open question"). Until it is
+> decided, expect the first real apply of the environment to need changes, and do not rely on this group to protect the API.
+
 | Subnet | Allowed in | Everything else |
 |---|---|---|
 | Container Apps (`snet-aca`) | HTTPS (443) from `ingress_allowed_source_prefixes`; the Azure Load Balancer health probes; the subnet's own addresses | denied, including the database subnet |
 | Database (`snet-db`) | PostgreSQL (5432) from the Container Apps subnet; 5432 inside the database subnet (PostgreSQL features such as high availability need it) | denied |
 
 - **Port 80 is closed on purpose.** A browser or script that calls `http://` instead of `https://` fails to connect; it is
-  never redirected, so a sign-in token cannot be sent in clear text by mistake.
+  never redirected, so a sign-in token cannot be sent in clear text by mistake. This is unverified: Microsoft's list of
+  rules for a consumption-only environment names ports 80 and 443, and I did not test that 443 alone is enough. The same page
+  has a row allowing client addresses to the environment's static IP, which I left out because for an external environment
+  that address is not in the subnet; that is also unverified.
 - **Who can reach the API.** `ingress_allowed_source_prefixes` defaults to `["Internet"]`, because the API is public and
   every call still needs a token with an app role. To allow only your office or VPN, set it to a list of ranges in
-  `terraform.tfvars`, for example `ingress_allowed_source_prefixes = ["203.0.113.0/24"]`. The value `"Internet"` cannot be
-  mixed with ranges.
+  `terraform.tfvars`, for example `ingress_allowed_source_prefixes = ["203.0.113.0/24"]`. Ranges must be IPv4 in their
+  network form (`203.0.113.0/24` or `198.51.100.7/32`, not `203.0.113.7/24`); IPv6, `0.0.0.0/0` and `"Internet"` mixed with
+  ranges are refused. Like the rest of the Container Apps group, this is provisional (see the box above).
 - **Geo-redundant database backup is off.** `postgres_geo_redundant_backup_enabled = true` keeps a second copy of the
   backups in the paired Azure region. It costs money (backup storage is billed for twice the backup size beyond the free
   allowance, see [Backup and restore](https://learn.microsoft.com/azure/postgresql/backup-restore/concepts-backup-restore))
