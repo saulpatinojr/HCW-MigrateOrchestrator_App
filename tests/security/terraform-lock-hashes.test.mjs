@@ -23,7 +23,9 @@ const PLATFORMS = 5;
 export function h1CountsByProvider(text) {
   const counts = {};
   for (const m of text.matchAll(/^provider "([^"]+)" \{\n([\s\S]*?)^\}/gm)) {
-    counts[m[1]] = new Set([...m[2].matchAll(/"(h1:[A-Za-z0-9+/=]+)"/g)].map((h) => h[1])).size;
+    // Comment lines (# or //) do not count: a commented-out checksum protects nobody.
+    const active = m[2].split("\n").filter((l) => !/^\s*(#|\/\/)/.test(l)).join("\n");
+    counts[m[1]] = new Set([...active.matchAll(/"(h1:[A-Za-z0-9+/=]+)"/g)].map((h) => h[1])).size;
   }
   return counts;
 }
@@ -39,4 +41,11 @@ test("every provider in the committed lock file has a checksum for each of the f
 test("the checker notices a lock file that kept only one platform", () => {
   const regenerated = 'provider "registry.terraform.io/hashicorp/azurerm" {\n  version = "4.1.0"\n  hashes = [\n    "h1:AAAA=",\n    "zh:BBBB",\n  ]\n}\n';
   assert.deepEqual(h1CountsByProvider(regenerated), { "registry.terraform.io/hashicorp/azurerm": 1 });
+});
+
+test("commented-out checksums are not counted", () => {
+  const lines = ['provider "registry.terraform.io/hashicorp/azurerm" {', '  version = "4.1.0"', "  hashes = [", '    "h1:AAAA=",'];
+  for (const c of ["B", "C", "D", "E"]) lines.push(`    # "h1:${c}${c}${c}=",`, `    // "h1:${c}${c}${c}${c}=",`);
+  lines.push("  ]", "}", "");
+  assert.deepEqual(h1CountsByProvider(lines.join("\n")), { "registry.terraform.io/hashicorp/azurerm": 1 });
 });
