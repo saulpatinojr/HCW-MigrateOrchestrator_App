@@ -27,7 +27,7 @@ variable "postgres_sku" {
 }
 variable "image_ref" {
   type        = string
-  description = "The appliance image, always by immutable digest (docker.io/hybridcloudworks/hcw-migrateorchestrator@sha256:...), as printed at the end of the publish-images run summary. A tag such as :latest can change under a running deployment, so it is refused."
+  description = "The appliance image, always by immutable digest (docker.io/hybridcloudworks/img-mo-appliance-app@sha256:...), as printed at the end of the publish-images run summary. A tag such as :latest can change under a running deployment, so it is refused."
   validation {
     condition     = can(regex("^[^@[:space:]]+@sha256:[0-9a-f]{64}$", var.image_ref))
     error_message = "image_ref must be an image reference with an exact digest, in the form registry/name@sha256:<64 hexadecimal characters>. Tags such as :latest are not accepted. Copy the reference from the end of the publish-images run summary."

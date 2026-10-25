@@ -8,7 +8,7 @@
 [![node](https://img.shields.io/badge/node-%3E%3D26-339933?logo=node.js&logoColor=white)](docs/adr/ADR-0029-node-26-runtime-floor.md)
 [![packages](https://img.shields.io/badge/packages-migration--core%20%C2%B7%20migration--ui%20as%20release%20assets-6f42c1?logo=github)](https://github.com/saulpatinojr/HCW-MigrateOrchestrator_App/releases/latest)
 [![live](https://img.shields.io/website?url=https%3A%2F%2Fmigration.lab.hybridcloudworks.com%2Fapi%2Fhealth&label=try%20it%20at%20%2Ftools%2Fmigration&up_message=live&down_message=down)](https://hybridcloudworks.com/tools/migration)
-[![docker hub](https://img.shields.io/badge/docker.io-hybridcloudworks%2Fhcw--migrateorchestrator-2496ED?logo=docker&logoColor=white)](https://hub.docker.com/r/hybridcloudworks/hcw-migrateorchestrator)
+[![docker hub](https://img.shields.io/badge/docker.io-hybridcloudworks%2Fimg--mo--appliance--app-2496ED?logo=docker&logoColor=white)](https://hub.docker.com/r/hybridcloudworks/img-mo-appliance-app)
 [![license](https://img.shields.io/github/license/saulpatinojr/HCW-MigrateOrchestrator_App)](LICENSE)
 [![downstream](https://img.shields.io/badge/downstream-HCW--MigrateOrchestrator__AddOn-6f42c1?logo=github)](https://github.com/saulpatinojr/HCW-MigrateOrchestrator_AddOn)
 
@@ -109,7 +109,7 @@ A `v*` tag publishes, only after the checks pass:
 
 | Artifact | Where | Gate |
 |---|---|---|
-| Appliance image | `docker.io/hybridcloudworks/hcw-migrateorchestrator` | Built locally, scanned (Trivy, HIGH/CRITICAL fixed), then pushed through the Docker OIDC connection with provenance and SBOM (`docs/release/docker-hub.md`). Deploy by digest, never by tag. **Only while the repository variable `DOCKERHUB_ENABLED` is `true`:** the job was skipped (not failed) for `v0.3.0` and `v0.3.1`, so no image exists for them yet (ticket #42). Terraform refuses any `image_ref` that is not an exact digest |
+| Appliance image | `docker.io/hybridcloudworks/img-mo-appliance-app` | Built locally, scanned (Trivy, HIGH/CRITICAL fixed), then pushed through the Docker OIDC connection with provenance and SBOM (`docs/release/docker-hub.md`). Deploy by digest, never by tag. **Only while the repository variable `DOCKERHUB_ENABLED` is `true`:** the job was skipped (not failed) for `v0.3.0` and `v0.3.1`, so no image exists for them yet (ticket #42). Terraform refuses any `image_ref` that is not an exact digest |
 | CLI binaries | GitHub Releases, three platforms, with `SHA256SUMS-*.txt` and provenance | Each binary smoke-tested (`rules validate` + a sample `assess`) |
 | `@hybridcloudworks/migration-core`, `@hybridcloudworks/migration-ui` | GitHub Release assets (`hybridcloudworks-migration-{core,ui}-<version>.tgz`) with provenance; the downstream edition pins them by URL and hash. npm publishing is optional ([`docs/release/npm-publishing.md`](docs/release/npm-publishing.md)) | Clean-consumer gate (`npm run packages:verify`) against the packed tarballs |
 
