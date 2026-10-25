@@ -132,7 +132,7 @@ These happen only on a real tag, so the first real tag is also their first test.
    ```
 
 4. **Watch the tag run** in [Actions](https://github.com/saulpatinojr/HCW-MigrateOrchestrator_App/actions/workflows/release-cli.yml).
-   When all seven jobs are green, open the [release page](https://github.com/saulpatinojr/HCW-MigrateOrchestrator_App/releases) and
+   When all eight jobs are green, open the [release page](https://github.com/saulpatinojr/HCW-MigrateOrchestrator_App/releases) and
    check it lists the ten files from section 1.
 5. **Verify one download yourself** (optional but quick), with the same strict flags the pipeline uses. After downloading
    `hybridcloudworks-migration-core-<version>.tgz` from the release page into the current folder, bash:

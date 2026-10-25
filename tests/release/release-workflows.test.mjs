@@ -62,13 +62,14 @@ test("no workflow grants write at the top level, installs a floating npm, or ove
 
 test("release-cli: one ordered path, check first, every build waits for it", () => {
   const j = jobs(text(RELEASE));
-  assert.deepEqual(Object.keys(j), ["check", "sea", "packages", "inventory", "attest", "release", "post-release"]);
+  assert.deepEqual(Object.keys(j), ["check", "sea", "packages", "inventory", "attest", "verify-attestations", "release", "post-release"]);
   assert.deepEqual(needs(j.check), []);
   assert.deepEqual(needs(j.sea), ["check"]);
   assert.deepEqual(needs(j.packages), ["check"]);
   assert.deepEqual(needs(j.inventory), ["check", "sea", "packages"]);
   assert.deepEqual(needs(j.attest), ["check", "inventory"]);
-  assert.deepEqual(needs(j.release), ["check", "inventory", "attest"]);
+  assert.deepEqual(needs(j["verify-attestations"]), ["check", "attest"]);
+  assert.deepEqual(needs(j.release), ["check", "inventory", "attest", "verify-attestations"]);
   assert.deepEqual(needs(j["post-release"]), ["check", "release"]);
   assert.match(text(RELEASE), /^on:\n {2}push:\n {4}tags: \["v\*"\]\n {2}workflow_dispatch:/m);
   assert.match(text(RELEASE), /^concurrency:\n {2}group: release-\$\{\{ github\.ref \}\}\n {2}cancel-in-progress: false$/m);
@@ -88,6 +89,7 @@ test("release-cli: permissions are per job, write only where it is used", () => 
   const j = jobs(text(RELEASE));
   for (const name of ["check", "sea", "packages", "inventory"]) assert.deepEqual(grants(j[name]), [], `${name} needs only the top-level contents: read`);
   assert.deepEqual(grants(j.attest), ["attestations: write", "contents: read", "id-token: write"]);
+  assert.deepEqual(grants(j["verify-attestations"]), ["attestations: read", "contents: read"]);
   assert.deepEqual(grants(j.release), ["attestations: read", "contents: write"]);
   assert.deepEqual(grants(j["post-release"]), ["attestations: read", "contents: read"]);
   const writers = Object.entries(j).filter(([, body]) => /contents: write/.test(head(body))).map(([n]) => n);
@@ -113,8 +115,9 @@ test("release-cli: exactly one job creates the release, as a draft, through the 
 test("release-cli: release and post-release run only for a pushed v* tag, never for a manual run", () => {
   const j = jobs(text(RELEASE));
   for (const name of ["release", "post-release"]) assert.ok(head(j[name]).includes(`if: ${TAG_ONLY}`), `${name} must be tag-only`);
-  for (const name of ["check", "sea", "packages", "inventory", "attest"]) assert.doesNotMatch(j[name], /release-publish\.mjs (publish|verify-release)/, `${name} must not publish`);
+  for (const name of ["check", "sea", "packages", "inventory", "attest", "verify-attestations"]) assert.doesNotMatch(j[name], /release-publish\.mjs (publish|verify-release)/, `${name} must not publish`);
   assert.match(head(j.attest), /if: github\.event_name == 'push' \|\| inputs\.attest/);
+  assert.match(head(j["verify-attestations"]), /if: github\.event_name == 'push' \|\| inputs\.attest/);
   assert.match(text(RELEASE), /inputs:\n {6}attest:\n(?: {8}.*\n)*? {8}default: false/, "the permanent signing log is opt-in for a dry run");
 });
 
@@ -129,7 +132,11 @@ test("release-cli: provenance and CycloneDX SBOM attestations for the binaries a
   assert.match(attest, /amo-cli-\$\{\{ needs\.check\.outputs\.version \}\}\.cdx\.json/);
   assert.match(attest, /hybridcloudworks-migration-packages-\$\{\{ needs\.check\.outputs\.version \}\}\.cdx\.json/);
   assert.doesNotMatch(code(RELEASE), /attest-build-provenance/, "one attestation action, the newest stable");
-  for (const name of ["attest", "release"]) {
+  // The job that can sign (id-token) and write attestations runs none of the repository's own scripts and does not even check
+  // the repository out: it only downloads the files and calls the pinned attest action (review of pull request 79, F6).
+  assert.doesNotMatch(attest, /^\s*run:/m, "the attest job must run no script");
+  assert.doesNotMatch(attest, /actions\/checkout@|scripts\/|setup-node@/, "the attest job must not check out or run repository code");
+  for (const name of ["verify-attestations", "release"]) {
     const job = jobs(text(RELEASE))[name];
     assert.match(job, /SOURCE_REF: "\$\{\{ github\.ref \}\}"/, `${name}: bound to the ref (refs/tags/<tag> on a release)`);
     assert.match(job, /SOURCE_DIGEST: "\$\{\{ github\.sha \}\}"/, `${name}: bound to the commit`);

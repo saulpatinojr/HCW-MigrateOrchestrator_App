@@ -22,8 +22,8 @@ checksum files and the two package tarballs the downstream edition pins by URL a
 
 ## Decision
 
-1. **One workflow, one ordered path, one job that touches the release.** `release-cli.yml` has seven jobs: `check`, `sea`,
-   `packages`, `inventory`, `attest`, `release`, `post-release`. Only `release` has `contents: write`. It creates the
+1. **One workflow, one ordered path, one job that touches the release.** `release-cli.yml` has eight jobs: `check`, `sea`,
+   `packages`, `inventory`, `attest`, `verify-attestations`, `release`, `post-release`. Only `release` has `contents: write`. It creates the
    release as a **draft** with every file, checks that the draft holds exactly the expected files (names, upload state, the
    sha256 GitHub reports), and only then makes it public. The draft is judged from `GET /releases/{id}`, re-read up to ten
    times while GitHub is still processing the uploads, never from the list answer; an expected asset with no sha256 digest is a
@@ -31,7 +31,7 @@ checksum files and the two package tarballs the downstream edition pins by URL a
    `scripts/release-publish.mjs`, which has tests. An existing release (draft or public) for the tag is never touched and no
    file is ever replaced (no `--clobber`).
 2. **Permissions per job, minimum scopes.** The workflow level is `contents: read`. Build jobs have nothing more. `attest`
-   has `id-token: write` and `attestations: write` (no repository write). `release` has `contents: write` and
+   has `id-token: write` and `attestations: write` (no repository write) and runs no script of this repository (it does not check the repository out); `verify-attestations` runs the repository script that checks them, with `contents: read` and `attestations: read` only (review of pull request 79, F6). `release` has `contents: write` and
    `attestations: read`. `post-release` has `contents: read` and `attestations: read`. `publish-npm.yml` has `id-token:
    write` only in its `publish` job.
 3. **Attested CycloneDX SBOMs.** `scripts/generate-sbom.mjs` (built on `npm sbom`) writes `amo-cli-<version>.cdx.json` and
@@ -39,7 +39,7 @@ checksum files and the two package tarballs the downstream edition pins by URL a
    with their React peers). `actions/attest` (v4.2.2, the newest stable at 2026-10-25, pinned by SHA) attests build
    provenance and the SBOM for each of the three binaries and each of the two tarballs.
 4. **The attestation check is bound to the tag.** `gh attestation verify` is run with `--signer-workflow`, `--signer-digest
-   <commit>`, `--source-ref refs/tags/<tag>`, `--source-digest <commit>` and `--deny-self-hosted-runners`, for provenance and SBOM, in the `attest` job and again in
+   <commit>`, `--source-ref refs/tags/<tag>`, `--source-digest <commit>` and `--deny-self-hosted-runners`, for provenance and SBOM, in the `verify-attestations` job and again in
    `release` on the downloaded files, and in `post-release` on the files downloaded from the public release. "Some
    attestation of these bytes exists" is not enough: a dry-run attestation of the same bytes must not satisfy a real release.
 5. **The tag guards each workflow.** `scripts/check-release-version.mjs` runs first in `release-cli.yml`, `publish-npm.yml` and
