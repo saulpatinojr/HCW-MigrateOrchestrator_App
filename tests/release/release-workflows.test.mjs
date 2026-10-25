@@ -124,7 +124,11 @@ test("release-cli: release and post-release run only for a pushed v* tag, never 
 test("release-cli: provenance and CycloneDX SBOM attestations for the binaries and the tarballs, verified strictly", () => {
   const attest = jobs(text(RELEASE)).attest;
   const uses = steps(attest).filter((s) => /uses: actions\/attest@/.test(s));
-  assert.equal(uses.length, 4, "provenance and SBOM, for binaries and for tarballs");
+  assert.equal(uses.length, 5, "provenance and SBOM for binaries and for tarballs, and provenance for the checksum files and SBOMs");
+  const metadata = uses.filter((s) => s.includes("release-files/SHA256SUMS-linux-x64.txt"));
+  assert.equal(metadata.length, 1, "review F7: the checksum files and the SBOMs are attested subjects");
+  for (const f of ["SHA256SUMS-darwin-arm64.txt", "SHA256SUMS-windows-x64.txt", "amo-cli-${{ needs.check.outputs.version }}.cdx.json", "hybridcloudworks-migration-packages-${{ needs.check.outputs.version }}.cdx.json"]) assert.ok(metadata[0].includes(`release-files/${f}`), f);
+  assert.doesNotMatch(metadata[0], /sbom-path:/, "provenance only for those files");
   for (const s of uses) assert.ok(s.includes(`actions/attest@${ATTEST_SHA} # v4.2.2`));
   assert.equal(uses.filter((s) => /sbom-path:/.test(s)).length, 2);
   for (const bin of BINARIES) assert.equal(uses.filter((s) => s.includes(`release-files/${bin}`)).length, 2, `${bin}: provenance and SBOM`);
@@ -191,9 +195,12 @@ test("release-cli: nothing is published or released by a dry run; the notes name
 
 test("publish-npm: verify (read only) then publish (tag only, the only job with id-token); npm is not installed from @latest", () => {
   const j = jobs(text(NPM));
-  assert.deepEqual(Object.keys(j), ["verify", "publish"]);
-  assert.deepEqual(needs(j.publish), ["verify"]);
+  assert.deepEqual(Object.keys(j), ["verify", "release-ready", "publish"]);
+  assert.deepEqual(needs(j["release-ready"]), ["verify"]);
+  assert.deepEqual(needs(j.publish), ["verify", "release-ready"], "review F5: nothing is published before the release is verified");
   assert.deepEqual(grants(j.verify), []);
+  assert.deepEqual(grants(j["release-ready"]), ["attestations: read", "contents: read"]);
+  assert.ok(head(j["release-ready"]).includes(TAG_ONLY) && /vars\.NPM_TRUSTED_PUBLISHING == 'ready'/.test(head(j["release-ready"])));
   assert.deepEqual(grants(j.publish), ["contents: read", "id-token: write"]);
   assert.ok(head(j.publish).includes(TAG_ONLY), "a manual run never publishes");
   assert.match(head(j.publish), /vars\.NPM_TRUSTED_PUBLISHING == 'ready'/);
@@ -206,7 +213,18 @@ test("publish-npm: verify (read only) then publish (tag only, the only job with 
   assert.match(j.verify, /fetch-depth: 0/);
   assert.match(steps(j.verify)[0], /if: github\.event_name != 'push' && github\.ref != 'refs\/heads\/main'/);
   assert.match(text(NPM), /^concurrency:\n {2}group: publish-npm-\$\{\{ github\.ref \}\}\n {2}cancel-in-progress: false$/m);
-  assert.match(j.publish, /name: dist-packages/, "what was gated is what is published");
+  // F5: what is published is the released, attested tarball, checked by digest, behind a GitHub Environment
+  assert.match(head(j.publish), /environment: npm-publish/);
+  assert.match(j["release-ready"], /release-publish\.mjs verify-release --repo "\$GH_REPO" --tag "\$TAG" --out released/);
+  assert.match(j["release-ready"], /--workflow \.github\/workflows\/release-cli\.yml --source-ref "\$SOURCE_REF" --source-digest "\$SOURCE_DIGEST"/);
+  assert.match(j["release-ready"], /gh release view "\$TAG"/, "it waits for the public release");
+  assert.match(j.publish, /name: released-tarballs/, "what was verified against the release is what is published");
+  assert.match(j.publish, /npm publish "tarballs\/hybridcloudworks-migration-core-\$\{VERSION\}\.tgz" --access public --provenance/);
+  assert.match(j.publish, /npm publish "tarballs\/hybridcloudworks-migration-ui-\$\{VERSION\}\.tgz" --access public --provenance/);
+  assert.match(j.publish, /= "\$CORE_SHA256"/, "the digest is compared again before publishing");
+  assert.match(j.publish, /= "\$UI_SHA256"/);
+  assert.doesNotMatch(j.publish, /dist-packages|working-directory/, "nothing built in this workflow is published");
+  assert.doesNotMatch(j["release-ready"], /npm publish|id-token/);
   assert.ok(j.publish.indexOf("migration-core") < j.publish.indexOf("migration-ui"), "core first");
 });
 
@@ -248,6 +266,21 @@ test("publish-images: no expression is expanded inside a run script, and the bui
   const checkout = steps(j).find((s) => /uses: actions\/checkout@/.test(s));
   assert.match(checkout, /persist-credentials: false/);
   assert.match(j, /env: \{ DIGEST: "\$\{\{ steps\.build\.outputs\.digest \}\}" \}\n\s+run: echo "\$\{IMAGE\}@\$\{DIGEST\}"/);
+});
+
+test("publish-images: one build, pushed by digest, that digest scanned, and only then tagged and attested (follow-up of issue 83)", () => {
+  const j = jobs(text("publish-images.yml"))["build-scan-publish"];
+  const c = code("publish-images.yml");
+  assert.equal([...c.matchAll(/docker\/build-push-action@/g)].length, 1, "the image is built once");
+  assert.doesNotMatch(c, /load: true|:scan\b/, "no separate local build that is scanned instead of the pushed one");
+  const build = j.indexOf("push-by-digest=true,name-canonical=true,push=true");
+  const scan = j.indexOf("aquasecurity/trivy-action@");
+  const tag = j.indexOf("docker buildx imagetools create");
+  const attest = j.indexOf("actions/attest-build-provenance@");
+  assert.ok(build > 0 && build < scan && scan < tag && tag < attest, "build by digest, scan, tag, attest, in that order");
+  assert.match(j, /image-ref: "\$\{\{ env\.IMAGE \}\}@\$\{\{ steps\.build\.outputs\.digest \}\}"/, "the scan reads the pushed digest");
+  assert.doesNotMatch(j, /^\s+tags: \$\{\{ steps\.meta\.outputs\.tags \}\}/m, "the build itself pushes no tag");
+  assert.match(j, /docker buildx imagetools create "\$\{args\[@\]\}" "\$\{IMAGE\}@\$\{DIGEST\}"/);
 });
 
 test("the workflows do not call a tag permanent without the ruleset caveat (review F3)", () => {

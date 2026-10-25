@@ -1,7 +1,8 @@
 # Publishing the appliance image to Docker Hub (owner runbook)
 
-`publish-images.yml` builds `infrastructure/docker/Dockerfile.appliance` on every `v*` tag, scans it (Trivy, HIGH/CRITICAL,
-fixed only) and pushes `docker.io/hybridcloudworks/img-mo-appliance-app` with provenance and SBOM, then prints the
+`publish-images.yml` builds `infrastructure/docker/Dockerfile.appliance` once on every `v*` tag, pushes that build to
+`docker.io/hybridcloudworks/img-mo-appliance-app` by digest (no tag) with provenance and SBOM, scans that digest (Trivy,
+HIGH/CRITICAL, fixed only), and only then tags it, so the scanned, tagged and attested image is one digest. It then prints the
 immutable digest in the run summary. Deployments (`infrastructure/terraform/appliance-azure`, `image_ref`) reference that
 digest, never a tag, and Terraform now enforces that: `image_ref` has no default and must end in `@sha256:` followed by 64 hexadecimal characters. Moved from GHCR on 2026-10-10 so both repositories publish to the one registry the website's lab host
 already pulls from (`REFACTOR_APP.md` section 7, optional item).
@@ -26,7 +27,14 @@ skipped, not failed.
    Success: `gh variable list --repo saulpatinojr/HCW-MigrateOrchestrator_App` prints both names.
 3. Run the workflow for the current tag from the Actions tab (`publish-images`, **Run workflow**), or push the next `v*` tag.
    Success: the run summary ends with one line of the form `docker.io/hybridcloudworks/img-mo-appliance-app@sha256:…`,
-   and `docker pull` of that reference succeeds anonymously.
+   and `docker pull` of that reference succeeds anonymously. Then check the attestation of that exact digest, bash or PowerShell:
+
+   ```bash
+   gh attestation verify oci://docker.io/hybridcloudworks/img-mo-appliance-app@sha256:<digest-from-the-run-summary> --repo saulpatinojr/HCW-MigrateOrchestrator_App
+   ```
+
+   Which tags have an image, and how to tell a skipped run from a published one: the README section "Which tags have an
+   appliance image".
 
 ## Failure modes
 
@@ -35,8 +43,10 @@ skipped, not failed.
 - `400 access_denied` from the token exchange: the connection's rule does not match this repository, ref or workflow.
   Compare the connection's rule with the run's `repository`, `ref` and `workflow` claims; Docker reports only the
   refusal, not the failing condition.
-- A Trivy finding before the push: nothing is published. Rebuild on an updated base image or wait for the fix; never
-  skip the scan.
+- A Trivy finding: the image gets no tag and no attestation. The build is pushed by digest first and that exact digest is
+  scanned (so the scanned bytes are the published bytes), which means a failed scan leaves an **untagged** image in the
+  repository. Delete it on Docker Hub (the repository's Tags page, the untagged image) so nobody can pull it by digest.
+  Rebuild on an updated base image or wait for the fix; never skip the scan.
 
 ## Rollback
 

@@ -44,18 +44,32 @@ On npmjs.com → package → Settings → Trusted Publisher → GitHub Actions:
 | Organization or user | `saulpatinojr` |
 | Repository | `HCW-MigrateOrchestrator_App` |
 | Workflow filename | `publish-npm.yml` |
-| Environment | leave empty |
+| Environment | `npm-publish` (the GitHub Environment created in step 4) |
 
 Then, in the same settings, require two-factor authentication or trusted publishing for new versions (disallow tokens).
 
-## 4. Arm the workflow
+## 4. Create the GitHub Environment `npm-publish` with required reviewers (a person approves every publish)
+
+The publish job runs in a GitHub Environment named `npm-publish`. An environment with **required reviewers** stops the job
+until a named person approves it on the run page, so a tag alone can never put a package on npm. If you skip this step GitHub
+creates the environment empty the first time the job runs and the job then does **not** wait for anyone, so do it before step 5.
+
+1. Open [Settings, Environments](https://github.com/saulpatinojr/HCW-MigrateOrchestrator_App/settings/environments) and choose **New environment**.
+2. Name: `npm-publish`. Choose **Configure environment**.
+3. Tick **Required reviewers** and add yourself (and one other person if there is one). Leave **Prevent self-review** unticked if you are the only maintainer, or the job could never be approved.
+4. Under **Deployment branches and tags** choose **Selected branches and tags**, then add a **tag** rule `v*`. Save protection rules.
+5. Do not add any secret to this environment: publishing needs none.
+
+Docs: [Managing environments for deployment](https://docs.github.com/actions/managing-workflow-runs-and-deployments/managing-deployments/managing-environments-for-deployment).
+
+## 5. Arm the workflow
 
 In GitHub → repository Settings → Secrets and variables → Actions → Variables: add `NPM_TRUSTED_PUBLISHING` = `ready`.
-From the next `v*` tag the workflow first checks that the tag, the package version and `main` agree and that the npm that ships with Node 26 is at least 11.5.1 (it never installs `npm@latest`), builds at the package version, runs the clean-consumer gate, and publishes exactly those packages with
-provenance. Verify at https://www.npmjs.com/package/@hybridcloudworks/migration-core (the Provenance panel must show this
+From the next `v*` tag the workflow first checks that the tag, the package version and `main` agree and that the npm that ships with Node 26 is at least 11.5.1 (it never installs `npm@latest`), rehearses the build and the clean-consumer gate, then **waits for the GitHub Release of that tag to be public**, downloads it and verifies every file's digest and signed attestation (the same strict check as `post-release`). Only then does the `publish` job wait for your approval (step 4) and publish **the released tarballs themselves** with
+provenance, after comparing their sha256 once more: what reaches npm is byte for byte what the release carries and what was attested. If the release run fails, nothing is published to npm. Verify at https://www.npmjs.com/package/@hybridcloudworks/migration-core (the Provenance panel must show this
 repository and workflow).
 
-## 5. Switch the downstream consumers to the registry
+## 6. Switch the downstream consumers to the registry
 
 - `_Addon`: replace the two `file:` links in `package.json` with the exact version (`"@hybridcloudworks/migration-core": "0.2.1"`),
   remove the sibling checkout steps from `.github/workflows`, and delete `scripts/bootstrap-app.sh`. Dependabot (`npm`
@@ -66,4 +80,4 @@ repository and workflow).
 Never publish from a developer machine after step 2; never create or store an npm automation token.
 
 A version that was published in error cannot be published again. Mark it with `npm deprecate` and ship the next version (commands:
-[`README.md`](README.md) section 5). `publish-npm.yml` starts from the same tag as the release run but does not wait for it.
+[`README.md`](README.md) section 5). `publish-npm.yml` starts from the same tag as the release run and waits (up to 45 minutes) for that release to be public and verified before it asks for your approval; if the release run fails, it publishes nothing.

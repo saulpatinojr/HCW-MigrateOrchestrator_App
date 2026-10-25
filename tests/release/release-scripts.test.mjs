@@ -5,7 +5,7 @@ import { copyFileSync, existsSync, mkdirSync, mkdtempSync, readFileSync, readdir
 import { tmpdir } from "node:os";
 import { basename, join } from "node:path";
 import { spawnSync } from "node:child_process";
-import { allNames, attestedNames, checkFiles, decodeJsonValues, publish, releaseProblems, releaseNotes, verifyAttestations, verifyCommand, verifyRelease, versionOfTag, PROVENANCE, SBOM } from "../../scripts/release-publish.mjs";
+import { allNames, attestedNames, attestationChecks, provenanceOnlyNames, checkFiles, decodeJsonValues, publish, releaseProblems, releaseNotes, verifyAttestations, verifyCommand, verifyRelease, versionOfTag, PROVENANCE, SBOM } from "../../scripts/release-publish.mjs";
 import { atLeast, check, notOnBranch, setVersion, workflowParity } from "../../scripts/check-release-version.mjs";
 import { addComponent, assertBom, retitle } from "../../scripts/generate-sbom.mjs";
 
@@ -80,7 +80,9 @@ const callsOf = (calls, a, b) => calls.filter((c) => c[0] === a && c[1] === b);
 
 test("the expected file list is the contract: three binaries, three checksum files, two tarballs, two SBOMs", () => {
   assert.deepEqual(allNames(VERSION), ["amo-linux-x64", "amo-darwin-arm64", "amo-windows-x64.exe", "SHA256SUMS-linux-x64.txt", "SHA256SUMS-darwin-arm64.txt", "SHA256SUMS-windows-x64.txt", "hybridcloudworks-migration-core-1.2.3.tgz", "hybridcloudworks-migration-ui-1.2.3.tgz", "amo-cli-1.2.3.cdx.json", "hybridcloudworks-migration-packages-1.2.3.cdx.json"]);
-  assert.equal(attestedNames(VERSION).length, 5, "binaries and tarballs are attested; checksum files and SBOMs are not subjects");
+  assert.equal(attestedNames(VERSION).length, 5, "binaries and tarballs get provenance and an SBOM attestation");
+  assert.deepEqual(provenanceOnlyNames(VERSION), ["SHA256SUMS-linux-x64.txt", "SHA256SUMS-darwin-arm64.txt", "SHA256SUMS-windows-x64.txt", "amo-cli-1.2.3.cdx.json", "hybridcloudworks-migration-packages-1.2.3.cdx.json"], "checksum files and SBOMs get provenance (follow-up F7)");
+  assert.equal(attestationChecks(VERSION).length, 10, "every release file is bound to the workflow, ref and commit");
   assert.equal(versionOfTag("v0.3.1"), "0.3.1");
   assert.throws(() => versionOfTag("0.3.1"), /not v followed/);
   assert.throws(() => versionOfTag("v0.3.1-rc.1"), /not v followed/);
@@ -105,7 +107,7 @@ test("attestations are verified for provenance and SBOM, bound to this workflow,
   const digest = "a".repeat(40);
   const problems = verifyAttestations({ dir, version: VERSION, repo: REPO, workflow: WORKFLOW, sourceRef: `refs/tags/${TAG}`, sourceDigest: digest }, gh, noPause);
   assert.deepEqual(problems, []);
-  assert.equal(calls.length, 10, "five files, two predicates each");
+  assert.equal(calls.length, 15, "five files with two predicates each, five with provenance only");
   for (const c of calls) {
     assert.equal(c[c.indexOf("--signer-workflow") + 1], `${REPO}/${WORKFLOW}`);
     assert.equal(c[c.indexOf("--source-ref") + 1], `refs/tags/${TAG}`);
@@ -114,8 +116,18 @@ test("attestations are verified for provenance and SBOM, bound to this workflow,
     assert.equal(c[c.indexOf("--signer-digest") + 1], digest, "the workflow that signed must be the one at this commit");
     assert.ok(c.includes("--deny-self-hosted-runners"));
   }
-  assert.equal(calls.filter((c) => c.includes(PROVENANCE)).length, 5);
+  assert.equal(calls.filter((c) => c.includes(PROVENANCE)).length, 10, "every one of the ten files has provenance");
   assert.equal(calls.filter((c) => c.includes(SBOM)).length, 5);
+  for (const name of provenanceOnlyNames(VERSION)) {
+    const mine = calls.filter((c) => c[2].endsWith(name));
+    assert.equal(mine.length, 1, `${name}: exactly one check`);
+    assert.ok(mine[0].includes(PROVENANCE) && !mine[0].includes(SBOM), `${name}: provenance only`);
+  }
+  // a checksum file or SBOM without an attestation is refused, and named
+  const missing = fakeGh();
+  missing.state.attestationFails = true;
+  const refused = verifyAttestations({ dir, version: VERSION, repo: REPO, workflow: WORKFLOW, sourceRef: "r", sourceDigest: "d".repeat(40) }, missing.gh, noPause);
+  assert.ok(refused.some((p) => /attestation of SHA256SUMS-linux-x64\.txt/.test(p)) && refused.some((p) => /attestation of amo-cli-1\.2\.3\.cdx\.json/.test(p)));
   assert.deepEqual(verifyCommand("f", "o/r", SBOM, "w.yml", "refs/tags/v1.0.0", "d").slice(0, 3), ["attestation", "verify", "f"]);
 });
 
@@ -124,9 +136,9 @@ test("a failed attestation check is retried, then reported with the file, the pr
   const { gh, calls, state } = fakeGh();
   state.attestationFails = true;
   const problems = verifyAttestations({ dir, version: VERSION, repo: REPO, workflow: WORKFLOW, sourceRef: "refs/heads/main", sourceDigest: "b".repeat(40) }, gh, noPause);
-  assert.equal(problems.length, 10);
+  assert.equal(problems.length, 15);
   assert.match(problems[0], /no https:\/\/slsa\.dev\/provenance\/v1 attestation of amo-linux-x64 from \.github\/workflows\/release-cli\.yml on refs\/heads\/main at bbbbbbbbbbbb: no matching attestation/);
-  assert.equal(calls.length, 30, "three tries per check");
+  assert.equal(calls.length, 45, "three tries per check");
   rmSync(join(dir, "amo-linux-x64"));
   assert.match(verifyAttestations({ dir, version: VERSION, repo: REPO, workflow: WORKFLOW, sourceRef: "r", sourceDigest: "d" }, fakeGh().gh, noPause)[0], /amo-linux-x64 is missing/);
 });
@@ -224,7 +236,7 @@ test("verify-release: downloads the public release, compares files and digests, 
   state.releases = [{ id: 7, tag_name: TAG, draft: false, assets: allNames(VERSION).map((n) => ({ name: n, state: "uploaded", digest: `sha256:${sha(join(dir, n))}` })) }];
   assert.deepEqual(await verifyRelease({ repo: REPO, tag: TAG, out, workflow: WORKFLOW, sourceRef: `refs/tags/${TAG}`, sourceDigest: "c".repeat(40) }, gh, noPause), []);
   assert.equal(readdirSync(out).length, 10);
-  assert.equal(callsOf(calls, "attestation", "verify").length, 10);
+  assert.equal(callsOf(calls, "attestation", "verify").length, 15);
   // a downloaded file that differs from the digest GitHub reports is caught before any attestation is trusted
   writeFileSync(join(dir, "amo-linux-x64"), "tampered");
   const tampered = await verifyRelease({ repo: REPO, tag: TAG, out: join(scratch(), "again"), workflow: WORKFLOW, sourceRef: "r", sourceDigest: "d" }, gh, noPause);
