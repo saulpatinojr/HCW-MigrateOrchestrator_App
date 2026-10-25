@@ -183,7 +183,7 @@ only the traffic below gets in (ADR-0032). Outbound traffic is left at Azure's d
 > your virtual network", and that locking down inbound traffic with an NSG or firewall "isn't supported"
 > ([Network security groups for Container Apps](https://learn.microsoft.com/en-us/azure/container-apps/firewall-integration)).
 > So this firewall **does not restrict who reaches the API from the internet**. What does: the IP restrictions on the container app
-> ingress (`ingress_allowed_source_prefixes`, below) and, above all, the sign-in token with an app role that every call needs
+> ingress (`ingress_allowed_source_prefixes`, below) and, above all, the sign-in token with an app role that every protected call needs (everything except the public health and agent-list routes)
 > (section 2). Whether the firewall itself lets the environment start has not been shown: a sandbox apply must confirm it.
 
 | Subnet | Allowed in | Everything else |

@@ -153,7 +153,7 @@ resource "azurerm_network_security_group" "aca" {
 # Accepted risk, the only suppression in this configuration (ADR-0032): by default the source is the Internet tag, because the
 # container app has external ingress and its users sign in from anywhere. Per Learn this rule only matters for traffic that
 # enters through the virtual network; the public path is limited by the ingress IP restrictions and by the Entra token with an
-# app role (ADR-0031), which every request needs.
+# app role (ADR-0031), which every protected request needs (all routes except the public health and agent-list routes).
 #trivy:ignore:AVD-AZU-0047
 resource "azurerm_network_security_rule" "aca_allow_https_from_clients" {
   name                        = "allow-https-from-clients"

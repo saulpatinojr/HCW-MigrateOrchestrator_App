@@ -26,7 +26,7 @@ subnet", that "inbound NSG rules apply only to traffic that goes through your vi
 traffic via NSG or firewall on an external workload profile environment isn't supported". So the `aca` group only limits traffic
 that crosses the virtual network. What limits the public path is (a) the IP restrictions on the container app ingress, driven by
 `ingress_allowed_source_prefixes` (Learn: [Set up IP ingress restrictions](https://learn.microsoft.com/en-us/azure/container-apps/ip-restrictions)), and above all (b) the Microsoft Entra
-bearer token with an app role that the API requires on every request (ADR-0031). A sandbox apply must confirm that the environment
+bearer token with an app role that the API requires on every protected request (every route except the public `/api/health` and `/api/agents`) (ADR-0031). A sandbox apply must confirm that the environment
 starts and the API answers over 443 with this group attached before the PROVISIONAL label is removed (issues 82 and 53).
 Each subnet gets an NSG, associated with the subnet, whose last rule is an explicit **deny all inbound at priority 4096**.
 That rule also overrides Azure's built-in "allow traffic from the virtual network" rule, so a subnet is reachable only through
@@ -67,7 +67,7 @@ any IP address") on `aca_allow_https_from_clients` when the source is the defaul
 per Learn this NSG rule does not decide that for the public path. It is the **only** suppression, an inline
 `#trivy:ignore:AVD-AZU-0047` directly above that one resource with the reason beside it; there is no `.trivyignore` file, and the
 workflow's severity and exit code are unchanged. A static test fails if a second suppression or an ignore file appears. The
-residual risk is that the API accepts connections (not requests: every request needs an Entra token with an app role) from
+residual risk is that the API accepts connections (not requests: every protected request (every route except the public `/api/health` and `/api/agents`) needs an Entra token with an app role) from
 anywhere. To close it, set `ingress_allowed_source_prefixes` to known ranges: they become Allow rules on the container app
 ingress (the control that limits the public path) and are mirrored in this rule.
 
@@ -137,8 +137,10 @@ environment, and both are covered above. The ticket's `CKV2_AZURE_31` (NSG on tw
 
 Found in review and decided by the owner on 2026-10-25 in a comment on [issue 82](https://github.com/saulpatinojr/HCW-MigrateOrchestrator_App/issues/82):
 **a workload-profile Container Apps environment** (subnet at least /27, delegated to `Microsoft.App/environments`, with a
-`workload_profile` block). Label note: the comment calls this "option A", while the issue text lists workload profiles as option B and
-consumption-only as option A; the description in the comment (workload profile, /27 or larger, delegated) is what is implemented.
+`workload_profile` block). Label note: this is workload profiles, which is **this issue's Option B** (the issue text lists
+consumption-only as Option A); the owner answered "workload" on 2026-10-25, and an earlier comment on the issue that called the
+choice "option A" described the same workload-profile environment. The workload-profile description (subnet /27 or larger,
+delegated, with a `workload_profile` block) is what is implemented.
 
 **Why the previous configuration was invalid.** It had no `workload_profile` block, so the environment was consumption-only, which
 per Learn ([Virtual network configuration](https://learn.microsoft.com/en-us/azure/container-apps/custom-virtual-networks)) needs a subnet of at least /23 that must not be delegated, while

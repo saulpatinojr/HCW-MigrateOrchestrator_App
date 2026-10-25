@@ -49,7 +49,7 @@ variable "tags" {
 }
 variable "ingress_allowed_source_prefixes" {
   type        = list(string)
-  description = "Who may reach the API over HTTPS (port 443) through the Container Apps subnet firewall: the single value \"Internet\" (the default; the API is public, and every request still needs an Entra token that carries an app role, ADR-0031), or a list of IPv4 CIDR ranges in their network form (for example 203.0.113.0/24 or 198.51.100.7/32, not 203.0.113.7/24) such as your office or VPN addresses, which is stricter. IPv6, 0.0.0.0/0 and a tag mixed with ranges are refused. It is enforced twice: as IP restrictions on the container app ingress (the control that limits the public path, Learn: Set up IP ingress restrictions) and, only for traffic that crosses the virtual network, in the subnet firewall (ADR-0032)."
+  description = "Who may reach the API over HTTPS (port 443) through the Container Apps subnet firewall: the single value \"Internet\" (the default; the API is public, and every protected request still needs an Entra token that carries an app role, ADR-0031; only the health and agent-list routes are public), or a list of IPv4 CIDR ranges in their network form (for example 203.0.113.0/24 or 198.51.100.7/32, not 203.0.113.7/24) such as your office or VPN addresses, which is stricter. IPv6, 0.0.0.0/0 and a tag mixed with ranges are refused. It is enforced twice: as IP restrictions on the container app ingress (the control that limits the public path, Learn: Set up IP ingress restrictions) and, only for traffic that crosses the virtual network, in the subnet firewall (ADR-0032)."
   default     = ["Internet"]
   validation {
     condition = length(var.ingress_allowed_source_prefixes) > 0 && (
