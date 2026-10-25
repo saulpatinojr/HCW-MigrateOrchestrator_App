@@ -17,6 +17,15 @@ locals {
   name = "${var.prefix}-${var.environment}-${var.location_short}"
   tags = merge({ application = "azure-migration-orchestrator", component = "appliance", environment = var.environment }, var.tags)
 
+  # The API's Container App name, and the Host names it accepts (AMO_ALLOWED_HOSTS, ADR-0033 addendum): its own address,
+  # which is "<app name>.<environment default domain>", plus any custom names. Written from the name and the environment,
+  # not from the app's own attributes, because a resource cannot read itself. The API turns its Host check on when this
+  # list is not empty (it is off by default, because only the deployment knows its own address) and lets IP addresses pass.
+  api_app_name = "ca-${local.name}-api"
+  # The short app name is listed too: other container apps in the same environment call it as http://<app name> (Learn,
+  # "Communicate between container apps"), and that is the Host header they send.
+  api_allowed_hosts = join(",", concat([local.api_app_name, "${local.api_app_name}.${azurerm_container_app_environment.app.default_domain}"], var.additional_allowed_hosts))
+
   # Subnet ranges, shared by the subnets and by the network security group rules that name them (ADR-0032).
   aca_subnet_cidr = cidrsubnet(var.vnet_cidr, 4, 0)
   db_subnet_cidr  = cidrsubnet(var.vnet_cidr, 4, 1)
@@ -307,6 +316,8 @@ resource "azurerm_private_dns_zone_virtual_network_link" "pg" {
 
 # PostgreSQL with Entra-only authentication; the app's managed identity is the database principal.
 resource "azurerm_postgresql_flexible_server" "db" {
+  #checkov:skip=CKV_AZURE_136:Geo-redundant backup costs money and can only be chosen when the server is created, so it is the opt-in variable postgres_geo_redundant_backup_enabled (default false, validated against region pairs); an owner decision, ADR-0032 section 3.
+  #checkov:skip=CKV2_AZURE_57:The server is private through virtual network integration (delegated subnet, private DNS zone, public network access disabled). Microsoft Learn: a server created with virtual network integration cannot have a private endpoint, and the networking mode cannot change after creation; ADR-0032 section 4.
   name                          = "psql-${local.name}-01"
   location                      = var.location
   resource_group_name           = azurerm_resource_group.app.name
@@ -367,7 +378,7 @@ resource "azurerm_container_app_environment" "app" {
 }
 
 resource "azurerm_container_app" "api" {
-  name                         = "ca-${local.name}-api"
+  name                         = local.api_app_name
   container_app_environment_id = azurerm_container_app_environment.app.id
   resource_group_name          = azurerm_resource_group.app.name
   revision_mode                = "Single"
@@ -421,6 +432,11 @@ resource "azurerm_container_app" "api" {
       env {
         name  = "AMO_CREDENTIAL_KIND"
         value = "managed-identity"
+      }
+      env {
+        # The Host names the API answers (DNS-rebinding guard, issue 83 F8): its own address and any additional_allowed_hosts. Set on the API only: the worker does not serve HTTP.
+        name  = "AMO_ALLOWED_HOSTS"
+        value = local.api_allowed_hosts
       }
       env {
         name  = "AZURE_CLIENT_ID"

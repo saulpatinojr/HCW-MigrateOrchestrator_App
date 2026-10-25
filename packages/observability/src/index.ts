@@ -23,12 +23,27 @@ const WHOLE_SECRET_PATTERNS: RegExp[] = [
   /(?<![A-Za-z0-9_])eyJ[A-Za-z0-9_-]{10,2048}\.[A-Za-z0-9_-]{10,16384}\.[A-Za-z0-9_-]{0,4096}/g,
 ];
 
+// Whitespace between a separator and its value. When the separator is followed by spaces, the next word must not itself
+// look like another "key:" or "key=" (the first key then has an empty value): otherwise "api_key= token: s3cr3t" would
+// take "token:" as the value and leave the real secret in the output. Both counts are bounded.
+const SPACE_THEN_VALUE = String.raw`(?:[ \t]{1,64}(?![^\s;,]{0,64}[=:](?:[ \t]|$)))?`;
+
 // "key=value" secrets: group 1 is the key and separator, which stay readable; only the value is replaced.
 const KEYED_SECRET_PATTERNS: RegExp[] = [
   /(AccountKey=)[^;\s]+/gi,
   /(SharedAccessSignature=)[^;\s]+/gi,
   /(sig=)[A-Za-z0-9%+/=]{20,}/gi,
-  /((?:password|pwd|secret|token)\s*[=:]\s*)[^;\s,]+/gi,
+  // An Authorization header, with or without a scheme word: the credential (an opaque token, "user:password" in Basic
+  // form, anything) is hidden, to the end of the value however long it is (a length cap would leave the rest of a long credential in
+  // the log). The scheme word and the separators are bounded; the value is consumed once, so the cost stays linear.
+  new RegExp(String.raw`(\b(?:proxy-)?authorization["']?[ \t]{0,16}[=:]${SPACE_THEN_VALUE}(?:(?:bearer|basic|negotiate|digest|token)[ \t]{1,16})?)[^\s;,"']+`, "gi"),
+  // A bare "Bearer <opaque token>", as it appears in an error message that quotes a request.
+  // The 20-character floor keeps ordinary prose ("Bearer authentication failed") readable.
+  /(\bbearer[ \t]{1,16})[A-Za-z0-9._~+/-]{20,}=*/gi,
+  // JSON or object-literal form: "password": "value". The key may carry a prefix or suffix (client_secret, secretKey).
+  /("[A-Za-z0-9_.-]{0,64}(?:password|passwd|pwd|secret|token|api[_-]?key|access[_-]?key|subscription[_-]?key|private[_-]?key)[A-Za-z0-9_.-]{0,64}"[ \t]{0,16}:[ \t]{0,16}")(?:[^"\\]|\\.)+/gi,
+  // key=value or key: value, with the key spelled in any of the usual ways.
+  new RegExp(String.raw`((?:password|passwd|pwd|secret|token|api[_-]?key|access[_-]?key|subscription[_-]?key|private[_-]?key)[ \t]{0,64}[=:]${SPACE_THEN_VALUE})[^;\s,]+`, "gi"),
 ];
 
 export function redact(input: string): string {
