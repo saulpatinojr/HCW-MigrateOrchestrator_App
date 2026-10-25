@@ -1,6 +1,6 @@
 {
   "name": "hcw-azmigrateorchestrator-app",
-  "version": "0.3.1",
+  "version": "0.4.0",
   "private": true,
   "description": "Azure Migration Orchestrator — the appliance and the migration intelligence core it is built on; publishes @hybridcloudworks/migration-core and @hybridcloudworks/migration-ui (ADR-0028)",
   "license": "MIT",
