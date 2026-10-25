@@ -11,7 +11,7 @@ import { noopLogger, type Logger } from "@amo/observability";
 /** Startup check for the worker: the same credential-style environment refusals as the API (client secrets, passwords, certificate path, user name). Throws before anything connects. */
 export function workerConfigFromEnv(env: NodeJS.ProcessEnv = process.env): EnterpriseConfig {
   // The worker serves no web requests, so the API-only allow-lists are left out: a bad value meant for the API must not stop it.
-  return configFromEnv({ ...env, AMO_ALLOWED_ORIGINS: undefined, AMO_ALLOWED_HOSTS: undefined });
+  return configFromEnv({ ...env, AMO_ALLOWED_ORIGINS: undefined, AMO_ALLOWED_HOSTS: undefined, AMO_ALLOW_SELF_APPROVAL: undefined });
 }
 
 export interface WorkerOptions {
