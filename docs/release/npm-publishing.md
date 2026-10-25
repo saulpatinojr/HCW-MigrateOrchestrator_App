@@ -1,7 +1,7 @@
 # Publishing the npm packages (owner runbook)
 
 > **Optional since 2026-10-11.** Every `v*` tag's GitHub Release carries the two package tarballs
-> (`release-cli.yml`, job `packages`), and the downstream edition `HCW-AzMigrateOrchestrator_Addon` pins them by URL with
+> (`release-cli.yml`, job `packages`), and the downstream edition `HCW-MigrateOrchestrator_AddOn` pins them by URL with
 > an integrity hash and adopts new releases through its `core-update` workflow. Publishing to npm makes the packages
 > available to third parties; it is not on the path between a release and the website.
 

@@ -19,4 +19,4 @@ Canonical documentation for both repositories lives here (ADR-0028). Start with 
 
 Downstream (web-front edition) documentation — website integration guide, routes, lab API OpenAPI, lab deployment,
 operations runbook, lab threat model, partner one-pagers — lives in
-[`HCW-AzMigrateOrchestrator_Addon/docs`](https://github.com/saulpatinojr/HCW-AzMigrateOrchestrator_Addon/tree/main/docs).
+[`HCW-MigrateOrchestrator_AddOn/docs`](https://github.com/saulpatinojr/HCW-MigrateOrchestrator_AddOn/tree/main/docs).

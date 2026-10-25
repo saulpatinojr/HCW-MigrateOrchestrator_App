@@ -2,7 +2,7 @@
 
 This is `saulpatinojr/HCW-MigrateOrchestrator_App`: the upstream product — engine, rules, CLI, UI components and the Azure
 appliance (ADR-0028). It publishes `@hybridcloudworks/migration-core` and `@hybridcloudworks/migration-ui`; the slim web-front
-edition `saulpatinojr/HCW-AzMigrateOrchestrator_Addon` consumes them.
+edition `saulpatinojr/HCW-MigrateOrchestrator_AddOn` consumes them.
 
 Build/test: `npm ci && npm test` (TypeScript project references, Node 26 test runner; the build also assembles `dist-packages/`).
 Rules: `npm run rules:validate`. Packages: `npm run packages:verify`. Web UI: `npm run web:build`.

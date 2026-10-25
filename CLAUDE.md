@@ -3,7 +3,7 @@
 This is `saulpatinojr/HCW-MigrateOrchestrator_App`, the **upstream product** (ADR-0028): the migration intelligence core
 (`packages/*`), the rule corpus (`rules/`), the `amo` CLI, the explorer UI components and the Azure appliance. It publishes
 `@hybridcloudworks/migration-core` and `@hybridcloudworks/migration-ui` (assembled by `scripts/assemble-packages.mjs` into
-`dist-packages/`). The slim web-front edition `saulpatinojr/HCW-AzMigrateOrchestrator_Addon` consumes those packages as the tarballs attached to each `v*` GitHub Release (pinned by URL and integrity hash) at exact
+`dist-packages/`). The slim web-front edition `saulpatinojr/HCW-MigrateOrchestrator_AddOn` consumes those packages as the tarballs attached to each `v*` GitHub Release (pinned by URL and integrity hash) at exact
 versions and must stay technically unable to reach Azure: `azure-auth`, `azure-arm` and `azure-execution` are never published
 (`tests/security/appliance-boundary.test.mjs`, `tests/packaging/`).
 
@@ -12,7 +12,7 @@ versions and must stay technically unable to reach Azure: `azure-auth`, `azure-a
   public surface, exports or the rules location change. Never claim a check passed that you did not run.
 - A change to any `packages/*` public surface is a change to the published packages and to the downstream edition: say so in
   the PR; releases are semver tags (`v*`), and the addon's `core-update` workflow tests each release before adopting it.
-- **Keep the AddOn informed.** When a change reaches `saulpatinojr/HCW-AzMigrateOrchestrator_Addon` (a `packages/*` public
+- **Keep the AddOn informed.** When a change reaches `saulpatinojr/HCW-MigrateOrchestrator_AddOn` (a `packages/*` public
   surface, the rule corpus, a release or its assets, the shared tests), add an entry to the AddOn's
   `docs/whats-new-upstream.md` in the same change set, or say in the PR why none is needed.
 - Rules are data: change `scripts/author-rules.mjs` → `node scripts/author-rules.mjs` → build → `amo rules report` → `amo rules snapshot`. Cite Microsoft Learn with a retrieval date.
