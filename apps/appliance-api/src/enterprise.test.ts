@@ -37,6 +37,76 @@ test("refuses to start with a client secret in the environment; roles map to lev
   assert.equal(principalFromClaims({ oid: "o", roles: ["Migration.Plan"] })?.grantedLevel, "planning");
 });
 
+test("app roles map to levels, the highest role wins, and anything else is no principal (ticket #46, ADR-0031)", () => {
+  assert.equal(principalFromClaims({ oid: "o", roles: ["Migration.Plan"] })?.grantedLevel, "planning");
+  assert.equal(principalFromClaims({ oid: "o", roles: ["Migration.Execute"] })?.grantedLevel, "controlled-execution");
+  assert.equal(principalFromClaims({ oid: "o", roles: ["Migration.Execute.Destructive"] })?.grantedLevel, "destructive-execution");
+  assert.equal(principalFromClaims({ oid: "o", roles: ["Migration.Plan", "Migration.Execute"] })?.grantedLevel, "controlled-execution");
+  assert.equal(principalFromClaims({ oid: "o", roles: ["Other.Role", "Migration.Execute.Destructive", "Migration.Plan"] })?.grantedLevel, "destructive-execution");
+  // No role is not "discovery": it is no principal.
+  assert.equal(principalFromClaims({ oid: "o", roles: [] }), null);
+  assert.equal(principalFromClaims({ oid: "o" }), null);
+  assert.equal(principalFromClaims({ roles: ["Migration.Plan"] }), null, "a role without an object id is still refused");
+  // Wrong role: other app roles, other casing, look-alikes, and the scope claim name used as a role.
+  for (const wrong of ["Reader", "Migration.Read", "migration.plan", "MIGRATION.PLAN", "Migration.Plan ", " Migration.Plan", "Migration.Planner", "Migration.Execute.Destructive.Extra", "access_as_user", ""]) {
+    assert.equal(principalFromClaims({ oid: "o", roles: [wrong] }), null, JSON.stringify(wrong));
+  }
+  // A roles claim that is not an array of strings must not match by substring or by coercion.
+  for (const odd of ["Migration.Plan", "xMigration.Planx", { 0: "Migration.Plan" }, [["Migration.Plan"]], [{ toString: () => "Migration.Plan" }], null, 7]) {
+    assert.equal(principalFromClaims({ oid: "o", roles: odd }), null, JSON.stringify(odd));
+  }
+});
+
+test("a valid token with no role, or the wrong role, is refused with 403 on every protected route (ticket #46, ADR-0031)", async () => {
+  const before = (await repo.listAssessments("roleless-oid")).length;
+  const eventsBefore = repo.events.length;
+  const col = { subscriptionId: SUB, resourceGroup: "rg-mover", name: "mc-roleless" };
+  const routes: Array<[string, string, unknown?]> = [
+    ["GET", "/api/me"],
+    ["GET", "/api/scopes"],
+    ["GET", "/api/assessments"],
+    ["POST", "/api/assessments", { scope: { kind: "subscription", id: SUB } }],
+    ["GET", "/api/assessments/00000000-0000-4000-8000-000000000001"],
+    ["POST", "/api/assessments/00000000-0000-4000-8000-000000000001/validate-move", { targetResourceGroupId: "/x" }],
+    ["POST", "/api/approvals", { operation: "production-deploy", targetKey: "mc-roleless" }],
+    ["POST", "/api/execution/resource-mover/prepare", { collection: col, moveResourceIds: ["/r1"] }],
+    ["POST", "/api/execution/resource-mover/commit", { collection: col, moveResourceIds: ["/r1"] }],
+    ["GET", "/api/operations/mc-roleless"],
+    ["GET", "/api/no-such-route"],
+  ];
+  const tokens: Array<[string, string[]]> = [["no roles claim value", []], ["an unrelated role", ["Reader"]], ["a look-alike role in other casing", ["migration.plan"]], ["a look-alike role with a suffix", ["Migration.Plan.ReadOnly"]]];
+  for (const [what, roles] of tokens) {
+    const token = mint(roles, "roleless-oid");
+    for (const [method, path, body] of routes) {
+      const r = await call(path, token, method, body);
+      assert.equal(r.status, 403, `${what}: ${method} ${path}`);
+      const j = (await r.json()) as { error: { code: string; message: string }; level?: unknown; oid?: unknown };
+      assert.equal(j.error.code, "forbidden");
+      assert.match(j.error.message, /no application role assigned/);
+      assert.equal(j.level, undefined, "no level is disclosed to a roleless caller");
+    }
+  }
+  assert.equal((await repo.listAssessments("roleless-oid")).length, before, "nothing was created for the roleless caller");
+  assert.equal(repo.events.length, eventsBefore, "no audit-worthy action was taken for the roleless caller");
+  // Still 401 (not 403) without a valid token, and the public routes stay public.
+  assert.equal((await call("/api/me", null)).status, 401);
+  assert.equal((await call("/api/health", null)).status, 200);
+});
+
+test("a valid role is accepted: each role reaches /api/me with its level, and Migration.Plan can still discover (ticket #46)", async () => {
+  for (const [role, level] of [["Migration.Plan", "planning"], ["Migration.Execute", "controlled-execution"], ["Migration.Execute.Destructive", "destructive-execution"]] as const) {
+    const r = await call("/api/me", mint([role], `holder-${role}`));
+    assert.equal(r.status, 200, role);
+    const j = (await r.json()) as { level: string; roles: string[] };
+    assert.equal(j.level, level);
+    assert.deepEqual(j.roles, [role]);
+  }
+  const created = await call("/api/assessments", mint(["Migration.Plan"], "planner-2"), "POST", { scope: { kind: "subscription", id: SUB } });
+  assert.equal(created.status, 201);
+  // An extra, unrelated role next to a valid one does not take the valid one away.
+  assert.equal((await call("/api/me", mint(["Reader", "Migration.Plan"], "mixed"))).status, 200);
+});
+
 test("refuses a certificate path or a user name identity (ticket #50); existing refusals unchanged", () => {
   assert.throws(() => configFromEnv({ AZURE_CLIENT_CERTIFICATE_PATH: "/certs/app.pem" }), /AZURE_CLIENT_CERTIFICATE_PATH.*not supported/);
   assert.throws(() => configFromEnv({ AZURE_USERNAME: "someone@example.test" }), /AZURE_USERNAME.*not supported/);

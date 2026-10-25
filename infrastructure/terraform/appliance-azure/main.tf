@@ -16,6 +16,10 @@ provider "azuread" {}
 locals {
   name = "${var.prefix}-${var.environment}-${var.location_short}"
   tags = merge({ application = "azure-migration-orchestrator", component = "appliance", environment = var.environment }, var.tags)
+
+  # Subnet ranges, shared by the subnets and by the network security group rules that name them (ADR-0032).
+  aca_subnet_cidr = cidrsubnet(var.vnet_cidr, 4, 0)
+  db_subnet_cidr  = cidrsubnet(var.vnet_cidr, 4, 1)
 }
 
 resource "azurerm_resource_group" "app" {
@@ -69,7 +73,7 @@ resource "azurerm_subnet" "aca" {
   name                 = "snet-aca"
   resource_group_name  = azurerm_resource_group.app.name
   virtual_network_name = azurerm_virtual_network.app.name
-  address_prefixes     = [cidrsubnet(var.vnet_cidr, 4, 0)]
+  address_prefixes     = [local.aca_subnet_cidr]
   delegation {
     name = "aca"
     service_delegation {
@@ -83,7 +87,7 @@ resource "azurerm_subnet" "db" {
   name                 = "snet-db"
   resource_group_name  = azurerm_resource_group.app.name
   virtual_network_name = azurerm_virtual_network.app.name
-  address_prefixes     = [cidrsubnet(var.vnet_cidr, 4, 1)]
+  address_prefixes     = [local.db_subnet_cidr]
   delegation {
     name = "pg"
     service_delegation {
@@ -91,6 +95,160 @@ resource "azurerm_subnet" "db" {
       actions = ["Microsoft.Network/virtualNetworks/subnets/join/action"]
     }
   }
+}
+
+# Subnet firewalls (ticket #53, ADR-0032). Each subnet gets a network security group (NSG) that ends in an explicit
+# deny-all-inbound rule at priority 4096, which also overrides Azure's built-in "allow traffic from the virtual network"
+# rule, so nothing reaches either subnet unless a rule below names it. Outbound is left at Azure's defaults on purpose:
+# the Container Apps platform and PostgreSQL both have outbound dependencies (container registry, Microsoft Entra ID,
+# Azure Monitor, Storage) that an outbound lockdown must list exactly, and the docs for both services say what to allow.
+
+# Container Apps subnet. Rules follow "Network security groups for configuring a virtual network in Azure Container Apps"
+# for a consumption-only environment (the type this configuration creates: it has no workload_profile block).
+resource "azurerm_network_security_group" "aca" {
+  name                = "nsg-${local.name}-aca"
+  location            = var.location
+  resource_group_name = azurerm_resource_group.app.name
+  tags                = local.tags
+}
+
+# Accepted risk, the only suppression in this configuration (ADR-0032): by default the API is reachable over HTTPS from the
+# internet, because the container app has external ingress and its users sign in from anywhere. Every request still needs a
+# valid Microsoft Entra token that carries an app role (ADR-0031). Restrict it with var.ingress_allowed_source_prefixes.
+#trivy:ignore:AVD-AZU-0047
+resource "azurerm_network_security_rule" "aca_allow_https_from_clients" {
+  name                         = "allow-https-from-clients"
+  description                  = "HTTPS to the API from var.ingress_allowed_source_prefixes. Port 80 is deliberately closed so no bearer token goes in clear text."
+  network_security_group_name  = azurerm_network_security_group.aca.name
+  resource_group_name          = azurerm_resource_group.app.name
+  priority                     = 100
+  direction                    = "Inbound"
+  access                       = "Allow"
+  protocol                     = "Tcp"
+  source_port_range            = "*"
+  source_address_prefixes      = var.ingress_allowed_source_prefixes
+  destination_address_prefixes = [local.aca_subnet_cidr]
+  destination_port_range       = "443"
+}
+
+resource "azurerm_network_security_rule" "aca_allow_load_balancer_probes" {
+  name                         = "allow-azure-load-balancer-probes"
+  description                  = "Azure Load Balancer health probes of the environment (the platform allocates a port in this range)."
+  network_security_group_name  = azurerm_network_security_group.aca.name
+  resource_group_name          = azurerm_resource_group.app.name
+  priority                     = 110
+  direction                    = "Inbound"
+  access                       = "Allow"
+  protocol                     = "Tcp"
+  source_port_range            = "*"
+  source_address_prefix        = "AzureLoadBalancer"
+  destination_address_prefixes = [local.aca_subnet_cidr]
+  destination_port_range       = "30000-32767"
+}
+
+resource "azurerm_network_security_rule" "aca_allow_subnet_internal" {
+  name                         = "allow-subnet-internal"
+  description                  = "Traffic inside the Container Apps subnet (the environment's Envoy sidecars talk to each other)."
+  network_security_group_name  = azurerm_network_security_group.aca.name
+  resource_group_name          = azurerm_resource_group.app.name
+  priority                     = 120
+  direction                    = "Inbound"
+  access                       = "Allow"
+  protocol                     = "*"
+  source_port_range            = "*"
+  source_address_prefixes      = [local.aca_subnet_cidr]
+  destination_address_prefixes = [local.aca_subnet_cidr]
+  destination_port_range       = "*"
+}
+
+resource "azurerm_network_security_rule" "aca_deny_all_inbound" {
+  name                        = "deny-all-inbound"
+  description                 = "Default deny: everything not allowed above, including other subnets of the virtual network."
+  network_security_group_name = azurerm_network_security_group.aca.name
+  resource_group_name         = azurerm_resource_group.app.name
+  priority                    = 4096
+  direction                   = "Inbound"
+  access                      = "Deny"
+  protocol                    = "*"
+  source_port_range           = "*"
+  source_address_prefix       = "*"
+  destination_address_prefix  = "*"
+  destination_port_range      = "*"
+}
+
+# The association comes after the rules, so the subnet is never briefly attached to an empty group.
+resource "azurerm_subnet_network_security_group_association" "aca" {
+  subnet_id                 = azurerm_subnet.aca.id
+  network_security_group_id = azurerm_network_security_group.aca.id
+  depends_on = [
+    azurerm_network_security_rule.aca_allow_https_from_clients,
+    azurerm_network_security_rule.aca_allow_load_balancer_probes,
+    azurerm_network_security_rule.aca_allow_subnet_internal,
+    azurerm_network_security_rule.aca_deny_all_inbound,
+  ]
+}
+
+# Database subnet: PostgreSQL only, and only from the Container Apps subnet.
+resource "azurerm_network_security_group" "db" {
+  name                = "nsg-${local.name}-db"
+  location            = var.location
+  resource_group_name = azurerm_resource_group.app.name
+  tags                = local.tags
+}
+
+resource "azurerm_network_security_rule" "db_allow_postgres_from_aca" {
+  name                         = "allow-postgres-from-aca-subnet"
+  description                  = "PostgreSQL (5432) from the Container Apps subnet, where the API and the worker run."
+  network_security_group_name  = azurerm_network_security_group.db.name
+  resource_group_name          = azurerm_resource_group.app.name
+  priority                     = 100
+  direction                    = "Inbound"
+  access                       = "Allow"
+  protocol                     = "Tcp"
+  source_port_range            = "*"
+  source_address_prefixes      = [local.aca_subnet_cidr]
+  destination_address_prefixes = [local.db_subnet_cidr]
+  destination_port_range       = "5432"
+}
+
+resource "azurerm_network_security_rule" "db_allow_postgres_within_subnet" {
+  name                         = "allow-postgres-within-db-subnet"
+  description                  = "Port 5432 inside the database subnet, which PostgreSQL features such as high availability need (Microsoft Learn)."
+  network_security_group_name  = azurerm_network_security_group.db.name
+  resource_group_name          = azurerm_resource_group.app.name
+  priority                     = 110
+  direction                    = "Inbound"
+  access                       = "Allow"
+  protocol                     = "Tcp"
+  source_port_range            = "*"
+  source_address_prefixes      = [local.db_subnet_cidr]
+  destination_address_prefixes = [local.db_subnet_cidr]
+  destination_port_range       = "5432"
+}
+
+resource "azurerm_network_security_rule" "db_deny_all_inbound" {
+  name                        = "deny-all-inbound"
+  description                 = "Default deny: everything not allowed above."
+  network_security_group_name = azurerm_network_security_group.db.name
+  resource_group_name         = azurerm_resource_group.app.name
+  priority                    = 4096
+  direction                   = "Inbound"
+  access                      = "Deny"
+  protocol                    = "*"
+  source_port_range           = "*"
+  source_address_prefix       = "*"
+  destination_address_prefix  = "*"
+  destination_port_range      = "*"
+}
+
+resource "azurerm_subnet_network_security_group_association" "db" {
+  subnet_id                 = azurerm_subnet.db.id
+  network_security_group_id = azurerm_network_security_group.db.id
+  depends_on = [
+    azurerm_network_security_rule.db_allow_postgres_from_aca,
+    azurerm_network_security_rule.db_allow_postgres_within_subnet,
+    azurerm_network_security_rule.db_deny_all_inbound,
+  ]
 }
 
 resource "azurerm_private_dns_zone" "pg" {
@@ -117,13 +275,18 @@ resource "azurerm_postgresql_flexible_server" "db" {
   delegated_subnet_id           = azurerm_subnet.db.id
   private_dns_zone_id           = azurerm_private_dns_zone.pg.id
   public_network_access_enabled = false
+  # Off by default. Opting in roughly doubles backup storage and can only be chosen when the server is created (ADR-0032).
+  geo_redundant_backup_enabled = var.postgres_geo_redundant_backup_enabled
   authentication {
     active_directory_auth_enabled = true
     password_auth_enabled         = false
     tenant_id                     = var.tenant_id
   }
-  tags       = local.tags
-  depends_on = [azurerm_private_dns_zone_virtual_network_link.pg]
+  tags = local.tags
+  depends_on = [
+    azurerm_private_dns_zone_virtual_network_link.pg,
+    azurerm_subnet_network_security_group_association.db,
+  ]
 }
 
 resource "azurerm_postgresql_flexible_server_active_directory_administrator" "app" {
@@ -147,6 +310,8 @@ resource "azurerm_container_app_environment" "app" {
   log_analytics_workspace_id = azurerm_log_analytics_workspace.app.id
   infrastructure_subnet_id   = azurerm_subnet.aca.id
   tags                       = local.tags
+  # The subnet firewall is attached before the environment is created, so the environment is built under it.
+  depends_on = [azurerm_subnet_network_security_group_association.aca]
 }
 
 resource "azurerm_container_app" "api" {
@@ -208,7 +373,9 @@ resource "azurerm_container_app" "api" {
   }
 }
 
-# Entra app registration for the appliance API with app roles mapped to authorization levels.
+# Entra app registration for the appliance API with app roles mapped to authorization levels. The API refuses a token
+# that carries none of these roles (403, ADR-0031), and the service principal below makes Entra refuse to issue a token
+# to anyone who has not been assigned a role.
 resource "azuread_application" "api" {
   display_name     = "Azure Migration Orchestrator (${var.environment})"
   sign_in_audience = "AzureADMyOrg"
@@ -229,6 +396,23 @@ resource "azuread_application" "api" {
       value                = app_role.key
     }
   }
+}
+
+# The enterprise application (service principal) behind the registration. app_role_assignment_required = true means Entra
+# issues a token for this API only to users, groups and applications that have been assigned one of the app roles above
+# (ticket #46, ADR-0031). Without it, any user in the tenant could obtain a token (the API would still refuse it, 403).
+resource "azuread_service_principal" "api" {
+  client_id                    = azuread_application.api.client_id
+  app_role_assignment_required = true
+}
+
+# Optional, declarative role assignments (var.app_role_assignments, empty by default). Anyone not listed there is assigned
+# in the Entra portal instead; the steps are in docs/deployment/enterprise.md.
+resource "azuread_app_role_assignment" "api" {
+  for_each            = var.app_role_assignments
+  app_role_id         = azuread_service_principal.api.app_role_ids[each.value.role]
+  principal_object_id = each.value.principal_object_id
+  resource_object_id  = azuread_service_principal.api.object_id
 }
 
 # Worker: same image, different command; polls Azure long-running operations and updates the repository (ADR-0026).

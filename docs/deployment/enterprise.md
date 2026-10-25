@@ -30,18 +30,67 @@ cd infrastructure/terraform/appliance-azure && cp terraform.tfvars.example terra
 terraform init && terraform plan -out appliance.plan && terraform apply appliance.plan
 ```
 
-Creates: resource group, user-assigned identity (Reader on `assessment_scope_ids`), VNet + delegated subnets, PostgreSQL
+Creates: resource group, user-assigned identity (Reader on `assessment_scope_ids`), VNet + delegated subnets, each behind
+a network security group that denies all inbound traffic except what the appliance needs (section 2d), PostgreSQL
 Flexible Server (private, **Entra-only auth**, the identity is the DB admin), Log Analytics + App Insights, Container Apps
-environment + app, Entra app registration with app roles. Follow the `post_apply` output (identifier URI, role assignments).
+environment + app, Entra app registration with app roles, and its enterprise application with **assignment required**
+switched on (section 2). Follow the `post_apply` output (identifier URI, role assignments).
 
 ## 2. Authentication model
 
+Signing in with Microsoft Entra ID is not enough. To use the appliance a person (or an application) must also be **assigned
+one of the app roles** below. The API reads the roles from the token and answers **403 `forbidden`** to a valid token
+that has no role, or only a role it does not know, on every route except the public health and agent-list routes. There is
+no "signed in, no role" level (ADR-0031).
+
 | Role | Level | Can |
 |---|---|---|
-| (signed in, no role) | discovery | run discovery assessments on permitted scopes |
-| `Migration.Plan` | planning | + validate-move evidence, plans, bundles |
+| (no role, or an unknown role) | none | nothing: every protected route answers 403 |
+| `Migration.Plan` | planning | discovery assessments on permitted scopes, validate-move evidence, plans, bundles (read-only) |
 | `Migration.Execute` | controlled-execution | + record approvals; Resource Mover prepare / initiateMove (approval `production-deploy`) / discard |
 | `Migration.Execute.Destructive` | destructive-execution | + commit (approval `data-cutover`), source deletion workflows (future) |
+
+Two layers enforce this. Terraform sets `app_role_assignment_required = true` on the enterprise application, so Entra
+itself issues no token to anyone who is not assigned a role (Entra refuses the sign-in of an unassigned user,
+and an unassigned application cannot get a token). The API checks the role again in every token, so a token obtained some other way, or an environment where
+the setting was switched off, still gets 403.
+
+### Assign a role to a person
+
+Do this after the first `terraform apply`, and again for each new person. You need to be an owner of the application or
+hold the Application Administrator or Cloud Application Administrator role in Entra. See
+[Assign users and groups to an application](https://learn.microsoft.com/en-us/entra/identity/enterprise-apps/assign-user-or-group-access-portal).
+
+1. Open the [Microsoft Entra admin center](https://entra.microsoft.com) and sign in.
+2. Go to **Entra ID**, then **Enterprise apps**, and open **Azure Migration Orchestrator (prod)** (the name ends in the `environment` you deployed, `prod` by default).
+3. Choose **Users and groups**, then **Add user/group**.
+4. Under **Users**, pick the person. Assigning a group needs Microsoft Entra ID P1 or higher; a single user does not.
+5. Under **Select a role**, pick `Migration.Plan` (read-only), `Migration.Execute` or `Migration.Execute.Destructive`, then **Assign**.
+6. Ask the person to sign out of the appliance and sign in again. Their new token carries the role. You should see their level next to their name at the top of the page.
+
+### Assign roles with Terraform instead
+
+The variable `app_role_assignments` assigns roles when you apply. This example assigns yourself `Migration.Execute`.
+Run it in the same shell you use for the other `terraform` commands in section 1, then plan and apply again.
+
+PowerShell:
+
+```powershell
+$me = az ad signed-in-user show --query id --output tsv
+$env:TF_VAR_app_role_assignments = '{"me":{"principal_object_id":"' + $me + '","role":"Migration.Execute"}}'
+```
+
+bash:
+
+```bash
+me="$(az ad signed-in-user show --query id --output tsv)"
+export TF_VAR_app_role_assignments="{\"me\":{\"principal_object_id\":\"$me\",\"role\":\"Migration.Execute\"}}"
+```
+
+Each entry is a label you choose, the person's (or group's, or application's) object ID, and the role. The outputs
+`api_service_principal_object_id` and `api_app_roles` print the enterprise application's object ID and the role IDs.
+Removing an entry removes that assignment on the next apply. A role assigned in the portal and also listed here is
+reported as already existing: keep each person in one place.
 
 Tokens: authorization-code flow with PKCE in the client; the API validates audience `api://` followed by the API registration's Application (client) ID against the tenant
 JWKS. Credentials for Azure calls: managed identity in Container Apps (`AMO_CREDENTIAL_KIND=managed-identity`), workload
@@ -59,6 +108,32 @@ set to the exact web address where you host the UI, with no slash at the end (th
 The worker Container App (named `ca-`, your app name, then `-worker`) runs `node apps/worker/dist/main.js` from the same image with the same identity, polling Azure long-running
 operations recorded by the API and auditing their completion (ADR-0026). Locally: the `worker` service in
 `docker-compose.appliance.yml`.
+
+## 2d. Network rules and optional costs
+
+The two subnets each have a network security group (a firewall for a subnet) with a deny-all-inbound rule at the end, so
+only the traffic below gets in (ADR-0032). Outbound traffic is left at Azure's defaults.
+
+| Subnet | Allowed in | Everything else |
+|---|---|---|
+| Container Apps (`snet-aca`) | HTTPS (443) from `ingress_allowed_source_prefixes`; the Azure Load Balancer health probes; the subnet's own addresses | denied, including the database subnet |
+| Database (`snet-db`) | PostgreSQL (5432) from the Container Apps subnet; 5432 inside the database subnet (PostgreSQL features such as high availability need it) | denied |
+
+- **Port 80 is closed on purpose.** A browser or script that calls `http://` instead of `https://` fails to connect; it is
+  never redirected, so a sign-in token cannot be sent in clear text by mistake.
+- **Who can reach the API.** `ingress_allowed_source_prefixes` defaults to `["Internet"]`, because the API is public and
+  every call still needs a token with an app role. To allow only your office or VPN, set it to a list of ranges in
+  `terraform.tfvars`, for example `ingress_allowed_source_prefixes = ["203.0.113.0/24"]`. The value `"Internet"` cannot be
+  mixed with ranges.
+- **Geo-redundant database backup is off.** `postgres_geo_redundant_backup_enabled = true` keeps a second copy of the
+  backups in the paired Azure region. It costs money (backup storage is billed for twice the backup size beyond the free
+  allowance, see [Backup and restore](https://learn.microsoft.com/azure/postgresql/backup-restore/concepts-backup-restore))
+  and Azure only allows choosing it when the server is created: switching it on for an existing server makes Terraform plan
+  to destroy and recreate the database. Decide before the first apply. Restoring in the paired region also needs a second
+  virtual network and DNS zone, which this configuration does not create.
+- **No private endpoint.** The database already has no public address and lives inside the virtual network (virtual network
+  integration). Azure Database for PostgreSQL offers either that or a private endpoint, not both, so there is nothing to add;
+  see ADR-0032.
 
 ## 3. API surface
 
@@ -81,3 +156,5 @@ Outside production mode (for example `npm run appliance:api` on a laptop) it sti
 
 JWKS fetch, Resource Graph paging, `validateMoveResources` polling, Resource Mover API shapes ([VERIFY] 2023-08-01 request
 bodies), PostgreSQL Entra token exchange at connect time (implemented as a `pg` password provider, ADR-0025; untested live). All are exercised against fakes in the test suite.
+
+Also not yet validated live: that Entra refuses to issue a token to an unassigned user or application once `app_role_assignment_required` is on, that the `roles` claim carries the assigned role in a real access token, and that the subnet network security groups let the Container Apps environment and the PostgreSQL server come up and talk to each other. The Terraform tests (`terraform test` with mocked providers) and the static tests prove what the configuration declares, not what Azure or Entra do with it. If the Container Apps environment fails to start after the groups are attached, the first rule to review is the one for the Container Apps subnet (section 2d) against the current Microsoft Learn page "Network security groups for configuring a virtual network in Azure Container Apps".

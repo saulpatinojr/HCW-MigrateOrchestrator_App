@@ -138,7 +138,17 @@ docker, network access to Azure/GitHub/Microsoft Learn. Everything below disting
 
 ## Entra `nbf` check, ticket #46 (2026-10-24)
 
-Ran on Node 26.12.1: `npm ci`, `npm test` (126 passed, 0 failed, including the new `nbf` test and the appliance API tests), `npm run rules:validate` and `npm run packages:verify`. Not run: Docker, Terraform, a live Entra sign-in. The role / assignment-required half of #46 is not implemented (owner decision pending).
+Ran on Node 26.12.1: `npm ci`, `npm test` (126 passed, 0 failed, including the new `nbf` test and the appliance API tests), `npm run rules:validate` and `npm run packages:verify`. Not run: Docker, Terraform, a live Entra sign-in. The role / assignment-required half of #46 was implemented afterwards (ADR-0031, section below).
+
+## App role required and subnet firewalls, tickets #46 and #53 (2026-10-25, ADR-0031, ADR-0032)
+
+Ran on Windows 11 with Node 26.5.0, Terraform 1.16.6 (local), Terraform 1.9.8 and Trivy 0.76.1 (pinned containers), Docker Desktop (`desktop-linux`):
+
+- `npm ci`, `npm run build`, `npm run test:only` (141 passed, 0 failed, including 3 new API tests and 11 new static Terraform and role tests), `npm run rules:validate` (35 rules), `npm run packages:verify`, `npm run web:build`. On Windows the golden-file test fails on a stock checkout because Git rewrites `samples/` to CRLF line endings; the run above used LF copies of those files (the committed content), as CI does.
+- `bash scripts/ci/local-iac-checks.sh all`: `terraform fmt -check`, `init -backend=false`, `validate`, `terraform test` (12 plan-only runs, mocked providers) with Terraform 1.9.8, and `trivy config` at HIGH,CRITICAL (0 findings, with the one documented suppression). At all severities Trivy still reports 3 MEDIUM findings on the PostgreSQL server parameters (`AVD-AZU-0019`, `-0021`, `-0024`); they were there before and are not part of these tickets.
+- Mutations checked: making `principalFromClaims` default to `discovery` fails two API tests; setting `app_role_assignment_required = false` or moving the deny rule from priority 4096 fails three Terraform test runs.
+
+**Not run, not verified:** `terraform plan` or `apply` against any subscription or tenant; that the Container Apps environment and the PostgreSQL server start under the new network security groups; that Entra refuses to issue a token to an unassigned user or application; that a real access token carries the `roles` claim; checkov (the ticket's scanner; the image was not pulled), and which resource `CKV2_AZURE_57` names; the version of Trivy that `aquasecurity/trivy-action` uses in CI. Open question for the owner, found while reading the Terraform: `snet-aca` is a /26 and the azurerm provider documents a /23 minimum for an environment without workload profiles (ADR-0032).
 
 ## Not implemented
 

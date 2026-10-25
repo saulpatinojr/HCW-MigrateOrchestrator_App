@@ -45,9 +45,28 @@ export function assertProductionConfig(cfg: EnterpriseConfig, env: NodeJS.Proces
   if (missing.length) throw new Error(`refusing to start in production: Entra ID sign-in is not configured (missing ${missing.join(" and ")}); set them as described in docs/deployment/enterprise.md`);
 }
 
-export function principalFromClaims(claims: { oid?: string; roles?: string[] } | null): Principal | null {
+/**
+ * The Entra app roles the API recognises, highest first, and the authorization level each grants (ADR-0031). Role values
+ * are matched exactly (case-sensitive), as Entra issues them in the `roles` claim. The lowest role is `Migration.Plan`;
+ * a token with none of these roles is not a principal at all.
+ */
+export const APP_ROLE_LEVELS: ReadonlyArray<readonly [role: string, level: AuthorizationLevel]> = [
+  ["Migration.Execute.Destructive", "destructive-execution"],
+  ["Migration.Execute", "controlled-execution"],
+  ["Migration.Plan", "planning"],
+];
+
+/**
+ * Maps validated token claims to a principal. Fails closed (ticket #46, ADR-0031): no object id, no `roles` array, or no
+ * recognised app role gives `null`, and the API answers 403. A signed-in user without a role gets no access, not
+ * "discovery". A `roles` claim that is not an array of strings counts as no roles (a string would otherwise match by
+ * substring).
+ */
+export function principalFromClaims(claims: { oid?: string; roles?: unknown } | null): Principal | null {
   if (!claims?.oid) return null;
-  const level: AuthorizationLevel = claims.roles?.includes("Migration.Execute.Destructive") ? "destructive-execution" : claims.roles?.includes("Migration.Execute") ? "controlled-execution" : claims.roles?.includes("Migration.Plan") ? "planning" : "discovery";
+  const held = new Set(Array.isArray(claims.roles) ? claims.roles.filter((r): r is string => typeof r === "string") : []);
+  const level = APP_ROLE_LEVELS.find(([role]) => held.has(role))?.[1];
+  if (!level) return null;
   return { id: claims.oid, edition: "enterprise", grantedLevel: level, approvals: new Set() };
 }
 
@@ -90,8 +109,14 @@ export function createEnterpriseApi(cfg: EnterpriseConfig, deps: ApplianceDeps):
       if (!deps.validator) return fail(401, "unauthenticated", "Entra ID sign-in not configured (AMO_ENTRA_TENANT_ID, AMO_ENTRA_CLIENT_ID); see docs/deployment/enterprise.md");
       const v = await deps.validator.validate(req.headers.authorization);
       if (!v.ok) return fail(401, "unauthenticated", v.reason);
-      const principal = principalFromClaims(v.claims)!;
       const actor = v.claims.oid;
+      // A valid token is not enough: it must carry an app role (ADR-0031). A token with no role and one with an
+      // unrecognised role get the same answer, on every route below.
+      const principal = principalFromClaims(v.claims);
+      if (!principal) {
+        log.warn("request refused: token has no recognised app role", { oid: actor });
+        return fail(403, "forbidden", "no application role assigned: ask an administrator to assign you one of the Migration.* app roles (docs/deployment/enterprise.md, section 2)");
+      }
 
       if (url.pathname === "/api/me") return send(200, { oid: actor, level: principal.grantedLevel, roles: v.claims.roles });
 
