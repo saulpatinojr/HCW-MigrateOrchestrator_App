@@ -29,7 +29,7 @@ The existing website is https://hybridcloudworks.com and its repository is https
 | CSV lab API | Existing Hostinger VPS, behind host-native Caddy | Lab image from `_Addon` (built on the published core); host configuration in website repository |
 | Authenticated appliance UI and API | One Azure Container App, same origin | `_App` repository |
 | Lab image | Docker Hub `docker.io/hybridcloudworks/hcw-addon-migration`, by digest | Versioned releases from `_Addon` |
-| Appliance image | Docker Hub `docker.io/hybridcloudworks/hcw-migrateorchestrator`, by digest, through the Docker OIDC connection | Versioned releases from `_App` |
+| Appliance image | Docker Hub `docker.io/hybridcloudworks/img-mo-appliance-app`, by digest, through the Docker OIDC connection | Versioned releases from `_App` |
 | Reusable core and explorer packages | Public npm registry, `@hybridcloudworks/migration-core` and `@hybridcloudworks/migration-ui` (trusted publishing) | `_App` repository |
 | CLI downloads | GitHub Releases | `_App` repository |
 | Appliance infrastructure state | Dedicated HCP Terraform workspace | `_App` repository's project Terraform root |

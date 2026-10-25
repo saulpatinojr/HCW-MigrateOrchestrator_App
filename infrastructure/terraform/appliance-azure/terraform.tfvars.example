@@ -1,5 +1,5 @@
 tenant_id            = "00000000-0000-0000-0000-000000000000"
 assessment_scope_ids = ["/subscriptions/00000000-0000-0000-0000-000000000000"]
 # Required, and deliberately not set here: image_ref, the appliance image by exact digest. Copy the line that ends the
-# publish-images run summary (docker.io/hybridcloudworks/hcw-migrateorchestrator@sha256: followed by 64 hexadecimal
+# publish-images run summary (docker.io/hybridcloudworks/img-mo-appliance-app@sha256: followed by 64 hexadecimal
 # characters) and pass it as shown in docs/deployment/enterprise.md. Tags such as :latest are refused.
