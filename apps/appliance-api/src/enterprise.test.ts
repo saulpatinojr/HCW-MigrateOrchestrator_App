@@ -27,7 +27,9 @@ const fakeFetch = (async (url: string, init?: RequestInit) => {
 }) as unknown as typeof fetch;
 const res = (name: string, type: string): NormalizedResource => { const id = `/subscriptions/${SUB}/resourceGroups/rg/providers/${type}/${name}`; return { key: id.toLowerCase(), resourceId: id, name, type, provider: type.split("/")[0], resourceGroup: "rg", location: "eastus", subscriptionName: null, subscriptionId: SUB, kind: null, sku: null, status: null, tags: {}, parsedId: { valid: true, issues: [], fullType: type, name, subscriptionId: SUB, resourceGroup: "rg" }, provenance: [], warnings: [], sourceRow: 0 }; };
 const repo = new InMemoryRepository();
-const cfg = configFromEnv({ AMO_ENTRA_TENANT_ID: TENANT, AMO_ENTRA_CLIENT_ID: "amo", AMO_ENTRA_AUDIENCE: "api://amo" });
+// These tests drive one principal through approve-then-execute, so they opt out of the two-person rule explicitly
+// (AMO_ALLOW_SELF_APPROVAL, ADR-0031). The rule itself, and the default, are tested in two-person-approval.test.ts.
+const cfg = configFromEnv({ AMO_ENTRA_TENANT_ID: TENANT, AMO_ENTRA_CLIENT_ID: "amo", AMO_ENTRA_AUDIENCE: "api://amo", AMO_ALLOW_SELF_APPROVAL: "true" });
 const server = createEnterpriseApi(cfg, { validator: new EntraTokenValidator({ tenantId: TENANT, audiences: ["api://amo"], fetchImpl: fakeFetch }), credential: new StaticTokenCredential(), repository: repo, discovery: new FixtureDiscoveryProvider([res("vm1", "Microsoft.Compute/virtualMachines"), res("st1", "Microsoft.Storage/storageAccounts")]), fetchImpl: fakeFetch, logger: noopLogger });
 await new Promise<void>((r) => server.listen(0, r));
 const base = `http://127.0.0.1:${(server.address() as { port: number }).port}`;

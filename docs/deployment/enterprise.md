@@ -72,8 +72,8 @@ assessment is only visible to the person who created it):
 | `GET /api/operations/{targetKey}` | 403 | yes | yes | yes |
 | `POST /api/approvals` | 403 | 403 | yes | yes |
 | `POST /api/execution/resource-mover/{prepare, discard}` | 403 | 403 | yes | yes |
-| `POST /api/execution/resource-mover/initiateMove` | 403 | 403 | yes, with a recorded `production-deploy` approval | same |
-| `POST /api/execution/resource-mover/commit` | 403 | 403 | yes, with a recorded `data-cutover` approval | same |
+| `POST /api/execution/resource-mover/initiateMove` | 403 | 403 | yes, with a `production-deploy` approval recorded by someone else | same |
+| `POST /api/execution/resource-mover/commit` | 403 | 403 | yes, with a `data-cutover` approval recorded by someone else | same |
 
 No route today needs more than `Migration.Execute`: the extra level of `Migration.Execute.Destructive` is reserved by the approval
 gate for operations such as source deletion, which the API does not expose yet.
@@ -98,9 +98,15 @@ to ask an administrator (Entra error code `AADSTS50105`; unverified against a re
 
 **Known limitations (pre-existing, not changed).** A role is not a data scope. Operation status
 (`GET /api/operations/{targetKey}`) can be read by any `Migration.Plan` holder or higher for any collection name. Approvals are
-matched on the collection name only, so an approval recorded by one `Migration.Execute` holder counts for anyone's execution of
-that collection, and the person who records an approval can also be the person who executes it: there is no separation of
-duties yet. Assessments are the exception: they are visible only to their creator. See ADR-0031.
+matched on the collection name only. Assessments are the exception: they are visible only to their creator. See ADR-0031.
+
+**Two-person approval (`AMO_ALLOW_SELF_APPROVAL`).** An approval only counts for a Resource Mover `initiateMove` or `commit` when
+the person who recorded it is not the person executing. So a move needs two `Migration.Execute` holders: one records the approval
+(`POST /api/approvals`), the other runs the action; a person's own approval is ignored and the answer is 403 with the reason. If
+the appliance is a lab or has a single operator, an administrator can set `AMO_ALLOW_SELF_APPROVAL=true` on the **API** Container
+App (not the worker) to turn the rule off; every execution that used the caller's own approval is then marked `selfApproval: true`
+in the audit log. It is off by default, the Terraform in this repository never sets it, and any value other than `true` or
+`false` stops the API at startup. For `docker compose`, put it in `.env` (see `.env.example`).
 
 ### Assign a role to a person
 

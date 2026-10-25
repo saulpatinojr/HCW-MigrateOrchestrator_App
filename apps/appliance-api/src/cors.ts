@@ -71,6 +71,13 @@ export function applyCors(allowed: readonly string[], req: IncomingMessage, res:
   res.setHeader("access-control-allow-methods", CORS_METHODS);
   res.setHeader("access-control-allow-headers", CORS_HEADERS);
   res.setHeader("access-control-max-age", CORS_MAX_AGE_SECONDS);
+  // Private Network Access (F9 of issue 83): Chrome asks, with this request header, whether a public page may reach a
+  // private or loopback address. Say yes only to that exact question, and only here, where the Origin is already on the
+  // list; the answer depends on the request header, so a cache must key on it.
+  if (req.headers["access-control-request-private-network"] === "true") {
+    res.setHeader("access-control-allow-private-network", "true");
+    res.setHeader("vary", "Origin, Access-Control-Request-Private-Network");
+  }
   res.writeHead(204);
   res.end();
   return true;

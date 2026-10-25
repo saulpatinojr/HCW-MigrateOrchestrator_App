@@ -113,16 +113,14 @@ in the pipeline. Use the variable for a lab or for your own first assignment.
 - **Not verified:** behaviour against a real tenant, that the `roles` claim appears in a real access token for an assigned
   user, and Entra's refusal to issue a token to an unassigned user. Recorded in `VALIDATION.md`.
 
+**Two-person approval (amendment 2026-10-25, security follow-up F-05 of issue 83; decided by the owner).** An approval now only counts when the person who recorded it is not the person executing. The execution route for Resource Mover `initiateMove` (approval `production-deploy`) and `commit` (approval `data-cutover`) ignores approvals whose `approvedBy` equals the caller's object id (compared without regard to case) and answers 403 with a reason that names the two-person rule; the audit event records how many of the caller's own approvals were set aside. A second `Migration.Execute` holder records the approval, the first executes. `prepare` and `discard` need no approval and are unchanged. The explicit opt-out is **`AMO_ALLOW_SELF_APPROVAL=true`**, for a lab or a single-operator appliance where there is no second person: off by default, never set by the Terraform, the image or the Compose file (which only passes through what the operator sets), refused at startup if it holds any value other than `true` or `false`, ignored by the worker, and when it lets an execution through on the caller's own approval the audit event says `selfApproval: true`. Alternatives considered: approvals bound to a named requester (more bookkeeping, same protection for this threat), and leaving it as documented (rejected by the owner). Tests: `apps/appliance-api/src/two-person-approval.test.ts` (two principals over HTTP, the opt-out, and mutation checks that fail if the comparison is removed, inverted or made case-sensitive) and `tests/security/self-approval-default.test.mjs`. Not verified: behaviour against a real tenant with real tokens.
+
 **Known limitations (pre-existing, not changed by this ADR).** Holding a role is not the same as being scoped to your own data:
 
 - `GET /api/operations/{targetKey}` is not scoped to the caller. Any holder of `Migration.Plan` or higher can read the operations
   recorded for any move collection, if they know or guess its name.
-- Approvals are not scoped to the caller either. An approval recorded by one `Migration.Execute` holder is picked up for any
-  execution request on the same collection name, and nothing stops the person who records an approval from also being the
-  person who executes it, so there is no separation of duties yet.
+- Approvals are matched on the collection name only: an approval recorded by one `Migration.Execute` holder counts for any *other* person's execution on the same collection name (the two-person rule working as intended, but not tied to a named requester or a named move).
 - Assessments are scoped to their owner (a different owner gets 404); that part works.
-
-Fixing these changes behaviour and is a separate decision; this ADR only records them so nobody reads a role as more than it is.
 
 ## Rollback and lock-out
 

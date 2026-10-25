@@ -19,3 +19,8 @@ test("the worker still refuses what it must refuse: a client secret", () => {
 test("the worker's configuration carries no host allow-list either", () => {
   assert.deepEqual(workerConfigFromEnv({ AMO_ALLOWED_HOSTS: "localhost:8081" }).allowedHosts, []);
 });
+
+test("the worker ignores AMO_ALLOW_SELF_APPROVAL, even a malformed value (it belongs to the API, F-05)", () => {
+  assert.doesNotThrow(() => workerConfigFromEnv({ AMO_ALLOW_SELF_APPROVAL: "maybe" }));
+  assert.equal(workerConfigFromEnv({ AMO_ALLOW_SELF_APPROVAL: "true" }).allowSelfApproval, false);
+});

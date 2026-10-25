@@ -102,18 +102,32 @@ API reaches it and giving up the Entra-only, no-public-address design of ADR-002
 destructive rebuild. If a private endpoint on the Container Apps environment is ever wanted, it needs a workload-profile
 environment with public network access disabled, which removes the public API; that is a different architecture and a new ADR.
 
-I could not re-run checkov here (the image is about a gigabyte and the machine was nearly out of disk), so I cannot say which
-resource `CKV2_AZURE_57` names; the two candidates in this configuration are the database and the Container Apps
-environment, and both are covered above. The ticket's `CKV2_AZURE_31` (NSG on two subnets) is fixed by section 1.
+**Confirmed 2026-10-25 against Learn and by running checkov.** Learn, [Networking with Private Link](https://learn.microsoft.com/azure/postgresql/network/concepts-networking-private-link): "The use of private endpoints isn't currently supported on servers created with virtual network integration", and the networking choice "can't be changed after creation"
+([quickstart](https://learn.microsoft.com/azure/postgresql/configure-maintain/quickstart-create-server)). checkov 3.3.30 names the database server
+(`azurerm_postgresql_flexible_server.db`) for `CKV2_AZURE_57`; it is therefore a false positive for this design and is skipped with this reason
+in `main.tf`. The ticket's `CKV2_AZURE_31` (NSG on two subnets) is fixed by section 1.
 
 ### 5. Scanning
 
-- `iac-validate` is unchanged except for one added step, `terraform test`, which runs plan-only tests against mocked providers
-  (`infrastructure/terraform/appliance-azure/tests/appliance.tftest.hcl`): no credentials, nothing applied.
+- `iac-validate` runs `trivy config` at HIGH and CRITICAL (unchanged), plus two steps added since: `terraform test`, which runs plan-only tests against mocked providers
+  (`infrastructure/terraform/appliance-azure/tests/appliance.tftest.hcl` and `hardening.tftest.hcl`: no credentials, nothing applied), and checkov (see the next bullet).
 - `scripts/ci/local-iac-checks.sh` runs `terraform` (fmt, init without a backend, validate, test) with Terraform 1.9.8 and
   `trivy config` at HIGH,CRITICAL in disposable containers pinned by digest (Trivy 0.76.1 by digest, the same pattern as
   the other HCW repositories). It refuses a Docker engine that is not the local one.
-- **Ticket #53 is only partly done on scanning.** checkov was not run and was not added to CI, and the "stored baseline" below is prose in this ADR: nothing in the pipeline compares a scan against it. The gate that exists is Trivy at HIGH,CRITICAL failing the job.
+- **checkov now runs in `iac-validate` (added 2026-10-25, issue 53).** Run on the unchanged configuration with checkov 3.3.30 it reported
+  exactly two failures, on the database server: `CKV_AZURE_136` and `CKV2_AZURE_57` (40 checks passed). Both are decisions, not defects, and each is
+  skipped by a `#checkov:skip=` comment inside `azurerm_postgresql_flexible_server.db` in `main.tf`, with the reason written beside it
+  (sections 3 and 4). The run now reports 0 failed, 2 skipped, and the workflow step fails the job on any new finding, so the
+  skip comments are the stored baseline: a new finding fails, and removing a skip makes the old one fail again. The earlier prose
+  baseline below stays as the Trivy record. The checkov step installs the pinned version with `pipx` on the runner; its own dependencies are not pinned.
+- **Geo-redundant backup is validated against region pairs (added 2026-10-25).** `postgres_geo_redundant_backup_enabled = true` is refused at plan time when
+  `location` is one of the regions that Learn's [region pairs page](https://learn.microsoft.com/azure/reliability/regions-paired) shows
+  without a pair (Chile Central, Mexico Central, Austria East, Belgium Central, Denmark East, Italy North, Poland Central, Spain
+  Central, Israel Central, Qatar Central, Indonesia Central, Malaysia West, New Zealand North; read 2026-10-25). It is a deny-list, and the trade-off
+  is explicit: a region that Microsoft newly leaves unpaired, or a name the list does not know, passes the plan and fails at Azure when the server is created, and a listed region
+  that Microsoft pairs later stays refused here until the list is edited (the fix is a one-line change and a test). Learn also says the choice is possible only at creation,
+  which is why the default stays `false` and the variable description warns about recreation. The rule reads another variable, which needs Terraform
+  1.9 (`required_version` and the CI pin already say 1.9). Tests: `tests/hardening.tftest.hcl`.
 - **Baseline (Trivy 0.76.1, 2026-10-25).** Before this change: 0 findings at HIGH and CRITICAL; 3 at MEDIUM
   (`AVD-AZU-0019` connection logging, `AVD-AZU-0021` connection throttling, `AVD-AZU-0024` checkpoint logging). After: 0 at
   HIGH and CRITICAL with the one suppression above; the same MEDIUM findings remain. The MEDIUM findings are **not** fixed here
