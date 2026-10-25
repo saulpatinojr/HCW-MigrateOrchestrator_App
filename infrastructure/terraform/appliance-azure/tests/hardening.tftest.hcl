@@ -1,6 +1,9 @@
-# Plan-only tests with mock providers for the database hardening and the API host allow-list (issues 53 and 83, ADR-0032,
-# ADR-0033). Like appliance.tftest.hcl: both providers are mocked, every run is `command = plan`, nothing reaches Azure or
-# Microsoft Entra ID, and a pass proves what the configuration declares, not how Azure behaves once deployed.
+# Plan-only tests with mock providers for the database hardening and the API host names (issues 53 and 83, ADR-0032). Like
+# appliance.tftest.hcl: both providers are mocked, every run is `command = plan`, nothing reaches Azure or Microsoft Entra ID,
+# and a pass proves what the configuration declares, not how Azure behaves once deployed. What the API Container App is given
+# in AMO_ALLOWED_HOSTS cannot be read in a plan (the environment's address is known only after apply, and a mocked apply cannot
+# be torn down because the enterprise application has prevent_destroy), so tests/security/terraform-allowed-hosts.test.mjs
+# checks that wiring in the file instead.
 
 mock_provider "azurerm" {}
 mock_provider "azuread" {}
@@ -79,32 +82,18 @@ run "the_database_stays_private_and_entra_only_with_no_private_endpoint" {
   }
 }
 
-# ---- Host allow-list for the API (issue 83, F8)
+# ---- Host names for the API (issue 83, F8)
 
-run "the_api_gets_its_own_address_as_an_allowed_host_and_the_worker_gets_none" {
+run "additional_allowed_hosts_accepts_bare_lower_case_names" {
   command = plan
 
-  override_resource {
-    target          = azurerm_container_app_environment.app
-    override_during = plan
-    values = {
-      id             = "/subscriptions/00000000-0000-0000-0000-000000000000/resourceGroups/rg-test/providers/Microsoft.App/managedEnvironments/cae-test"
-      default_domain = "happyfield-0123abcd.westus3.azurecontainerapps.io"
-    }
-  }
-
   variables {
-    additional_allowed_hosts = ["amo.example.com"]
+    additional_allowed_hosts = ["amo.example.com", "api-2.example.co.uk"]
   }
 
   assert {
-    condition     = one([for c in one(azurerm_container_app.api.template).container : one([for e in c.env : e.value if e.name == "AMO_ALLOWED_HOSTS"])]) == "ca-amo-prod-wus3-api.happyfield-0123abcd.westus3.azurecontainerapps.io,amo.example.com"
-    error_message = "The API must accept its own Container Apps address plus additional_allowed_hosts."
-  }
-
-  assert {
-    condition     = length(flatten([for c in one(azurerm_container_app.worker.template).container : [for e in c.env : e.name if e.name == "AMO_ALLOWED_HOSTS" || e.name == "AMO_ALLOWED_ORIGINS"]])) == 0
-    error_message = "The worker serves no HTTP and must not get the web-exposure variables (issue 83, F10)."
+    condition     = length(var.additional_allowed_hosts) == 2
+    error_message = "Bare lower-case host names must be accepted."
   }
 }
 

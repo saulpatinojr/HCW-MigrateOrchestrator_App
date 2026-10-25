@@ -85,7 +85,8 @@ The API implements CORS as an **exact-match allow-list** and nothing broader.
   while the variable is empty, because only the deployment knows its own address, so a deployment that does not set it is not
   protected against DNS rebinding. The Terraform in `infrastructure/terraform/appliance-azure` now sets it on the API Container App
   (not the worker) to the app's own address, `ca-<name>-api.<environment default domain>`, plus the new `additional_allowed_hosts`
-  variable for custom domains. Test: `tests/hardening.tftest.hcl`.
+  variable for custom domains. Tests: `tests/security/terraform-allowed-hosts.test.mjs` (reads the files, because a plan cannot
+  show the environment's address) and `tests/hardening.tftest.hcl` (the variable's validation).
 
 ## What would reopen this decision
 
