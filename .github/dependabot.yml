@@ -21,3 +21,7 @@ updates:
   - package-ecosystem: docker-compose
     directory: /
     schedule: { interval: weekly }
+  # The appliance Terraform providers are pinned by .terraform.lock.hcl (committed on purpose, ADR-0031); this keeps it moving.
+  - package-ecosystem: terraform
+    directory: /infrastructure/terraform/appliance-azure
+    schedule: { interval: weekly }

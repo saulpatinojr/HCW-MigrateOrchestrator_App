@@ -19,7 +19,9 @@ jobs:
       - uses: hashicorp/setup-terraform@dfe3c3f87815947d99a8997f908cb6525fc44e9e # v4.0.1
         with: { terraform_version: "1.9.8" }
       - run: terraform -chdir=${{ matrix.dir }} fmt -recursive -check -diff
-      - run: terraform -chdir=${{ matrix.dir }} init -backend=false -input=false
+      - run: terraform -chdir=${{ matrix.dir }} init -backend=false -input=false -lockfile=readonly
       - run: terraform -chdir=${{ matrix.dir }} validate -no-color
+      # Plan-only tests with mocked providers (tests/*.tftest.hcl): no cloud, no credentials, nothing is applied.
+      - run: terraform -chdir=${{ matrix.dir }} test -no-color
       - uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25 # v0.36.0
         with: { scan-type: config, scan-ref: "${{ matrix.dir }}", exit-code: "1", severity: "HIGH,CRITICAL" }
