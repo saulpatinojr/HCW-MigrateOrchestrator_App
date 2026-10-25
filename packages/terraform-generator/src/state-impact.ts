@@ -1,4 +1,5 @@
 import type { Assessment, ResourceDecisionRecord } from "@amo/domain";
+import { tfName } from "./tf-name.js";
 
 /**
  * IaC state impact (ADR-0020). An ARM move or a Resource Mover relocation gives every resource a NEW resource ID
@@ -56,8 +57,6 @@ export interface StateImpactEntry {
   note: string;
 }
 
-const tfName = (s: string): string => s.toLowerCase().replace(/[^a-z0-9_]+/g, "_").replace(/^_+|_+$/g, "").replace(/^(\d)/, "r$1") || "resource";
-
 function terraformTypeFor(d: ResourceDecisionRecord): string | null {
   const t = d.resourceType.toLowerCase();
   if (t === "microsoft.web/sites" && /functionapp/i.test(d.kind ?? "")) return "azurerm_linux_function_app";
@@ -109,7 +108,7 @@ export function generateStateImpact(a: Assessment): Record<string, string> {
   const removed = impacted.map((e) => `removed {\n  from = ${e.suggestedAddress}  # TODO: actual address in your state (terraform state list)\n  lifecycle {\n    destroy = false\n  }\n}`).join("\n\n");
   const imports = impacted.filter((e) => e.newId).map((e) => `import {\n  to = ${e.suggestedAddress}\n  id = "${e.newId}"${e.newIdIsTemplate ? "  # TODO: replace the __PLACEHOLDER__ tokens with the destination scope" : ""}\n}`).join("\n\n");
   const script = `#!/usr/bin/env bash
-${header.replace(/^/gm, "")}# Imperative equivalent for Terraform < 1.7. Dry-run by default; EXECUTE=1 to apply. Run in the root module directory.
+${header}# Imperative equivalent for Terraform < 1.7. Dry-run by default; EXECUTE=1 to apply. Run in the root module directory.
 # Placeholders __DESTINATION_SUBSCRIPTION_ID__ / __DESTINATION_RESOURCE_GROUP__ are filled from the environment.
 set -euo pipefail
 EXECUTE="\${EXECUTE:-0}"

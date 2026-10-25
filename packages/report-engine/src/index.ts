@@ -1,6 +1,6 @@
 import type { Assessment, ResourceDecisionRecord } from "@amo/domain";
+import { esc } from "./markdown.js";
 
-const esc = (s: string): string => s.replace(/\|/g, "\\|").replace(/\n/g, " ");
 const csvCell = (v: unknown): string => {
   let s = v === null || v === undefined ? "" : Array.isArray(v) ? v.join("; ") : typeof v === "object" ? JSON.stringify(v) : String(v);
   if (/^[\s'"]*[=+\-@\t\r]/.test(s) && !/^[\s'"]*-\d/.test(s)) s = "'" + s;
