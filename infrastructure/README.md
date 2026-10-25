@@ -7,4 +7,4 @@
 
 Rules: Terraform has one owner per resource; state, plans, variable files and credentials never enter Git; apply is a
 reviewed manual action from the HCP Terraform workspace (Phase 5). The lab infrastructure (Hostinger VPS, Cloudflare edge,
-Coder) lives downstream in `HCW-AzMigrateOrchestrator_Addon/infrastructure`.
+Coder) lives downstream in `HCW-MigrateOrchestrator_AddOn/infrastructure`.

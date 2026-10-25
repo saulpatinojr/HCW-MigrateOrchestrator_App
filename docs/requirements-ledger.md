@@ -1,11 +1,11 @@
 # Requirement ledger
 
-Path markers: a path followed by *(downstream)* lives in `saulpatinojr/HCW-AzMigrateOrchestrator_Addon`; *(retired)* means it was deleted and exists in neither repository. `tests/end-to-end/requirements-ledger.test.mjs` fails on any other path that does not exist here.
+Path markers: a path followed by *(downstream)* lives in `saulpatinojr/HCW-MigrateOrchestrator_AddOn`; *(retired)* means it was deleted and exists in neither repository. `tests/end-to-end/requirements-ledger.test.mjs` fails on any other path that does not exist here.
 
 Source: the master implementation prompt (sections §1–§25; the supplied copy ends mid-§25). Each requirement has an ID,
 an implementation status for **this build**, and pointers. Status legend: **Done** (implemented and tested), **Partial**
 (implemented with documented gaps), **Interface** (contract + safe local adapter, real integration pending), **Planned**
-(documented, not built). Since the repository split (ADR-0027, ADR-0028) the lab (demo) web front lives in `saulpatinojr/HCW-AzMigrateOrchestrator_Addon`; paths marked *downstream* below are in that repository, not this one. The traceability matrix (`docs/traceability-matrix.md`) maps IDs to code, tests and docs.
+(documented, not built). Since the repository split (ADR-0027, ADR-0028) the lab (demo) web front lives in `saulpatinojr/HCW-MigrateOrchestrator_AddOn`; paths marked *downstream* below are in that repository, not this one. The traceability matrix (`docs/traceability-matrix.md`) maps IDs to code, tests and docs.
 
 | ID | Requirement (abridged) | Status | Notes |
 |---|---|---|---|

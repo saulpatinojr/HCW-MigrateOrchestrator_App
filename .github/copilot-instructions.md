@@ -15,4 +15,4 @@ Never expose secrets. Never treat a stale/older-head check as current evidence. 
 
 ## This repository
 
-This is `saulpatinojr/HCW-MigrateOrchestrator_App`: the appliance **and** the migration intelligence core (engine, rules, CLI, UI components) it is built on — the upstream product (ADR-0028). It publishes `@hybridcloudworks/migration-core` and `@hybridcloudworks/migration-ui`; the slim web-front edition in `saulpatinojr/HCW-AzMigrateOrchestrator_Addon` consumes them.
+This is `saulpatinojr/HCW-MigrateOrchestrator_App`: the appliance **and** the migration intelligence core (engine, rules, CLI, UI components) it is built on — the upstream product (ADR-0028). It publishes `@hybridcloudworks/migration-core` and `@hybridcloudworks/migration-ui`; the slim web-front edition in `saulpatinojr/HCW-MigrateOrchestrator_AddOn` consumes them.

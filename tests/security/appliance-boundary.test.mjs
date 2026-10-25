@@ -5,7 +5,7 @@ import { join } from "node:path";
 
 /**
  * This repository is the upstream product (ADR-0028): the engine, rules, CLI, UI components and the appliance. The lab
- * (web-front edition, saulpatinojr/HCW-AzMigrateOrchestrator_Addon) must stay technically unable to reach Azure (ADR-0008),
+ * (web-front edition, saulpatinojr/HCW-MigrateOrchestrator_AddOn) must stay technically unable to reach Azure (ADR-0008),
  * so the Azure clients are present here but never leave this repository, and the CLI stays lab-side.
  */
 const srcFiles = (dir) => readdirSync(dir, { withFileTypes: true }).flatMap((e) => (e.isDirectory() ? srcFiles(join(dir, e.name)) : /\.tsx?$/.test(e.name) && !/\.test\.tsx?$/.test(e.name) ? [join(dir, e.name)] : []));

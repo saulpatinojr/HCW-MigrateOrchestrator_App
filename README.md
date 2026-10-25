@@ -10,7 +10,7 @@
 [![live](https://img.shields.io/website?url=https%3A%2F%2Fmigration.lab.hybridcloudworks.com%2Fapi%2Fhealth&label=try%20it%20at%20%2Ftools%2Fmigration&up_message=live&down_message=down)](https://hybridcloudworks.com/tools/migration)
 [![docker hub](https://img.shields.io/badge/docker.io-hybridcloudworks%2Fhcw--migrateorchestrator-2496ED?logo=docker&logoColor=white)](https://hub.docker.com/r/hybridcloudworks/hcw-migrateorchestrator)
 [![license](https://img.shields.io/github/license/saulpatinojr/HCW-MigrateOrchestrator_App)](LICENSE)
-[![downstream](https://img.shields.io/badge/downstream-HCW--AzMigrateOrchestrator__Addon-6f42c1?logo=github)](https://github.com/saulpatinojr/HCW-AzMigrateOrchestrator_Addon)
+[![downstream](https://img.shields.io/badge/downstream-HCW--MigrateOrchestrator__AddOn-6f42c1?logo=github)](https://github.com/saulpatinojr/HCW-MigrateOrchestrator_AddOn)
 
 **New here?** Give it an inventory of an Azure environment and it tells you, resource by resource, how each one can be
 moved and what to watch out for, with the evidence behind every answer. You can try that today without installing
@@ -45,7 +45,7 @@ flowchart LR
     E --> A
     U --> A
   end
-  subgraph Addon["saulpatinojr/HCW-AzMigrateOrchestrator_Addon — downstream web-front edition"]
+  subgraph Addon["saulpatinojr/HCW-MigrateOrchestrator_AddOn — downstream web-front edition"]
     L[CSV lab API]
     H[Pane app apps/lab-web + Playwright e2e]
   end
@@ -62,7 +62,7 @@ flowchart LR
 | Repository | Role | Publishes |
 |---|---|---|
 | **`HCW-MigrateOrchestrator_App`** (this one) | Upstream: engine, rules, CLI, UI components, appliance. Freestanding. | `@hybridcloudworks/migration-core`, `@hybridcloudworks/migration-ui`, CLI binaries, appliance image |
-| [`HCW-AzMigrateOrchestrator_Addon`](https://github.com/saulpatinojr/HCW-AzMigrateOrchestrator_Addon) | Downstream: the slim web-front edition — CSV lab API and the pane framed at hybridcloudworks.com/tools/migration. Freestanding in deployment; depends on the two package tarballs attached to this repository's GitHub Release of each `v*` tag, pinned by URL and integrity hash and adopted through its `core-update` workflow. | Lab image |
+| [`HCW-MigrateOrchestrator_AddOn`](https://github.com/saulpatinojr/HCW-MigrateOrchestrator_AddOn) | Downstream: the slim web-front edition — CSV lab API and the pane framed at hybridcloudworks.com/tools/migration. Freestanding in deployment; depends on the two package tarballs attached to this repository's GitHub Release of each `v*` tag, pinned by URL and integrity hash and adopted through its `core-update` workflow. | Lab image |
 
 **Updates flow downstream.** Every release here is picked up by the addon's `core-update` workflow, which installs the
 release's package tarballs, runs the addon's unit tests and browser e2e, and opens a pull request bumping the pin labelled
