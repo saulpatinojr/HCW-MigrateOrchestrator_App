@@ -43,3 +43,12 @@ test("an oversized tags cell is caught as well, and a single 4 MB cell is refuse
   assert.equal(big.resources.length, 0);
   assert.ok(ms < 2000, `took ${Math.round(ms)} ms`);
 });
+
+test("a header cell longer than the limit refuses the file, without echoing it", () => {
+  const long = "H".repeat(DEFAULT_INGEST_LIMITS.maxFieldLength + 1);
+  const r = ingestResourcesCsv(`${header},${long}\n${line("vm-01")},x\n`);
+  assert.equal(r.resources.length, 0);
+  assert.equal(r.errors.length, 1);
+  assert.match(r.errors[0], /header/);
+  assert.ok(r.errors[0].length < 300);
+});

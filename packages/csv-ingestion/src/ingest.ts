@@ -29,6 +29,7 @@ export function ingestResourcesCsv(text: string, opts: IngestOptions = {}): Inge
   const parsed = parseCsv(text, { maxRows });
   warnings.push(...parsed.warnings);
   if (parsed.headers.length === 0) return emptyResult(inputHash, ["no header row found"], warnings);
+  if (parsed.headers.some((h) => h.length > maxFieldLength)) return emptyResult(inputHash, [`a header cell is longer than ${maxFieldLength} characters; not a resource export`], warnings);
   const { map, extra, missing } = mapHeaders(parsed.headers);
   const hardMissing = REQUIRED_COLUMNS.filter((c) => map[c] === null);
   if (hardMissing.length) return emptyResult(inputHash, [`required columns missing: ${hardMissing.join(", ")}`], warnings, map, missing, extra);
