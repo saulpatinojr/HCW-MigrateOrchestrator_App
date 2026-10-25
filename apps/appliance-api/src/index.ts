@@ -16,9 +16,11 @@ import { InMemoryRepository, type AssessmentRepository } from "./repository.js";
 import { applyCors, applyCorsHeaders, parseAllowedOrigins } from "./cors.js";
 import { hostAllowed, parseAllowedHosts } from "./host.js";
 import { FORBIDDEN_MESSAGE, levelAllows } from "./route-levels.js";
+import { countableApprovals, parseAllowSelfApproval, SELF_APPROVAL_REFUSAL } from "./approval-policy.js";
 export * from "./repository.js";
 export * from "./cors.js";
 export * from "./host.js";
+export * from "./approval-policy.js";
 
 export interface EnterpriseConfig {
   tenantId: string | null;
@@ -31,13 +33,15 @@ export interface EnterpriseConfig {
   allowedOrigins: string[];
   /** Host header values the API answers (AMO_ALLOWED_HOSTS), against DNS rebinding. Empty: any Host is served. */
   allowedHosts: string[];
+  /** AMO_ALLOW_SELF_APPROVAL=true: the person who records an approval may also execute it (lab or single-operator mode). Default false: a second person must approve (ADR-0031). */
+  allowSelfApproval: boolean;
 }
 
 export function configFromEnv(env: NodeJS.ProcessEnv = process.env): EnterpriseConfig {
   refuseUnsupportedIdentityEnv(env);
   for (const k of Object.keys(env)) if (/^(AMO_|AZURE_).*(SECRET|PASSWORD)$/i.test(k)) throw new Error(`refusing to start: ${k} looks like a client secret; use managed identity or workload identity federation`);
   const clientId = env.AMO_ENTRA_CLIENT_ID ?? null;
-  return { tenantId: env.AMO_ENTRA_TENANT_ID ?? null, clientId, audiences: [env.AMO_ENTRA_AUDIENCE, clientId, clientId ? `api://${clientId}` : null].filter((x): x is string => !!x), credentialKind: (env.AMO_CREDENTIAL_KIND as EnterpriseConfig["credentialKind"]) ?? "managed-identity", useFixture: env.AMO_DISCOVERY_FIXTURE === "1", allowedOrigins: parseAllowedOrigins(env.AMO_ALLOWED_ORIGINS), allowedHosts: parseAllowedHosts(env.AMO_ALLOWED_HOSTS) };
+  return { tenantId: env.AMO_ENTRA_TENANT_ID ?? null, clientId, audiences: [env.AMO_ENTRA_AUDIENCE, clientId, clientId ? `api://${clientId}` : null].filter((x): x is string => !!x), credentialKind: (env.AMO_CREDENTIAL_KIND as EnterpriseConfig["credentialKind"]) ?? "managed-identity", useFixture: env.AMO_DISCOVERY_FIXTURE === "1", allowedOrigins: parseAllowedOrigins(env.AMO_ALLOWED_ORIGINS), allowedHosts: parseAllowedHosts(env.AMO_ALLOWED_HOSTS), allowSelfApproval: parseAllowSelfApproval(env.AMO_ALLOW_SELF_APPROVAL) };
 }
 
 /**
@@ -209,9 +213,12 @@ export function createEnterpriseApi(cfg: EnterpriseConfig, deps: ApplianceDeps):
         const body = (await readJson(req)) as { collection?: { subscriptionId: string; resourceGroup: string; name: string }; moveResourceIds?: string[] };
         if (!body.collection?.name || !body.moveResourceIds?.length) return fail(400, "invalid", "collection and moveResourceIds required");
         // Hydrate approvals from the repository so the gate sees recorded human decisions.
-        for (const a of await repo.approvalsFor(body.collection.name)) principal.approvals.add(`${a.operation}:${a.targetKey}`);
+        // Two-person rule (ADR-0031): an approval recorded by the person executing does not count, unless AMO_ALLOW_SELF_APPROVAL=true.
+        const approvals = countableApprovals(await repo.approvalsFor(body.collection.name), actor, cfg.allowSelfApproval);
+        for (const a of approvals.counted) principal.approvals.add(`${a.operation}:${a.targetKey}`);
         const r = await mover.run(principal, body.collection, mv[1] as MoverAction, body.moveResourceIds);
-        await repo.audit({ at: new Date().toISOString(), actor, event: `execution.resource-mover.${mv[1]}`, details: { collection: body.collection.name, accepted: r.accepted, reason: r.reason } });
+        if (!r.accepted && approvals.setAside > 0) r.reason = `${r.reason}; ${SELF_APPROVAL_REFUSAL}`;
+        await repo.audit({ at: new Date().toISOString(), actor, event: `execution.resource-mover.${mv[1]}`, details: { collection: body.collection.name, accepted: r.accepted, reason: r.reason, selfApproval: approvals.usedOwnApproval, ownApprovalsSetAside: approvals.setAside } });
         let operationId: string | null = null;
         if (r.accepted && r.operationUrl) {
           const now = new Date().toISOString();
