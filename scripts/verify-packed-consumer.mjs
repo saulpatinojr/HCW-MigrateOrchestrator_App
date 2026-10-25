@@ -7,7 +7,7 @@
  *
  * `--tarballs DIR [--version X.Y.Z]` checks tarballs that already exist instead of packing dist-packages: the post-release
  * job of release-cli.yml passes the two files it downloaded from the public GitHub Release, so what consumers fetch is what
- * is tested (ADR-0032). With `--version` the installed packages must report exactly that version.
+ * is tested (ADR-0034). With `--version` the installed packages must report exactly that version.
  */
 import { spawnSync } from "node:child_process";
 import { cpSync, existsSync, mkdtempSync, readdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";

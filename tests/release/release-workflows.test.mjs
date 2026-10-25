@@ -4,7 +4,7 @@ import { readFileSync, readdirSync } from "node:fs";
 import { allNames, BINARIES } from "../../scripts/release-publish.mjs";
 
 /**
- * The release pipeline (release-cli.yml, publish-npm.yml; ADR-0032) first runs for real on a v* tag, and a v* tag can never
+ * The release pipeline (release-cli.yml, publish-npm.yml; ADR-0034) first runs for real on a v* tag, and a v* tag can never
  * be moved or deleted, so what the workflows must and must not do is written down here. These are static checks of the
  * files (no YAML library; the files share one style). They do not prove how GitHub runs them: that needs the dry run and
  * then a real tag (docs/release/README.md).

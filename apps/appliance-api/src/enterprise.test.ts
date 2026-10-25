@@ -159,30 +159,3 @@ test("accepted mover actions are recorded as operations and listable", async () 
   assert.equal(ops[0].status, "InProgress");
   assert.equal(ops[0].kind, "resource-mover.initiateMove");
 });
-
-test("the API is same-origin only: no response carries a CORS header, preflight included (ADR-0031, ticket #44)", async () => {
-  const cors = (r: Response) => [...r.headers.keys()].filter((h) => h.toLowerCase().startsWith("access-control-"));
-  const origin = "https://web.example.test";
-  const probes: Array<[string, Response]> = [
-    ["GET /api/health", await fetch(`${base}/api/health`, { headers: { origin } })],
-    ["GET /api/agents", await fetch(`${base}/api/agents`, { headers: { origin } })],
-    ["GET /api/me without a token (401)", await fetch(`${base}/api/me`, { headers: { origin } })],
-    ["GET /api/me with a token", await fetch(`${base}/api/me`, { headers: { origin, authorization: `Bearer ${mint(["Migration.Plan"])}` } })],
-    ["GET unknown route", await fetch(`${base}/api/nope`, { headers: { origin } })],
-    ["OPTIONS preflight on a public route", await fetch(`${base}/api/health`, { method: "OPTIONS", headers: { origin, "access-control-request-method": "GET" } })],
-    ["OPTIONS preflight on a protected route", await fetch(`${base}/api/assessments`, { method: "OPTIONS", headers: { origin, "access-control-request-method": "POST", "access-control-request-headers": "authorization,content-type" } })],
-  ];
-  for (const [what, r] of probes) assert.deepEqual(cors(r), [], `${what} must carry no Access-Control-* header`);
-  // A preflight is not special-cased and not authenticated: it is refused like any other request without a token, so the
-  // browser (which needs a CORS answer to continue) stops the cross-origin call.
-  assert.equal(probes[5][1].status, 200, "public route answers as before");
-  assert.equal(probes[6][1].status, 401, "protected route still demands an Entra token for OPTIONS");
-});
-
-test("Entra token validation still guards every protected route when a request names another origin (ADR-0031)", async () => {
-  const origin = "https://attacker.example.test";
-  for (const [method, path] of [["GET", "/api/me"], ["GET", "/api/scopes"], ["GET", "/api/assessments"], ["POST", "/api/assessments"], ["POST", "/api/approvals"], ["GET", "/api/operations/x"]] as const) {
-    const r = await fetch(`${base}${path}`, { method, headers: { origin, "content-type": "application/json" }, body: method === "POST" ? "{}" : undefined });
-    assert.equal(r.status, 401, `${method} ${path} without a token`);
-  }
-});

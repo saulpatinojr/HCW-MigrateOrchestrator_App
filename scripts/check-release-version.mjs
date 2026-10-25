@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 /**
  * Check that every place that names the release version agrees, before a v* tag can make a mistake permanent
- * (ADR-0032). A pushed v* tag cannot be moved or deleted (the "Protect release tags" ruleset), so a tag that disagrees with
+ * (ADR-0034). A pushed v* tag cannot be moved or deleted (the "Protect release tags" ruleset), so a tag that disagrees with
  * the package version is a permanent mistake. This runs first in release-cli.yml and publish-npm.yml, before anything is
  * built, attested, released or published. Node standard library only.
  *

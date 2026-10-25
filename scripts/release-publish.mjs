@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 /**
  * The steps of release-cli.yml that talk to GitHub about a release, kept in a script so that tests can run them
- * (ADR-0032). A v* tag cannot be moved or deleted once it is pushed, so the steps that decide whether the files are really
+ * (ADR-0034). A v* tag cannot be moved or deleted once it is pushed, so the steps that decide whether the files are really
  * the attested ones, and whether a release becomes public, must not be untested shell inside a workflow. Node standard
  * library only; it calls the GitHub CLI (`gh`), authenticated by GH_TOKEN in the workflow.
  *

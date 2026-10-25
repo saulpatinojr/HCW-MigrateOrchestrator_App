@@ -1,4 +1,4 @@
-# ADR-0032: One job creates the release; permissions per job; attested SBOMs; the tag guards everything
+# ADR-0034: One job creates the release; permissions per job; attested SBOMs; the tag guards everything
 
 **Status:** Accepted · **Date:** 2026-10-25 · **Decided by:** the orchestrator, at owner level (reversible by a later ADR); closes the design part of ticket AMO-11 (issue 52). The shape follows the pipeline built for `saulpatinojr/HCW-CloudCrawler_App` (`publish-core.yml`, `scripts/check-release-version.py`, `scripts/release-publish.py`).
 

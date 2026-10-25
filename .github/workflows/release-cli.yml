@@ -1,7 +1,7 @@
 # Actions are pinned to full commit SHAs (version in the trailing comment); Dependabot (github-actions ecosystem) proposes updates.
 # The whole GitHub Release is this one workflow, in one ordered path, so a release can only become public after everything
 # before it has succeeded. A v* tag can never be moved or deleted (the "Protect release tags" ruleset), so nothing here is
-# optimistic. Design and reasoning: docs/adr/ADR-0032-release-pipeline-one-release-job.md;
+# optimistic. Design and reasoning: docs/adr/ADR-0034-release-pipeline-one-release-job.md;
 # the owner's checklist, the dry run and what cannot be rehearsed: docs/release/README.md.
 #   check        (contents: read)  the tag, package.json, repository.manifest.json and package-lock.json must agree and the tagged
 #                                  commit must be the tip of main, or leave .github/workflows as the tip has it (a GITHUB_TOKEN

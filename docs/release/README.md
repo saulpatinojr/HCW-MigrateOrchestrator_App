@@ -3,7 +3,7 @@
 A release is a tag whose name starts with `v` (for example `v0.3.2`) pushed to this repository. Pushing the tag starts the
 workflow [`release-cli.yml`](../../.github/workflows/release-cli.yml), which builds everything, signs it, and publishes one
 [GitHub Release](https://github.com/saulpatinojr/HCW-MigrateOrchestrator_App/releases). The design and the reasons are in
-[ADR-0032](../adr/ADR-0032-release-pipeline-one-release-job.md). Publishing the packages to the npm registry is optional and
+[ADR-0034](../adr/ADR-0034-release-pipeline-one-release-job.md). Publishing the packages to the npm registry is optional and
 separate: [`npm-publishing.md`](npm-publishing.md).
 
 A pushed tag is **blocked from being moved, deleted or overwritten** by the ruleset
@@ -158,7 +158,7 @@ These happen only on a real tag, so the first real tag is also their first test.
    release made with this pipeline reaches it by itself, as a pull request on its side; look at that pull request. Add an entry to
    its `docs/whats-new-upstream.md` (newest first) and update its "Current upstream state" table, which still says the latest
    release is `v0.3.1`. Suggested entry text: "Upstream release `v<new version>` is built by the rebuilt release pipeline
-   (ADR-0032 upstream): file names are unchanged, two SBOM files (`amo-cli-<version>.cdx.json`,
+   (ADR-0034 upstream): file names are unchanged, two SBOM files (`amo-cli-<version>.cdx.json`,
    `hybridcloudworks-migration-packages-<version>.cdx.json`) are added, every binary and tarball has signed provenance and SBOM
    attestations, and the release page appears only after the files were checked. Reaches this edition: the tarballs only; the pins
    and hashes are unchanged in form." Whether the downstream edition should start verifying attestations is its owner's decision.

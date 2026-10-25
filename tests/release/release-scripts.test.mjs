@@ -10,7 +10,7 @@ import { atLeast, check, notOnBranch, setVersion, workflowParity } from "../../s
 import { addComponent, assertBom, retitle } from "../../scripts/generate-sbom.mjs";
 
 /**
- * Local, offline tests of the three release scripts (ADR-0032): they run the real code against a fake `gh`, so the logic
+ * Local, offline tests of the three release scripts (ADR-0034): they run the real code against a fake `gh`, so the logic
  * that decides whether a release becomes public is exercised before any real tag. They do not prove how GitHub behaves.
  */
 const VERSION = "1.2.3";

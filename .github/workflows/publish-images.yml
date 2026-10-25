@@ -18,7 +18,7 @@ env:
   IMAGE: docker.io/hybridcloudworks/img-mo-appliance-app
   DOCKERHUB_ORG: hybridcloudworks
 jobs:
-  # The same guard as release-cli.yml (scripts/check-release-version.mjs, ADR-0032): the tag, the package version and main must
+  # The same guard as release-cli.yml (scripts/check-release-version.mjs, ADR-0034): the tag, the package version and main must
   # agree before an image that deployments will reference by digest is built. This workflow is independent of release-cli.yml:
   # both start from the same tag, and the image can be pushed even if the release run fails (and the reverse).
   check:

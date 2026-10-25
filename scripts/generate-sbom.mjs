@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 /**
- * Write the CycloneDX SBOMs that release-cli.yml attests (ADR-0032). Uses `npm sbom` (built into npm), so no extra tool is
+ * Write the CycloneDX SBOMs that release-cli.yml attests (ADR-0034). Uses `npm sbom` (built into npm), so no extra tool is
  * installed. Run after `npm ci` and `npm run build`.
  *
  *   node scripts/generate-sbom.mjs cli --version X.Y.Z --out amo-cli-X.Y.Z.cdx.json

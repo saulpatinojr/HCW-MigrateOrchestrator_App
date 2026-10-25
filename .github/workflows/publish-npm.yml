@@ -2,7 +2,7 @@
 # Publishes @hybridcloudworks/migration-core and @hybridcloudworks/migration-ui with npm trusted publishing (OIDC, provenance).
 # No npm token is stored anywhere. Gated on the repository variable NPM_TRUSTED_PUBLISHING=ready, which the owner sets after the
 # one-time registry bootstrap described in docs/release/npm-publishing.md. Until then this workflow is skipped, not failed.
-# Two jobs, so the publishing permission exists only where something is published (ADR-0032):
+# Two jobs, so the publishing permission exists only where something is published (ADR-0034):
 #   verify   (contents: read)  the tag, every version and the commit must agree (scripts/check-release-version.mjs) and npm must
 #                              be new enough for trusted publishing, then build, assemble at that version, run the clean-consumer
 #                              gate and keep the assembled packages as a workflow artifact. Nothing is published here.
