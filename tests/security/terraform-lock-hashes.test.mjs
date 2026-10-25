@@ -9,6 +9,12 @@ import { readFileSync } from "node:fs";
  * could update it, may keep only the checksum for that platform. CI runs `init -lockfile=readonly` on Linux only, so it
  * would still pass and a Mac or Windows user would then be told the provider does not match the lock file. This test
  * makes that visible on the pull request instead (follow-up from the review of PR 78, ticket 83).
+ *
+ * What this does NOT prove: the lock file does not say which platform each "h1:" checksum belongs to, so this counts them
+ * and cannot tell that a particular platform (for example darwin_arm64) is missing. It is a tripwire for the known failure
+ * (five checksums collapsing to one), not a proof. The real check needs the provider registry: run
+ * `terraform providers lock` with the five -platform flags in CI and fail on a `git diff`; that is listed as open on
+ * ticket 83. A version bump legitimately changes every checksum, so pinning the checksums in this test was rejected.
  */
 const LOCK = "infrastructure/terraform/appliance-azure/.terraform.lock.hcl";
 const PLATFORMS = 5;
