@@ -73,6 +73,20 @@ The API implements CORS as an **exact-match allow-list** and nothing broader.
    scans the source (no wildcard, no credentials header, the origin is only echoed after an exact list match) and the documents
    (the variable is documented and no document suggests a wildcard).
 
+## Addendum 2026-10-25: Private Network Access, and the host name in Terraform ([issue 83](https://github.com/saulpatinojr/HCW-MigrateOrchestrator_App/issues/83), F9 and F8)
+
+- **F9, Private Network Access.** Chrome sends `Access-Control-Request-Private-Network: true` on a preflight from a public page to a
+  private or loopback address and wants `Access-Control-Allow-Private-Network: true` back
+  ([Chrome developers, Private Network Access preflights](https://developer.chrome.com/blog/private-network-access-preflight)).
+  The API now adds that header, and `Vary: Origin, Access-Control-Request-Private-Network`, only on a preflight from an **allowed
+  origin** whose request carries exactly that header with the value `true`. Anything else (a disallowed origin, a request that did not
+  ask, a non-preflight, the empty default) is unchanged: deny by default stays. Tests: `apps/appliance-api/src/private-network-access.test.ts`.
+- **F8, the host name in Terraform.** The Host header allow-list itself (`AMO_ALLOWED_HOSTS`) is described with its code. It is off
+  while the variable is empty, because only the deployment knows its own address, so a deployment that does not set it is not
+  protected against DNS rebinding. The Terraform in `infrastructure/terraform/appliance-azure` now sets it on the API Container App
+  (not the worker) to the app's own address, `ca-<name>-api.<environment default domain>`, plus the new `additional_allowed_hosts`
+  variable for custom domains. Test: `tests/hardening.tftest.hcl`.
+
 ## What would reopen this decision
 
 A new ADR that supersedes this one, before any code changes, if any of these happens:
