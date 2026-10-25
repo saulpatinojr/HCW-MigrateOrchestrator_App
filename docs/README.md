@@ -12,6 +12,7 @@ Canonical documentation for both repositories lives here (ADR-0028). Start with 
 | [`rules/README.md`](rules/README.md) · [`rules/coverage.md`](rules/coverage.md) | How rules are authored, sourced from Microsoft Learn, snapshotted and refreshed; resource-type coverage |
 | [`product/`](product/) | Editions, cross-tenant behaviour, Marketplace evaluation |
 | [`deployment/`](deployment/) | Azure appliance deployment (Container Apps, managed identity, Entra); lab deployment is documented downstream |
+| [`release/README.md`](release/README.md) | Owner runbook for cutting a release: what a release contains, the dry run that publishes nothing, what it cannot prove, and what to do when a step fails |
 | [`release/npm-publishing.md`](release/npm-publishing.md) | Owner runbook for the one-time npm bootstrap; after it, every `v*` tag publishes with trusted publishing |
 | [`governance/`](governance/) | Review-pack provenance and authoring standard |
 | [`repository-existing-files-review.md`](repository-existing-files-review.md) | Historical intake review of the supplied governance pack (2026-10-03) |

@@ -1,20 +1,75 @@
 # Actions are pinned to full commit SHAs (version in the trailing comment); Dependabot (github-actions ecosystem) proposes updates.
-# On every v* tag the GitHub Release carries two kinds of artifact: the single-executable `amo` CLI (Node SEA) for Linux,
-# macOS and Windows with checksums (job `sea`), and the two npm package tarballs `hybridcloudworks-migration-core-<version>.tgz`
-# and `hybridcloudworks-migration-ui-<version>.tgz` (job `packages`). The downstream edition (HCW-MigrateOrchestrator_AddOn)
-# pins the tarballs by URL and integrity hash, so no registry stands between a release and its adoption; npm trusted
-# publishing (publish-npm.yml) stays optional. Both jobs attest provenance.
+# The whole GitHub Release is this one workflow, in one ordered path, so a release can only become public after everything
+# before it has succeeded. A v* tag is blocked from being moved or deleted (the "Protect release tags" ruleset; repository admins can bypass it or switch it off), so nothing here is
+# optimistic. Design and reasoning: docs/adr/ADR-0034-release-pipeline-one-release-job.md;
+# the owner's checklist, the dry run and what cannot be rehearsed: docs/release/README.md.
+#   check        (contents: read)  the tag, package.json, repository.manifest.json and package-lock.json must agree and the tagged
+#                                  commit must be the tip of main, or leave .github/workflows as the tip has it (a GITHUB_TOKEN
+#                                  cannot create a release for a commit that changes workflows, which would only show after the
+#                                  attestations were written): scripts/check-release-version.mjs, before this workflow builds anything.
+#   sea          (contents: read)  the single-executable `amo` CLI for Linux, macOS and Windows with checksums, smoke tested.
+#   packages     (contents: read)  the two npm package tarballs (migration-core, migration-ui), the clean-consumer gate run on
+#                                  those very tarballs, and the CycloneDX SBOMs of the CLI and of the packages.
+#   inventory    (contents: read)  gathers every file into one artifact and checks that exactly the expected files exist.
+#   attest       (id-token and attestations: write, no repository write)  signed build provenance and signed CycloneDX SBOM
+#                                  attestations for every binary and tarball, then verifies them (this workflow file, this ref,
+#                                  this commit).
+#   release      (contents: write; a tag only)  the ONLY job that touches the release: verifies the attestations again against
+#                                  the downloaded files, creates the release as a DRAFT with every file, checks that it holds
+#                                  exactly the expected files, and only then makes it public (scripts/release-publish.mjs).
+#   post-release (contents: read; a tag only)  downloads the PUBLIC release, checks the files and attestations again and
+#                                  re-runs `packages:verify` against the released tarballs.
+# The downstream edition (HCW-MigrateOrchestrator_AddOn) pins the tarballs by URL and integrity hash, so no registry stands
+# between a release and its adoption; npm trusted publishing (publish-npm.yml) stays optional.
+# Dry run: Actions, release, Run workflow, on the main branch only (any other ref fails at once). It takes the tag to be v +
+# the package version, runs the same checks as a tag, builds everything and keeps the files as a workflow artifact. It
+# publishes nothing: `release` and `post-release` run only for a pushed v* tag, so a manual run can never create a release,
+# whatever ref it names. "attest" is off by default because attestations are permanent entries in the public signing log;
+# tick it once to rehearse them too (they are then verified with the same strict flags, naming the branch instead of the tag).
+# Re-running: "Re-run failed jobs" on a tag run uses THIS FILE AS IT IS AT THE TAGGED COMMIT and the files built by that run.
+# A release that already exists (draft or public) for the tag is never touched and no file is ever replaced: the job stops and
+# says what to delete by hand.
 name: release
 on:
   push:
     tags: ["v*"]
   workflow_dispatch:
+    inputs:
+      attest:
+        description: "Dry run only: also create and verify the attestations (permanent public signing log entries)"
+        type: boolean
+        default: false
 permissions:
-  contents: write
-  id-token: write
-  attestations: write
+  contents: read
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: false
 jobs:
+  check:
+    runs-on: ubuntu-latest
+    outputs:
+      version: ${{ steps.guard.outputs.version }}
+    steps:
+      - name: A manual run is only allowed on main
+        if: github.event_name != 'push' && github.ref != 'refs/heads/main'
+        env: { REF: "${{ github.ref }}" }
+        run: |
+          echo "::error::the dry run runs on the main branch only (this run is on $REF): Run workflow, Branch: main"
+          exit 1
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with: { persist-credentials: false, fetch-depth: 0 }
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with: { node-version: 26, package-manager-cache: false }
+      - id: guard
+        name: The tag and every version agree, and the commit is on main (a dry run runs the same checks as the tag)
+        env: { EVENT_NAME: "${{ github.event_name }}", REF_NAME: "${{ github.ref_name }}" }
+        run: |
+          set -euo pipefail
+          if [ "$EVENT_NAME" = "push" ]; then mode=(--tag "$REF_NAME"); else mode=(--rehearse); fi
+          node scripts/check-release-version.mjs "${mode[@]}" --ancestor-of origin/main
+
   sea:
+    needs: check
     strategy:
       fail-fast: false
       matrix:
@@ -22,8 +77,9 @@ jobs:
     runs-on: ${{ matrix.os }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with: { persist-credentials: false }
       - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
-        with: { node-version: 26, cache: npm }
+        with: { node-version: 26, package-manager-cache: false }
       - run: npm ci && npm run build
       - run: bash scripts/build-sea.sh
         shell: bash
@@ -38,50 +94,170 @@ jobs:
             "$b" assess --csv samples/resources-csv/sample-resources.csv --out "$RUNNER_TEMP/smoke" --region westus3 > /dev/null
             test -f "$RUNNER_TEMP/smoke/reports/resource-decisions.csv"
           done
-      - uses: actions/attest-build-provenance@4d101475d8b20a2381f78447822ac1eab6504dd8 # v4.2.2
-        with:
-          subject-path: dist-sea/amo-*
       - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
-          name: amo-${{ matrix.os }}
+          name: part-sea-${{ matrix.os }}
           path: dist-sea/*
-      - uses: softprops/action-gh-release@efb35369e0ad2afab669f228072c1b0d510eae64 # v3.0.3
-        if: startsWith(github.ref, 'refs/tags/')
-        with:
-          files: dist-sea/*
+          if-no-files-found: error
 
   packages:
+    needs: check
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with: { persist-credentials: false }
       - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
-        with: { node-version: 26, cache: npm }
+        with: { node-version: 26, package-manager-cache: false }
       - run: npm ci && npm run build
-      - name: The tag names the package version
-        if: startsWith(github.ref, 'refs/tags/')
-        run: |
-          set -euo pipefail
-          version="$(node -p "require('./package.json').version")"
-          test "${GITHUB_REF_NAME}" = "v${version}" || { echo "::error::tag ${GITHUB_REF_NAME} does not match package.json version ${version}"; exit 1; }
       - name: Pack the two packages
+        env: { VERSION: "${{ needs.check.outputs.version }}" }
         run: |
           set -euo pipefail
           mkdir -p dist-tarballs
           (cd dist-packages/migration-core && npm pack --pack-destination ../../dist-tarballs)
           (cd dist-packages/migration-ui && npm pack --pack-destination ../../dist-tarballs)
           ls -l dist-tarballs
-          test -f dist-tarballs/hybridcloudworks-migration-core-*.tgz
-          test -f dist-tarballs/hybridcloudworks-migration-ui-*.tgz
-      - name: Clean-consumer gate against the assembled packages
-        run: npm run packages:verify
-      - uses: actions/attest-build-provenance@4d101475d8b20a2381f78447822ac1eab6504dd8 # v4.2.2
-        with:
-          subject-path: dist-tarballs/*.tgz
+          test -f "dist-tarballs/hybridcloudworks-migration-core-${VERSION}.tgz"
+          test -f "dist-tarballs/hybridcloudworks-migration-ui-${VERSION}.tgz"
+      - name: Clean-consumer gate against the packed tarballs (the very files that are released)
+        env: { VERSION: "${{ needs.check.outputs.version }}" }
+        run: npm run packages:verify -- --tarballs dist-tarballs --version "$VERSION"
+      - name: SBOMs (CycloneDX) of the CLI and of the two packages
+        env: { VERSION: "${{ needs.check.outputs.version }}" }
+        run: |
+          set -euo pipefail
+          node scripts/generate-sbom.mjs cli --version "$VERSION" --out "dist-tarballs/amo-cli-${VERSION}.cdx.json"
+          node scripts/generate-sbom.mjs packages --version "$VERSION" --tarballs dist-tarballs \
+            --out "dist-tarballs/hybridcloudworks-migration-packages-${VERSION}.cdx.json"
+          test -s "dist-tarballs/amo-cli-${VERSION}.cdx.json"
+          test -s "dist-tarballs/hybridcloudworks-migration-packages-${VERSION}.cdx.json"
       - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
-          name: package-tarballs
-          path: dist-tarballs/*.tgz
-      - uses: softprops/action-gh-release@efb35369e0ad2afab669f228072c1b0d510eae64 # v3.0.3
-        if: startsWith(github.ref, 'refs/tags/')
+          name: part-packages
+          path: dist-tarballs/*
+          if-no-files-found: error
+
+  inventory:
+    needs: [check, sea, packages]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with: { persist-credentials: false }
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with: { node-version: 26, package-manager-cache: false }
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with: { pattern: "part-*", merge-multiple: true, path: release-files }
+      - name: Exactly the files a release carries are here (names, none empty)
+        env: { VERSION: "${{ needs.check.outputs.version }}" }
+        run: |
+          set -euo pipefail
+          ls -l release-files
+          node scripts/release-publish.mjs check-files --dir release-files --version "$VERSION"
+          { echo '### sha256'; echo; echo '```text'; (cd release-files && sha256sum -- *); echo '```'; } >> "$GITHUB_STEP_SUMMARY"
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
-          files: dist-tarballs/*.tgz
+          name: release-files
+          path: release-files/*
+          if-no-files-found: error
+
+  attest:
+    needs: [check, inventory]
+    if: github.event_name == 'push' || inputs.attest
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      id-token: write # to get the signing certificate for the attestations
+      attestations: write # to store them
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with: { persist-credentials: false }
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with: { node-version: 26, package-manager-cache: false }
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with: { name: release-files, path: release-files }
+      # Build provenance, then the SBOM, for the binaries and for the tarballs: four attestations in all.
+      - uses: actions/attest@1e69f48acb82d1966a394da916b4c1698aa569d6 # v4.2.2
+        with:
+          subject-path: |
+            release-files/amo-linux-x64
+            release-files/amo-darwin-arm64
+            release-files/amo-windows-x64.exe
+      - uses: actions/attest@1e69f48acb82d1966a394da916b4c1698aa569d6 # v4.2.2
+        with:
+          subject-path: |
+            release-files/amo-linux-x64
+            release-files/amo-darwin-arm64
+            release-files/amo-windows-x64.exe
+          sbom-path: release-files/amo-cli-${{ needs.check.outputs.version }}.cdx.json
+      - uses: actions/attest@1e69f48acb82d1966a394da916b4c1698aa569d6 # v4.2.2
+        with:
+          subject-path: release-files/hybridcloudworks-migration-*.tgz
+      - uses: actions/attest@1e69f48acb82d1966a394da916b4c1698aa569d6 # v4.2.2
+        with:
+          subject-path: release-files/hybridcloudworks-migration-*.tgz
+          sbom-path: release-files/hybridcloudworks-migration-packages-${{ needs.check.outputs.version }}.cdx.json
+      - name: Verify the attestations (provenance, then SBOM) came from this workflow, this ref and this commit
+        env:
+          GH_TOKEN: "${{ github.token }}"
+          GH_REPO: "${{ github.repository }}"
+          VERSION: "${{ needs.check.outputs.version }}"
+          SOURCE_REF: "${{ github.ref }}"
+          SOURCE_DIGEST: "${{ github.sha }}"
+        run: |
+          node scripts/release-publish.mjs verify-attestations --dir release-files --version "$VERSION" --repo "$GH_REPO" \
+            --workflow .github/workflows/release-cli.yml --source-ref "$SOURCE_REF" --source-digest "$SOURCE_DIGEST"
+
+  release:
+    needs: [check, inventory, attest]
+    if: github.event_name == 'push' && startsWith(github.ref, 'refs/tags/v')
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write # to create and publish the release: this job is the only one that has it
+      attestations: read # to verify them
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with: { persist-credentials: false }
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with: { node-version: 26, package-manager-cache: false }
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with: { name: release-files, path: release-files }
+      - name: Verify the attestations of the downloaded files (this workflow, this tag, this commit)
+        env:
+          GH_TOKEN: "${{ github.token }}"
+          GH_REPO: "${{ github.repository }}"
+          VERSION: "${{ needs.check.outputs.version }}"
+          SOURCE_REF: "${{ github.ref }}"
+          SOURCE_DIGEST: "${{ github.sha }}"
+        run: |
+          node scripts/release-publish.mjs verify-attestations --dir release-files --version "$VERSION" --repo "$GH_REPO" \
+            --workflow .github/workflows/release-cli.yml --source-ref "$SOURCE_REF" --source-digest "$SOURCE_DIGEST"
+      - name: Create the release as a draft, check it holds exactly the expected files, then make it public
+        env: { GH_TOKEN: "${{ github.token }}", GH_REPO: "${{ github.repository }}", TAG: "${{ github.ref_name }}" }
+        run: node scripts/release-publish.mjs publish --repo "$GH_REPO" --tag "$TAG" --dir release-files --workflow .github/workflows/release-cli.yml
+
+  post-release:
+    needs: [check, release]
+    if: github.event_name == 'push' && startsWith(github.ref, 'refs/tags/v')
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      attestations: read
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with: { persist-credentials: false }
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with: { node-version: 26, package-manager-cache: false }
+      - run: npm ci
+      - name: Download the public release; its files, digests and attestations are checked again
+        env:
+          GH_TOKEN: "${{ github.token }}"
+          GH_REPO: "${{ github.repository }}"
+          TAG: "${{ github.ref_name }}"
+          SOURCE_REF: "${{ github.ref }}"
+          SOURCE_DIGEST: "${{ github.sha }}"
+        run: |
+          node scripts/release-publish.mjs verify-release --repo "$GH_REPO" --tag "$TAG" --out released \
+            --workflow .github/workflows/release-cli.yml --source-ref "$SOURCE_REF" --source-digest "$SOURCE_DIGEST"
+      - name: Clean-consumer gate (packages:verify) against the RELEASED tarballs
+        env: { VERSION: "${{ needs.check.outputs.version }}" }
+        run: npm run packages:verify -- --tarballs released --version "$VERSION"

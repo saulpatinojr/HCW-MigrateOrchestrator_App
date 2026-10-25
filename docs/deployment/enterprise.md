@@ -161,8 +161,39 @@ identity federation in CI, Azure CLI for local development. `AMO_*SECRET` / `AZU
 
 `apps/appliance-web` (Vite + React + MSAL). Register a **second**, public-client SPA app registration with redirect URI
 set to the exact web address where you host the UI, with no slash at the end (the app sends `window.location.origin`, for example `https://` followed by the host name that Static Web Apps shows once you create it, and Microsoft Entra compares the address exactly), expose the API's `access_as_user` scope on the API registration, and pre-authorize the SPA. Build with
-`VITE_ENTRA_TENANT_ID`, `VITE_ENTRA_SPA_CLIENT_ID`, `VITE_API_SCOPE`, `VITE_API_BASE_URL` (all public values) and host the
-`dist/` on Static Web Apps or a second Container App. Add the web origin to the API's allowed origins when hosted separately.
+`VITE_ENTRA_TENANT_ID`, `VITE_ENTRA_SPA_CLIENT_ID` and `VITE_API_SCOPE` (public values).
+
+**Where the web UI and the API live decides one more setting (CORS, ADR-0033).** CORS (Cross-Origin Resource Sharing) is the browser
+rule that decides which websites may read an API's answers.
+
+- **Same address (recommended).** Put one reverse proxy on a single address that sends `/api/*` to the API Container App and
+  everything else to the compiled `dist/`, and leave `VITE_API_BASE_URL` empty so the web UI calls `/api/...` on the address that
+  served it. Nothing else is needed: with `AMO_ALLOWED_ORIGINS` unset the API sends no CORS headers at all.
+- **Different addresses.** Build the web UI with `VITE_API_BASE_URL` set to the API's address, and tell the API which web address
+  may call it by setting `AMO_ALLOWED_ORIGINS` on the **API** Container App (not the worker; for example in the Azure portal: the
+  Container App, Containers, Environment variables, add `AMO_ALLOWED_ORIGINS` with the value, then create the new revision).
+  The value is a comma-separated list of exact origins: `https://`, the host in lower case, a port only when it is not
+  the default, and **nothing else** (no path, no trailing slash). `http://` is accepted only for a web UI on your own machine
+  (`localhost`, `127.0.0.1` or `[::1]`); any other `http://` entry is refused. It is the same text as the redirect address registered above.
+  Examples: `https://app.example.com`, or for a local web UI started with Vite, `http://localhost:5174`; two origins are
+  `https://app.example.com,http://localhost:5174`. A wildcard (`*`), `null` or a malformed entry makes the API refuse to start
+  with a message that names `AMO_ALLOWED_ORIGINS`. Allowed origins get `Access-Control-Allow-Origin` with their own address,
+  `Vary: Origin`, and a preflight answer for `GET`, `POST`, the `Authorization` and `Content-Type` headers; no cookies or other
+  credentials are ever allowed, and the Entra token and the app role (ADR-0031) are still required on every protected route. An origin that is not in the list
+  gets no CORS headers, so the browser will not let that page read the answers. For local development with `docker compose`, put
+  `AMO_ALLOWED_ORIGINS=http://localhost:5174` in `.env` (see `.env.example`). The Terraform in this repository does not set the
+  variable.
+
+Front door options for the same-address layout: Azure Front Door or Application Gateway path routing, a small Caddy or nginx
+container in front of both, or Azure Static Web Apps with the Container App linked as its API backend. The Static Web Apps option
+is **untested** here and has limits
+([Container Apps backend](https://learn.microsoft.com/azure/static-web-apps/apis-container-apps),
+[API overview](https://learn.microsoft.com/azure/static-web-apps/apis-overview)): the Standard plan is required, the API paths
+must start with `/api`, linking adds an `Azure Static Web Apps (Linked)` identity provider on the Container App that by default
+accepts only traffic proxied through the static web app, only HTTP is supported, and a request is capped at 45 seconds. That the
+proxy forwards the `Authorization` header unchanged is not verified. Any proxy in front of the API can add or remove headers, so
+check the response headers there. A front door is not provisioned by the Terraform in this repository and has not been
+exercised here (`VALIDATION.md`).
 
 ## 2c. Worker
 

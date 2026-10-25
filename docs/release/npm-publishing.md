@@ -1,11 +1,11 @@
 # Publishing the npm packages (owner runbook)
 
 > **Optional since 2026-10-11.** Every `v*` tag's GitHub Release carries the two package tarballs
-> (`release-cli.yml`, job `packages`), and the downstream edition `HCW-MigrateOrchestrator_AddOn` pins them by URL with
+> (`release-cli.yml`, job `packages`; [`README.md`](README.md)), and the downstream edition `HCW-MigrateOrchestrator_AddOn` pins them by URL with
 > an integrity hash and adopts new releases through its `core-update` workflow. Publishing to npm makes the packages
 > available to third parties; it is not on the path between a release and the website.
 
-`publish-npm.yml` publishes `@hybridcloudworks/migration-core` and `@hybridcloudworks/migration-ui` on every `v*` tag using
+`publish-npm.yml` publishes `@hybridcloudworks/migration-core` and `@hybridcloudworks/migration-ui` on every `v*` tag (never from a manual run: Run workflow on `main` is a dry run that stops after the clean-consumer gate; see [`README.md`](README.md)) using
 **npm trusted publishing** (OIDC from GitHub Actions, provenance attached, no token stored anywhere). The registry needs a
 one-time bootstrap that only the package owner can do. Until it is done the workflow is skipped (not failed) because it is
 gated on the repository variable `NPM_TRUSTED_PUBLISHING`.
@@ -51,7 +51,7 @@ Then, in the same settings, require two-factor authentication or trusted publish
 ## 4. Arm the workflow
 
 In GitHub → repository Settings → Secrets and variables → Actions → Variables: add `NPM_TRUSTED_PUBLISHING` = `ready`.
-From the next `v*` tag the workflow builds at the tag version, runs the clean-consumer gate, and publishes both packages with
+From the next `v*` tag the workflow first checks that the tag, the package version and `main` agree and that the npm that ships with Node 26 is at least 11.5.1 (it never installs `npm@latest`), builds at the package version, runs the clean-consumer gate, and publishes exactly those packages with
 provenance. Verify at https://www.npmjs.com/package/@hybridcloudworks/migration-core (the Provenance panel must show this
 repository and workflow).
 
@@ -64,3 +64,6 @@ repository and workflow).
   `@source "../node_modules/@hybridcloudworks/migration-ui/dist";` to the Tailwind entry (see the integration guide in `_Addon`).
 
 Never publish from a developer machine after step 2; never create or store an npm automation token.
+
+A version that was published in error cannot be published again. Mark it with `npm deprecate` and ship the next version (commands:
+[`README.md`](README.md) section 5). `publish-npm.yml` starts from the same tag as the release run but does not wait for it.

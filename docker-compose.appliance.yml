@@ -10,6 +10,7 @@ services:
       AMO_CREDENTIAL_KIND: "${AMO_CREDENTIAL_KIND:-azure-cli}"
       AMO_DISCOVERY_FIXTURE: "${AMO_DISCOVERY_FIXTURE:-0}"
       AMO_ENTRA_AUDIENCE: "${AMO_ENTRA_AUDIENCE:-}"
+      AMO_ALLOWED_ORIGINS: "${AMO_ALLOWED_ORIGINS:-}"
       DATABASE_URL: "postgres://amo@postgres:5432/amo?sslmode=disable"
     ports: ["8081:8081"]
     depends_on: [postgres]

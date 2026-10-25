@@ -13,8 +13,10 @@ import { ResourceMoverClient, type MoverAction } from "@amo/azure-execution";
 import { gate, APPROVAL_REQUIRED_OPERATIONS, type Principal, type AuthorizationLevel, type ApprovalOperation } from "@amo/authorization";
 import { createLogger, type Logger } from "@amo/observability";
 import { InMemoryRepository, type AssessmentRepository } from "./repository.js";
+import { applyCors, applyCorsHeaders, parseAllowedOrigins } from "./cors.js";
 import { FORBIDDEN_MESSAGE, levelAllows } from "./route-levels.js";
 export * from "./repository.js";
+export * from "./cors.js";
 
 export interface EnterpriseConfig {
   tenantId: string | null;
@@ -23,13 +25,15 @@ export interface EnterpriseConfig {
   audiences: string[];
   credentialKind: "managed-identity" | "workload-identity-federation" | "azure-cli";
   useFixture: boolean;
+  /** Exact origins that may call the API from a browser (AMO_ALLOWED_ORIGINS, ADR-0033). Empty: no CORS headers at all. */
+  allowedOrigins: string[];
 }
 
 export function configFromEnv(env: NodeJS.ProcessEnv = process.env): EnterpriseConfig {
   refuseUnsupportedIdentityEnv(env);
   for (const k of Object.keys(env)) if (/^(AMO_|AZURE_).*(SECRET|PASSWORD)$/i.test(k)) throw new Error(`refusing to start: ${k} looks like a client secret; use managed identity or workload identity federation`);
   const clientId = env.AMO_ENTRA_CLIENT_ID ?? null;
-  return { tenantId: env.AMO_ENTRA_TENANT_ID ?? null, clientId, audiences: [env.AMO_ENTRA_AUDIENCE, clientId, clientId ? `api://${clientId}` : null].filter((x): x is string => !!x), credentialKind: (env.AMO_CREDENTIAL_KIND as EnterpriseConfig["credentialKind"]) ?? "managed-identity", useFixture: env.AMO_DISCOVERY_FIXTURE === "1" };
+  return { tenantId: env.AMO_ENTRA_TENANT_ID ?? null, clientId, audiences: [env.AMO_ENTRA_AUDIENCE, clientId, clientId ? `api://${clientId}` : null].filter((x): x is string => !!x), credentialKind: (env.AMO_CREDENTIAL_KIND as EnterpriseConfig["credentialKind"]) ?? "managed-identity", useFixture: env.AMO_DISCOVERY_FIXTURE === "1", allowedOrigins: parseAllowedOrigins(env.AMO_ALLOWED_ORIGINS) };
 }
 
 /**
@@ -100,7 +104,16 @@ export function createEnterpriseApi(cfg: EnterpriseConfig, deps: ApplianceDeps):
   const scopes = deps.credential && cfg.tenantId ? new ScopeInventory(deps.credential, cfg.tenantId, fetchImpl) : null;
 
   return createServer(async (req, res) => {
-    const url = new URL(req.url ?? "/", "http://localhost");
+    let url: URL;
+    try { url = new URL(req.url ?? "/", "http://localhost"); } catch {
+      // A request target such as "//" cannot be parsed. Answer 400 (an allowed origin can still read it); throwing out of an async handler would end the process.
+      applyCorsHeaders(cfg.allowedOrigins, req, res);
+      res.writeHead(400, { "content-type": "application/json", "cache-control": "no-store", "x-content-type-options": "nosniff" });
+      res.end(JSON.stringify({ error: { code: "bad_request", message: "malformed request target" } }));
+      return;
+    }
+    // CORS allow-list (ADR-0033): a preflight is answered here, before the auth guard, because it carries no token.
+    if (url.pathname.startsWith("/api/") && applyCors(cfg.allowedOrigins, req, res)) return;
     const send = (status: number, body: unknown) => { res.writeHead(status, { "content-type": "application/json", "cache-control": "no-store", "x-content-type-options": "nosniff" }); res.end(JSON.stringify(body)); };
     const fail = (status: number, code: string, message: string) => send(status, { error: { code, message } });
     try {
