@@ -1,6 +1,6 @@
 # ADR-0031: The appliance requires an Entra app role and fails closed without one
 
-**Status:** Accepted · **Date:** 2026-10-25 · **Closes the role half of ticket #46 (AMO-5); the `nbf` half shipped earlier. Amends ADR-0022 and ADR-0007 (app-role mapping only)**
+**Status:** Accepted (owner decision recorded 2026-10-25, see below) · **Date:** 2026-10-25 · **Closes the role half of ticket #46 (AMO-5); the `nbf` half shipped earlier. Amends ADR-0022 and ADR-0007 (app-role mapping only)**
 
 ## Context
 
@@ -11,36 +11,56 @@ against the scopes the appliance can read. That is a least-privilege gap, not a 
 for either a required app role or Entra's "assignment required" setting, with tests for a missing and a wrong role. Whether
 "assignment required" was on for the deployed application was not known, and the Terraform did not set it.
 
-The roles already exist in `infrastructure/terraform/appliance-azure` (`Migration.Plan`, `Migration.Execute`,
-`Migration.Execute.Destructive`) and are documented in ADR-0022 and `docs/deployment/enterprise.md`. The authorization
+Three roles already existed in `infrastructure/terraform/appliance-azure` (`Migration.Plan`, `Migration.Execute`, `Migration.Execute.Destructive`) and are documented in ADR-0022 and `docs/deployment/enterprise.md`; `Migration.Read` is added by this ADR. The authorization
 levels are, in order, `sign-in`, `discovery`, `validation`, `artifact-generation`, `planning`, `controlled-execution` and
 `destructive-execution` (`packages/authorization`); higher levels imply lower ones.
+
+## Owner decision
+
+On 2026-10-25 the owner decided for this ticket (row C3 of [HCW-HybridCloudWorks issue 1373](https://github.com/saulpatinojr/HCW-HybridCloudWorks/issues/1373)):
+**add a lowest role, `Migration.Read`, and also turn on Entra "assignment required"**. Nothing is deployed yet, so the breaking
+change (nobody has access until assigned) costs nothing now. An earlier draft of this ADR **deferred** the lowest role and
+shipped three roles; that deferral is **reversed**. The rest of this ADR describes the four-role result.
 
 ## Decision
 
 Both layers, because each covers a failure of the other:
 
 1. **The API requires an app role.** `principalFromClaims` returns a principal only when the token's `roles` claim is an
-   array containing at least one of the three known roles, matched exactly (case-sensitive). The highest role held wins:
+   array containing at least one of the four known roles, matched exactly (case-sensitive). The highest role held wins:
 
    | App role | Authorization level |
    |---|---|
+   | `Migration.Read` | `discovery`: assess only |
    | `Migration.Plan` | `planning` (includes discovery, validation, artifact generation) |
    | `Migration.Execute` | `controlled-execution` |
    | `Migration.Execute.Destructive` | `destructive-execution` |
 
    No role, an empty `roles` claim, a role the API does not know, a `roles` claim that is not an array of strings, or a
    missing object id gives no principal, and every protected route answers **403 `forbidden`** before any route logic runs.
-   There is no default level. The lowest role is `Migration.Plan`. It is **wider** than what an old role-less "discovery"
-   user had: `planning` also covers validation and artifact generation (for example `validate-move` evidence), which the
-   `discovery` level did not. There is no role below it, so nobody can be given discovery only; whether to add one is
-   listed under "Alternatives considered". The public routes `/api/health` and `/api/agents` are unchanged. A token that
+   There is no default level. The lowest role is `Migration.Read`, which maps to the `discovery` level: it carries exactly the
+   access a role-less signed-in user used to get automatically, and now only by assignment. What each level may call, checked
+   against the routes in `apps/appliance-api/src/index.ts`:
+
+   | Route | `Migration.Read` (discovery) | `Migration.Plan` | `Migration.Execute` | `Migration.Execute.Destructive` |
+   |---|---|---|---|---|
+   | `GET /api/me`, `GET /api/scopes` | yes | yes | yes | yes |
+   | `POST /api/assessments` (needs discovery), `GET /api/assessments`, `GET /api/assessments/{id}` (own only) | yes | yes | yes | yes |
+   | `POST /api/assessments/{id}/validate-move` (needs validation) | 403 | yes | yes | yes |
+   | `GET /api/operations/{targetKey}` (needs planning) | 403 | yes | yes | yes |
+   | `POST /api/approvals` (needs controlled execution) | 403 | 403 | yes | yes |
+   | `POST /api/execution/resource-mover/*` (prepare, discard: controlled execution; initiateMove, commit: controlled execution plus a recorded approval) | 403 | 403 | yes | yes |
+
+   No API route requires `artifact-generation` on its own, so the only differences between Read and Plan are move validation
+   and operation status. `Migration.Plan` is **wider** than the old role-less access (it adds those two), so an administrator
+   who wants assess-only access assigns `Migration.Read`, not `Migration.Plan`. The public routes `/api/health` and `/api/agents`
+   are unchanged. A token that
    fails validation is still 401.
 2. **Entra enforces assignment.** Terraform creates `azuread_service_principal.api` with
    `app_role_assignment_required = true`, so Entra issues a token for the API only to users, groups and applications that
    hold an assigned app role. Assignments are made in the Entra portal (steps in `docs/deployment/enterprise.md`) or
    declaratively with the optional variable `app_role_assignments`, which is empty by default and validated against the
-   three roles. Outputs print the enterprise application's object ID and the role IDs.
+   four roles. Outputs print the enterprise application's object ID and the role IDs.
 
 The service principal sets `use_existing = true`, so an enterprise application that already exists for the registration (for
 example one created by the portal) is adopted instead of stopping the apply with an import error; the alternative is
@@ -71,10 +91,7 @@ in the pipeline. Use the variable for a lab or for your own first assignment.
   costs a few lines and is testable here.
 - **Only the API role check.** Rejected as the sole control: without the setting Entra still issues tokens to every user in
   the tenant, which then hit the API and its logs. Defence in depth is cheap here.
-- **A fourth, lower role (for example `Migration.Read` mapped to `discovery`).** Deferred, not rejected. It would let an
-  owner grant assess-only access, but it is a new role ID and a new product decision, and the ticket asked to design with the
-  existing roles. If wanted, add it to `APP_ROLE_LEVELS`, to the Terraform role map (the static test fails until both agree)
-  and to this table.
+- **Deferring the lowest role (the first draft of this ADR).** Reversed by the owner decision above: `Migration.Read` is added, in `APP_ROLE_LEVELS`, in the Terraform role map with a stable id (`uuidv5("url", "amo-role-Migration.Read")`, like the others), in `app_role_assignments` validation, and in the docs. The static test fails if the Terraform roles and `APP_ROLE_LEVELS` differ.
 - **Keeping `discovery` as the level for an unrecognised role.** Rejected: that is the defect.
 
 ## Consequences

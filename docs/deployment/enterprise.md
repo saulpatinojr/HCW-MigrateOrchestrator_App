@@ -46,9 +46,31 @@ no "signed in, no role" level (ADR-0031).
 | Role | Level | Can |
 |---|---|---|
 | (no role, or an unknown role) | none | nothing: every protected route answers 403 |
-| `Migration.Plan` | planning | discovery assessments on permitted scopes, validate-move evidence, plans, bundles (read-only) |
+| `Migration.Read` | discovery | **assess only:** list scopes, run discovery assessments on permitted scopes, read your own assessments. No move validation, plans, approvals or execution |
+| `Migration.Plan` | planning | + validate-move evidence, plans, bundles, operation status (no execution) |
 | `Migration.Execute` | controlled-execution | + record approvals; Resource Mover prepare / initiateMove (approval `production-deploy`) / discard |
-| `Migration.Execute.Destructive` | destructive-execution | + commit (approval `data-cutover`), source deletion workflows (future) |
+| `Migration.Execute.Destructive` | destructive-execution | + the destructive operations the approval gate reserves for it (source deletion workflows, future) |
+
+If a person holds several roles, the highest one counts. `Migration.Read` is what a signed-in user without a role used to
+get automatically (the old `discovery` level); now it has to be assigned like the others (ADR-0031).
+
+What each role may call (`403` means the API refused it for lack of a level; every route also needs a valid token, and an
+assessment is only visible to the person who created it):
+
+| Route | Read | Plan | Execute | Execute.Destructive |
+|---|---|---|---|---|
+| `GET /api/health`, `GET /api/agents` (public) | yes | yes | yes | yes |
+| `GET /api/me`, `GET /api/scopes` | yes | yes | yes | yes |
+| `POST /api/assessments`, `GET /api/assessments`, `GET /api/assessments/{id}` | yes | yes | yes | yes |
+| `POST /api/assessments/{id}/validate-move` | 403 | yes | yes | yes |
+| `GET /api/operations/{targetKey}` | 403 | yes | yes | yes |
+| `POST /api/approvals` | 403 | 403 | yes | yes |
+| `POST /api/execution/resource-mover/{prepare, discard}` | 403 | 403 | yes | yes |
+| `POST /api/execution/resource-mover/initiateMove` | 403 | 403 | yes, with a recorded `production-deploy` approval | same |
+| `POST /api/execution/resource-mover/commit` | 403 | 403 | yes, with a recorded `data-cutover` approval | same |
+
+No route today needs more than `Migration.Execute`: the extra level of `Migration.Execute.Destructive` is reserved by the approval
+gate for operations such as source deletion, which the API does not expose yet.
 
 Two layers enforce this. Terraform sets `app_role_assignment_required = true` on the enterprise application, so Entra
 itself should issue no token to anyone who is not assigned a role (Microsoft documents that Entra refuses the sign-in of an
@@ -77,7 +99,7 @@ hold the Application Administrator or Cloud Application Administrator role in En
 2. Go to **Entra ID**, then **Enterprise apps**, and open **Azure Migration Orchestrator (prod)** (the name ends in the `environment` you deployed, `prod` by default).
 3. Choose **Users and groups**, then **Add user/group**.
 4. Under **Users**, pick the person. Assigning a group needs Microsoft Entra ID P1 or higher; a single user does not.
-5. Under **Select a role**, pick `Migration.Plan` (read-only), `Migration.Execute` or `Migration.Execute.Destructive`, then **Assign**.
+5. Under **Select a role**, pick `Migration.Read` (assess only), `Migration.Plan`, `Migration.Execute` or `Migration.Execute.Destructive`, then **Assign**. Start with the lowest role the person needs.
 6. Ask the person to sign out of the appliance and sign in again. Their new token carries the role. You should see their level next to their name at the top of the page.
 
 ### Assign roles with Terraform instead

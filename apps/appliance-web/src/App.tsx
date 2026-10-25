@@ -43,7 +43,7 @@ export default function App() {
   if (!account()) return (
     <main className="mx-auto max-w-xl p-10 space-y-6 text-center">
       <h1 className="text-2xl font-semibold">Azure Migration Orchestrator</h1>
-      <p className="text-slate-600">Sign in with Microsoft Entra ID. Access requires an assigned app role (Migration.Plan is read-only planning); execution needs a higher role and recorded approvals.</p>
+      <p className="text-slate-600">Sign in with Microsoft Entra ID. Access requires an assigned app role: Migration.Read is assess only, Migration.Plan adds move validation and planning, and execution needs a higher role and recorded approvals.</p>
       {error && <p role="alert" className="rounded-lg border border-red-700 p-3 text-sm text-red-700">{error}</p>}
       <button className="rounded-lg bg-sky-700 px-4 py-2 text-white" onClick={signIn}>Sign in</button>
       <PoweredBy compact />

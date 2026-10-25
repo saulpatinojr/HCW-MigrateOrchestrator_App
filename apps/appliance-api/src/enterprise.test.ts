@@ -38,17 +38,21 @@ test("refuses to start with a client secret in the environment; roles map to lev
 });
 
 test("app roles map to levels, the highest role wins, and anything else is no principal (ticket #46, ADR-0031)", () => {
+  assert.equal(principalFromClaims({ oid: "o", roles: ["Migration.Read"] })?.grantedLevel, "discovery", "the lowest role keeps the old discovery access, now only by assignment");
   assert.equal(principalFromClaims({ oid: "o", roles: ["Migration.Plan"] })?.grantedLevel, "planning");
   assert.equal(principalFromClaims({ oid: "o", roles: ["Migration.Execute"] })?.grantedLevel, "controlled-execution");
   assert.equal(principalFromClaims({ oid: "o", roles: ["Migration.Execute.Destructive"] })?.grantedLevel, "destructive-execution");
   assert.equal(principalFromClaims({ oid: "o", roles: ["Migration.Plan", "Migration.Execute"] })?.grantedLevel, "controlled-execution");
+  assert.equal(principalFromClaims({ oid: "o", roles: ["Migration.Read", "Migration.Plan"] })?.grantedLevel, "planning", "Plan beats Read");
+  assert.equal(principalFromClaims({ oid: "o", roles: ["Migration.Read", "Migration.Execute"] })?.grantedLevel, "controlled-execution", "Execute beats Read");
+  assert.equal(principalFromClaims({ oid: "o", roles: ["Migration.Plan", "Migration.Read", "Migration.Execute.Destructive", "Migration.Execute"] })?.grantedLevel, "destructive-execution", "order in the claim does not matter");
   assert.equal(principalFromClaims({ oid: "o", roles: ["Other.Role", "Migration.Execute.Destructive", "Migration.Plan"] })?.grantedLevel, "destructive-execution");
   // No role is not "discovery": it is no principal.
   assert.equal(principalFromClaims({ oid: "o", roles: [] }), null);
   assert.equal(principalFromClaims({ oid: "o" }), null);
   assert.equal(principalFromClaims({ roles: ["Migration.Plan"] }), null, "a role without an object id is still refused");
   // Wrong role: other app roles, other casing, look-alikes, and the scope claim name used as a role.
-  for (const wrong of ["Reader", "Migration.Read", "migration.plan", "MIGRATION.PLAN", "Migration.Plan ", " Migration.Plan", "Migration.Planner", "Migration.Execute.Destructive.Extra", "access_as_user", ""]) {
+  for (const wrong of ["Reader", "Migration.Reader", "migration.read", "MIGRATION.READ", "Migration.Read ", "Migration.Readonly", "migration.plan", "MIGRATION.PLAN", "Migration.Plan ", " Migration.Plan", "Migration.Planner", "Migration.Execute.Destructive.Extra", "access_as_user", ""]) {
     assert.equal(principalFromClaims({ oid: "o", roles: [wrong] }), null, JSON.stringify(wrong));
   }
   // A roles claim that is not an array of strings must not match by substring or by coercion.
@@ -93,8 +97,8 @@ test("a valid token with no role, or the wrong role, is refused with 403 on ever
   assert.equal((await call("/api/health", null)).status, 200);
 });
 
-test("a valid role is accepted: each role reaches /api/me with its level, and Migration.Plan can still discover (ticket #46)", async () => {
-  for (const [role, level] of [["Migration.Plan", "planning"], ["Migration.Execute", "controlled-execution"], ["Migration.Execute.Destructive", "destructive-execution"]] as const) {
+test("a valid role is accepted: each role reaches /api/me with its level (ticket #46)", async () => {
+  for (const [role, level] of [["Migration.Read", "discovery"], ["Migration.Plan", "planning"], ["Migration.Execute", "controlled-execution"], ["Migration.Execute.Destructive", "destructive-execution"]] as const) {
     const r = await call("/api/me", mint([role], `holder-${role}`));
     assert.equal(r.status, 200, role);
     const j = (await r.json()) as { level: string; roles: string[] };
@@ -228,4 +232,59 @@ test("accepted mover actions are recorded as operations and listable", async () 
   const ops = (await (await call("/api/operations/mc2", exec)).json()) as Array<{ status: string; kind: string }>;
   assert.equal(ops[0].status, "InProgress");
   assert.equal(ops[0].kind, "resource-mover.initiateMove");
+});
+
+test("Migration.Read is assess-only: allowed routes answer, validation, approvals, execution and operations answer 403 (ADR-0031)", async () => {
+  const reader = mint(["Migration.Read"], "reader-oid");
+  const eventsBefore = repo.events.length;
+  // Allowed: sign-in identity, scope list, create and list and read your own assessment.
+  const me = await call("/api/me", reader);
+  assert.equal(me.status, 200);
+  assert.equal(((await me.json()) as { level: string }).level, "discovery");
+  // /api/scopes needs a server whose fake Azure answers the subscription query, as in the scopes test above.
+  const scopesFetch = (async (url: string, init?: RequestInit) => {
+    if (url.includes("discovery/v2.0/keys")) return new Response(JSON.stringify({ keys: [{ kid: "k1", kty: "RSA", n: jwk.n, e: jwk.e }] }), { status: 200 });
+    if (String(init?.body).includes("resourcecontainers")) return new Response(JSON.stringify({ data: [{ subscriptionId: SUB, name: "Home", tenantId: TENANT }] }), { status: 200 });
+    return new Response("{}", { status: 202 });
+  }) as unknown as typeof fetch;
+  const s3 = createEnterpriseApi(cfg, { validator: new EntraTokenValidator({ tenantId: TENANT, audiences: ["api://amo"], fetchImpl: scopesFetch }), credential: new StaticTokenCredential(), repository: new InMemoryRepository(), discovery: new FixtureDiscoveryProvider([]), fetchImpl: scopesFetch, logger: noopLogger });
+  await new Promise<void>((r) => s3.listen(0, r));
+  try {
+    const sc = await fetch(`http://127.0.0.1:${(s3.address() as { port: number }).port}/api/scopes`, { headers: { authorization: `Bearer ${reader}` } });
+    assert.equal(sc.status, 200);
+    assert.equal(((await sc.json()) as { subscriptions: unknown[] }).subscriptions.length, 1);
+  } finally { s3.close(); }
+  const created = await call("/api/assessments", reader, "POST", { scope: { kind: "subscription", id: SUB } });
+  assert.equal(created.status, 201);
+  const { assessmentId } = (await created.json()) as { assessmentId: string };
+  assert.equal((await call("/api/assessments", reader)).status, 200);
+  assert.equal((await call(`/api/assessments/${assessmentId}`, reader)).status, 200);
+  assert.equal((await call(`/api/assessments/${assessmentId}`, mint(["Migration.Read"], "other-reader"))).status, 404, "another reader cannot see it");
+  assert.equal((await call("/api/assessments", reader, "POST", {})).status, 400, "a malformed request is still a 400, not a 403");
+  // Forbidden: everything that needs validation, planning or execution.
+  const col = { subscriptionId: SUB, resourceGroup: "rg-mover", name: "mc-reader" };
+  const armBefore = armCalls.length;
+  const forbidden: Array<[string, string, unknown?]> = [
+    ["POST", `/api/assessments/${assessmentId}/validate-move`, { targetResourceGroupId: `/subscriptions/${SUB}/resourceGroups/rg2` }],
+    ["POST", "/api/approvals", { operation: "production-deploy", targetKey: "mc-reader" }],
+    ["POST", "/api/execution/resource-mover/prepare", { collection: col, moveResourceIds: ["/r1"] }],
+    ["POST", "/api/execution/resource-mover/initiateMove", { collection: col, moveResourceIds: ["/r1"] }],
+    ["POST", "/api/execution/resource-mover/commit", { collection: col, moveResourceIds: ["/r1"] }],
+    ["POST", "/api/execution/resource-mover/discard", { collection: col, moveResourceIds: ["/r1"] }],
+    ["GET", "/api/operations/mc-reader"],
+  ];
+  for (const [method, path, body] of forbidden) {
+    const r = await call(path, reader, method, body);
+    assert.equal(r.status, 403, `${method} ${path}`);
+    const j = (await r.json()) as { accepted?: boolean; operationId?: unknown; error?: { code: string } };
+    assert.ok(j.error?.code === "forbidden" || j.accepted === false, "refused by the level check or the gate");
+    assert.ok(!j.operationId, "no operation was recorded");
+  }
+  assert.equal(armCalls.length, armBefore, "no Azure call was made on behalf of a reader");
+  // The reader's assessment was created. The gate audits refused execution attempts (existing behaviour), but nothing was
+  // approved, validated or accepted.
+  const added = repo.events.slice(eventsBefore);
+  assert.ok(added.some((e) => e.event === "assessment.created"));
+  assert.ok(!added.some((e) => e.event === "approval.granted" || e.event === "assessment.validate-move"));
+  for (const e of added.filter((x) => x.event.startsWith("execution."))) assert.equal((e.details as { accepted: boolean }).accepted, false, e.event);
 });

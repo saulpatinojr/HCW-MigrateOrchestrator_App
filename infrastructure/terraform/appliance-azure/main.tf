@@ -394,7 +394,8 @@ resource "azuread_application" "api" {
 
   dynamic "app_role" {
     for_each = {
-      "Migration.Plan"                = "Plan migrations (read-only discovery and planning)"
+      "Migration.Read"                = "Assess only: run discovery assessments and read your own results (no move validation, plans or execution)"
+      "Migration.Plan"                = "Plan migrations (validation evidence, plans and bundles; no execution)"
       "Migration.Execute"             = "Record approvals and run gated, reversible execution (Resource Mover prepare/initiate/discard)"
       "Migration.Execute.Destructive" = "Commit cutovers and destructive operations"
     }

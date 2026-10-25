@@ -5,7 +5,7 @@
  * again. Pure on purpose, so a test can load it without a browser.
  */
 export const NO_ROLE_MESSAGE =
-  "Your account has not been given a role on this application. Ask an administrator to assign you one of the Migration roles in Microsoft Entra (Enterprise applications, then Users and groups), then sign in again.";
+  "Your account has not been given a role on this application. Ask an administrator to assign you one of the Migration roles in Microsoft Entra (Enterprise applications, then Users and groups; Migration.Read is the lowest), then sign in again.";
 
 export function describeSignInError(e: unknown): string {
   const parts: string[] = [];

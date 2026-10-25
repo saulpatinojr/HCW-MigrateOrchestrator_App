@@ -47,13 +47,14 @@ export function assertProductionConfig(cfg: EnterpriseConfig, env: NodeJS.Proces
 
 /**
  * The Entra app roles the API recognises, highest first, and the authorization level each grants (ADR-0031). Role values
- * are matched exactly (case-sensitive), as Entra issues them in the `roles` claim. The lowest role is `Migration.Plan`;
+ * are matched exactly (case-sensitive), as Entra issues them in the `roles` claim. The lowest role is `Migration.Read` (assess only);
  * a token with none of these roles is not a principal at all.
  */
 export const APP_ROLE_LEVELS: ReadonlyArray<readonly [role: string, level: AuthorizationLevel]> = [
   ["Migration.Execute.Destructive", "destructive-execution"],
   ["Migration.Execute", "controlled-execution"],
   ["Migration.Plan", "planning"],
+  ["Migration.Read", "discovery"],
 ];
 
 /**

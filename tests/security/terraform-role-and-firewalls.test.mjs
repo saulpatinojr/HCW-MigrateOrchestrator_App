@@ -41,14 +41,15 @@ test("the Entra enterprise application requires an assigned app role", () => {
   assert.ok(sp.replace(/\s+/g, " ").includes("lifecycle { prevent_destroy = true }"), "destroying the enterprise application deletes every role assignment");
 });
 
-test("the app roles in Terraform and the roles the API recognises are the same set, and none maps below planning", () => {
+test("the app roles in Terraform and the roles the API recognises are the same set, and the lowest role is Migration.Read at the discovery level", () => {
   const app = block(main, "resource", "azuread_application", "api");
   const tfRoles = [...app.matchAll(/^\s*"(Migration\.[A-Za-z.]+)"\s*=\s*"/gm)].map((m) => m[1]).sort();
   const apiBlock = api.match(/export const APP_ROLE_LEVELS[\s\S]*?\n\];/)?.[0] ?? "";
   const apiRoles = [...apiBlock.matchAll(/\["(Migration\.[A-Za-z.]+)",\s*"([a-z-]+)"\]/g)].map((m) => [m[1], m[2]]);
   assert.deepEqual(apiRoles.map(([r]) => r).sort(), tfRoles, "Terraform app roles and APP_ROLE_LEVELS must match exactly");
-  assert.equal(tfRoles.length, 3);
-  for (const [, level] of apiRoles) assert.ok(["planning", "controlled-execution", "destructive-execution"].includes(level), `a role must not grant ${level}`);
+  assert.equal(tfRoles.length, 4);
+  assert.deepEqual(apiRoles, [["Migration.Execute.Destructive", "destructive-execution"], ["Migration.Execute", "controlled-execution"], ["Migration.Plan", "planning"], ["Migration.Read", "discovery"]], "highest first; Migration.Read is the lowest role and grants discovery only");
+  for (const [, level] of apiRoles) assert.ok(["discovery", "planning", "controlled-execution", "destructive-execution"].includes(level), `a role must not grant ${level}`);
   assert.ok(!/:\s*"discovery"|"discovery"\s*;/.test(api.slice(api.indexOf("export function principalFromClaims"), api.indexOf("export interface ApplianceDeps"))), "principalFromClaims must never hand out a default level");
 });
 
@@ -65,7 +66,7 @@ test("the API fails closed when the principal is null, before any route runs", (
 test("role assignments are validated against the three roles and empty by default", () => {
   const v = block(variables, "variable", "app_role_assignments");
   assert.equal(attr(v, "default"), "{}");
-  for (const r of ["Migration.Plan", "Migration.Execute", "Migration.Execute.Destructive"]) assert.ok(v.includes(`"${r}"`), r);
+  for (const r of ["Migration.Read", "Migration.Plan", "Migration.Execute", "Migration.Execute.Destructive"]) assert.ok(v.includes(`"${r}"`), r);
 });
 
 // ---------------------------------------------------------------- ticket #53: subnet firewalls and opt-in costs

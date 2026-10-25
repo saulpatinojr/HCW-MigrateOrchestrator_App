@@ -30,7 +30,7 @@ classification, 19 bounded agents and a Safety Agent, report and infrastructure 
 explorer components. It builds and runs on its own.
 
 Who can use the appliance: every call except the health and agent-list routes needs a valid Microsoft Entra token **that
-carries an app role** (`Migration.Plan`, `Migration.Execute` or `Migration.Execute.Destructive`). A valid token with no
+carries an app role** (`Migration.Read`, `Migration.Plan`, `Migration.Execute` or `Migration.Execute.Destructive`; the lowest, `Migration.Read`, is assess only). A valid token with no
 role, or an unknown one, is answered with 403; there is no default access for a signed-in user. Terraform also turns on
 "assignment required" for the Entra application, so Entra issues tokens only to assigned people. See
 [`docs/deployment/enterprise.md`](docs/deployment/enterprise.md) (sections 2 and 2d) and ADR-0031 and ADR-0032.

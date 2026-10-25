@@ -20,6 +20,7 @@ test("AADSTS50105 (no role assigned) becomes a plain instruction, however the er
   assert.equal(describeSignInError({ message: "x", subError: "aadsts50105" }), NO_ROLE_MESSAGE);
   assert.match(NO_ROLE_MESSAGE, /administrator/);
   assert.match(NO_ROLE_MESSAGE, /role/);
+  assert.match(NO_ROLE_MESSAGE, /Migration.Read/, "name the lowest role so the administrator knows where to start");
 });
 
 test("other errors keep Entra's first line without trace or correlation ids; empty errors still say something", () => {

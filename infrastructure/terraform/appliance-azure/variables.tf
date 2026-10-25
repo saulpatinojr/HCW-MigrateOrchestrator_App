@@ -67,10 +67,10 @@ variable "app_role_assignments" {
     principal_object_id = string
     role                = string
   }))
-  description = "Who may use the API: Entra users, groups or applications to assign an app role to, keyed by any short label. Empty by default; assign in the Entra portal instead if you prefer (docs/deployment/enterprise.md, section 2). role is Migration.Plan, Migration.Execute or Migration.Execute.Destructive. Assigning a group needs Microsoft Entra ID P1 or higher."
+  description = "Who may use the API: Entra users, groups or applications to assign an app role to, keyed by any short label. Empty by default; assign in the Entra portal instead if you prefer (docs/deployment/enterprise.md, section 2). role is Migration.Read (assess only), Migration.Plan, Migration.Execute or Migration.Execute.Destructive. Assigning a group needs Microsoft Entra ID P1 or higher."
   default     = {}
   validation {
-    condition     = alltrue([for a in values(var.app_role_assignments) : contains(["Migration.Plan", "Migration.Execute", "Migration.Execute.Destructive"], a.role)])
-    error_message = "Each role must be exactly Migration.Plan, Migration.Execute or Migration.Execute.Destructive."
+    condition     = alltrue([for a in values(var.app_role_assignments) : contains(["Migration.Read", "Migration.Plan", "Migration.Execute", "Migration.Execute.Destructive"], a.role)])
+    error_message = "Each role must be exactly Migration.Read, Migration.Plan, Migration.Execute or Migration.Execute.Destructive."
   }
 }

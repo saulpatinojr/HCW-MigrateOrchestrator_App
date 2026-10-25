@@ -19,8 +19,8 @@ run "enterprise_application_requires_an_app_role" {
   }
 
   assert {
-    condition     = toset([for r in azuread_application.api.app_role : r.value]) == toset(["Migration.Plan", "Migration.Execute", "Migration.Execute.Destructive"])
-    error_message = "The app roles must be exactly the three the API recognises (apps/appliance-api APP_ROLE_LEVELS)."
+    condition     = toset([for r in azuread_application.api.app_role : r.value]) == toset(["Migration.Read", "Migration.Plan", "Migration.Execute", "Migration.Execute.Destructive"])
+    error_message = "The app roles must be exactly the four the API recognises (apps/appliance-api APP_ROLE_LEVELS)."
   }
 
   assert {
@@ -31,6 +31,35 @@ run "enterprise_application_requires_an_app_role" {
   assert {
     condition     = length(azuread_app_role_assignment.api) == 0
     error_message = "No role is assigned unless var.app_role_assignments says so."
+  }
+}
+
+run "migration_read_is_the_lowest_role_with_a_stable_id" {
+  command = plan
+
+  assert {
+    condition     = length([for r in azuread_application.api.app_role : r.id if r.value == "Migration.Read"]) == 1 && [for r in azuread_application.api.app_role : r.id if r.value == "Migration.Read"][0] == uuidv5("url", "amo-role-Migration.Read")
+    error_message = "Migration.Read must exist once, with the id derived the same way as the other roles."
+  }
+
+  assert {
+    condition     = length(toset([for r in azuread_application.api.app_role : r.id])) == 4 && alltrue([for r in azuread_application.api.app_role : r.enabled && contains(r.allowed_member_types, "User") && contains(r.allowed_member_types, "Application")])
+    error_message = "All four roles must have distinct ids, be enabled and be assignable to users and applications."
+  }
+}
+
+run "migration_read_assignment_is_planned" {
+  command = plan
+
+  variables {
+    app_role_assignments = {
+      reader = { principal_object_id = "22222222-2222-4222-8222-222222222222", role = "Migration.Read" }
+    }
+  }
+
+  assert {
+    condition     = length(azuread_app_role_assignment.api) == 1
+    error_message = "A Migration.Read assignment must plan one azuread_app_role_assignment."
   }
 }
 
@@ -54,7 +83,7 @@ run "unknown_role_in_an_assignment_is_refused" {
 
   variables {
     app_role_assignments = {
-      admin = { principal_object_id = "11111111-1111-4111-8111-111111111111", role = "Migration.Read" }
+      admin = { principal_object_id = "11111111-1111-4111-8111-111111111111", role = "Migration.Reader" }
     }
   }
 

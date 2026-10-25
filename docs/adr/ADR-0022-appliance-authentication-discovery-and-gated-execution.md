@@ -26,4 +26,4 @@ The appliance works end to end against fakes with 84 tests; real-tenant validati
 (Contributor on source/target resource groups for Resource Mover) is granted per engagement, never by the base Terraform.
 Resource Mover request shapes are marked [VERIFY] against the current API version.
 
-- Amended 2026-10-25: a token with no recognised app role is no longer mapped to `discovery`; it is refused with 403, and Terraform requires role assignment on the enterprise application (ADR-0031). The two subnets of the hosting configuration now have network security groups with deny-all-inbound (ADR-0032).
+- Amended 2026-10-25: a token with no recognised app role is no longer mapped to `discovery`; it is refused with 403, a fourth, lowest role `Migration.Read` (assess only) was added, and Terraform requires role assignment on the enterprise application (ADR-0031). The two subnets of the hosting configuration now have network security groups with deny-all-inbound (ADR-0032).
