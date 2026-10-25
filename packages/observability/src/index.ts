@@ -4,18 +4,37 @@
  */
 export type LogLevel = "debug" | "info" | "warn" | "error";
 
-const SECRET_PATTERNS: RegExp[] = [
-  /AccountKey=[^;\s]+/gi,
-  /SharedAccessSignature=[^;\s]+/gi,
-  /sig=[A-Za-z0-9%+/=]{20,}/gi,
-  /(password|pwd|secret|token)\s*[=:]\s*[^;\s,]+/gi,
-  /-----BEGIN [A-Z ]*PRIVATE KEY-----[\s\S]*?-----END [A-Z ]*PRIVATE KEY-----/g,
-  /eyJ[a-zA-Z0-9_-]{10,}\.[a-zA-Z0-9_-]{10,}\.[a-zA-Z0-9_-]{10,}/g,
+const REDACTED = "[REDACTED]";
+
+// Every quantifier below has an upper bound (or a value class that cannot overlap the next token), and the two
+// patterns that need a closing part (PEM footer, JWT dots) are written so a failed attempt cannot rescan the input from
+// every later start position. That keeps the cost linear in the input length, so a crafted log line cannot stall the
+// logger (CodeQL js/polynomial-redos, AMO-13).
+
+// Secrets with no key name in front of them: the whole match is replaced with a fixed marker.
+const WHOLE_SECRET_PATTERNS: RegExp[] = [
+  // A PEM private key block. The body is anything except the start of the footer (so the "Proc-Type:" header lines of
+  // an old encrypted key are covered), capped at 16 KiB. The footer is optional so a key cut off in the middle of a
+  // log line is still hidden.
+  /-----BEGIN (?:[A-Z]{1,10} ){0,3}PRIVATE KEY-----(?:[^-]|-(?!----END )){0,16384}(?:-----END (?:[A-Z]{1,10} ){0,3}PRIVATE KEY-----)?/g,
+  // A JWT: three dot-separated base64url parts, the first starting "eyJ" ({"). The lookbehind means only the start of a
+  // run of token characters is tried, so a long run of "eyJeyJ..." is scanned once, not once per "eyJ". The signature
+  // part may be empty (an unsigned token).
+  /(?<![A-Za-z0-9_])eyJ[A-Za-z0-9_-]{10,2048}\.[A-Za-z0-9_-]{10,16384}\.[A-Za-z0-9_-]{0,4096}/g,
+];
+
+// "key=value" secrets: group 1 is the key and separator, which stay readable; only the value is replaced.
+const KEYED_SECRET_PATTERNS: RegExp[] = [
+  /(AccountKey=)[^;\s]+/gi,
+  /(SharedAccessSignature=)[^;\s]+/gi,
+  /(sig=)[A-Za-z0-9%+/=]{20,}/gi,
+  /((?:password|pwd|secret|token)\s*[=:]\s*)[^;\s,]+/gi,
 ];
 
 export function redact(input: string): string {
   let out = input;
-  for (const p of SECRET_PATTERNS) out = out.replace(p, (m) => m.split(/[=:]/)[0] + "=[REDACTED]");
+  for (const p of WHOLE_SECRET_PATTERNS) out = out.replace(p, REDACTED);
+  for (const p of KEYED_SECRET_PATTERNS) out = out.replace(p, (_match, keyPart: string) => keyPart + REDACTED);
   return out;
 }
 
