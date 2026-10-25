@@ -66,6 +66,29 @@ variable "postgres_geo_redundant_backup_enabled" {
   type        = bool
   description = "Keep a second copy of the PostgreSQL backups in the paired Azure region, so the database can be restored there after a regional outage. Off by default because it costs money (backup storage is billed for twice the backup size beyond the free allowance, see https://learn.microsoft.com/azure/postgresql/backup-restore/concepts-backup-restore) and because Azure only allows choosing it when the server is created: switching it on for a server that already exists makes Terraform plan to DESTROY and recreate the database. Decide before the first apply (ADR-0032)."
   default     = false
+  # Learn ("Backup and restore", "Restore to paired region"): geo-redundant backup is supported only for servers in an Azure
+  # paired region. A rule that reads another variable needs Terraform 1.9 or newer (iac-validate pins 1.9.8). The list is the
+  # regions that Learn's "Azure region pairs and nonpaired regions" page shows as N/A (read 2026-10-25,
+  # https://learn.microsoft.com/azure/reliability/regions-paired). It is a deny-list on purpose: a region Microsoft pairs later is
+  # not blocked by a stale list, and a newly unpaired one fails at apply, where Azure rejects it, not here.
+  validation {
+    condition = !var.postgres_geo_redundant_backup_enabled || !contains(
+      ["chilecentral", "mexicocentral", "austriaeast", "belgiumcentral", "denmarkeast", "italynorth", "polandcentral", "spaincentral", "israelcentral", "qatarcentral", "indonesiacentral", "malaysiawest", "newzealandnorth"],
+      lower(replace(var.location, " ", ""))
+    )
+    error_message = "postgres_geo_redundant_backup_enabled is true, but location has no Azure paired region (Chile Central, Mexico Central, Austria East, Belgium Central, Denmark East, Italy North, Poland Central, Spain Central, Israel Central, Qatar Central, Indonesia Central, Malaysia West and New Zealand North are not paired), and Azure supports geo-redundant backup only in paired regions. Choose a paired region such as westus3, or leave the variable false."
+  }
+}
+variable "additional_allowed_hosts" {
+  type        = list(string)
+  description = "Extra host names the API accepts in the Host header (AMO_ALLOWED_HOSTS, ADR-0033), for example a custom domain or a reverse proxy name. The Container App's own address is always listed and is added for you; the API lets any IP address through (DNS rebinding needs a domain name), so the platform's probes keep working. Bare lower-case host names only: no https://, no port, no path, no wildcard. Empty by default. The API reads AMO_ALLOWED_HOSTS from the host allow-list change (refs issue 83, F8); an API image without it ignores the variable."
+  default     = []
+  validation {
+    # A name made only of digits and dots is read by the API's URL parser as an IPv4 address (123 becomes 0.0.0.123), so it
+    # would be refused at startup: such a value must be a full dotted quad, or contain a letter.
+    condition     = alltrue([for h in var.additional_allowed_hosts : can(regex("^[a-z0-9]([a-z0-9.-]{0,251}[a-z0-9])?$", h)) && (can(regex("[a-z]", h)) || can(regex("^((25[0-5]|2[0-4][0-9]|1[0-9]{2}|[1-9]?[0-9])[.]){3}(25[0-5]|2[0-4][0-9]|1[0-9]{2}|[1-9]?[0-9])$", h)))])
+    error_message = "Each additional_allowed_hosts entry must be a bare lower-case host name such as app.example.com: letters, digits, dots and hyphens only, with no scheme, port, path, wildcard or leading or trailing dot, and not a number such as 123 (use a name with a letter in it, or a full IPv4 address)."
+  }
 }
 variable "app_role_assignments" {
   type = map(object({
