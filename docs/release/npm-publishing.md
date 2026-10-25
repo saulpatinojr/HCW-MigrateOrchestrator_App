@@ -64,3 +64,6 @@ repository and workflow).
   `@source "../node_modules/@hybridcloudworks/migration-ui/dist";` to the Tailwind entry (see the integration guide in `_Addon`).
 
 Never publish from a developer machine after step 2; never create or store an npm automation token.
+
+A version that was published in error cannot be published again. Mark it with `npm deprecate` and ship the next version (commands:
+[`README.md`](README.md) section 5). `publish-npm.yml` starts from the same tag as the release run but does not wait for it.

@@ -21,7 +21,8 @@ const ATTEST_SHA = "1e69f48acb82d1966a394da916b4c1698aa569d6";
 
 /** Map job name to its text: a job starts at two spaces and a name inside the top-level `jobs:` block. */
 function jobs(body) {
-  const rest = body.split("\njobs:\n")[1] ?? "";
+  // comment lines between jobs belong to no job
+  const rest = (body.split("\njobs:\n")[1] ?? "").split("\n").filter((l) => !/^\s*#/.test(l)).join("\n");
   const pieces = rest.split(/^(?=  [A-Za-z0-9_-]+:\s*$)/m).filter((p) => p.trim());
   return Object.fromEntries(pieces.map((p) => [p.split(":", 1)[0].trim(), p]));
 }
@@ -102,7 +103,7 @@ test("release-cli: exactly one job creates the release, as a draft, through the 
   assert.deepEqual(touching, ["release"]);
   const script = readFileSync("scripts/release-publish.mjs", "utf8");
   const create = script.indexOf('"release", "create"');
-  const verifyDraft = script.indexOf("{ draft: true }");
+  const verifyDraft = script.indexOf("await settleDraft(repo, draft.id");
   const patch = script.indexOf('"PATCH"');
   assert.ok(create > 0 && create < verifyDraft && verifyDraft < patch, "create, then check the draft, then make it public, in that order");
   assert.match(script, /"--draft", "--verify-tag"/);
@@ -212,4 +213,23 @@ test("the release workflows use no dependency cache (a poisoned cache would reac
     }
     assert.doesNotMatch(code(name), /actions\/cache@/, name);
   }
+});
+
+test("publish-images: the same tag, version and main check runs before an image can be built (review F8)", () => {
+  const name = "publish-images.yml";
+  const j = jobs(text(name));
+  assert.deepEqual(Object.keys(j), ["check", "build-scan-publish"]);
+  assert.deepEqual(needs(j["build-scan-publish"]), ["check"]);
+  assert.match(head(j.check), /if: vars\.DOCKERHUB_ENABLED == 'true'/, "inert while DOCKERHUB_ENABLED is unset, like the build");
+  assert.match(j.check, /fetch-depth: 0/);
+  assert.match(j.check, /check-release-version\.mjs "\$\{mode\[@\]\}" --ancestor-of origin\/main/);
+  assert.match(j.check, /mode=\(--tag "\$REF_NAME"\); else mode=\(--rehearse\)/);
+  assert.match(steps(j.check)[0], /if: github\.event_name != 'push' && github\.ref != 'refs\/heads\/main'/, "a manual run off main stops at once");
+  assert.deepEqual(grants(j.check), []);
+});
+
+test("release-cli: attestation checks also pin the signer commit and refuse self-hosted runners (review F10)", () => {
+  const script = readFileSync("scripts/release-publish.mjs", "utf8");
+  assert.match(script, /"--signer-digest", sourceDigest/);
+  assert.match(script, /"--deny-self-hosted-runners"/);
 });

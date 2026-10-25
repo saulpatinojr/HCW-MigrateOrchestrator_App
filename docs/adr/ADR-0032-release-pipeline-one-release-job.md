@@ -9,7 +9,8 @@ checksum files and the two package tarballs the downstream edition pins by URL a
 
 - the `v0.3.1` tag was moved once (the first run failed, the tag was re-pointed) before the tag ruleset existed. It cannot
   be repaired: the same version name once pointed at different code. The ruleset `Protect release tags` (deletion,
-  non-fast-forward, update on `refs/tags/v*`) has been active since 2026-10-24, so it cannot happen again;
+  non-fast-forward, update on `refs/tags/v*`; it has since gained a creation rule that repository admins can bypass) has been
+  active since 2026-10-24, so moving a tag is now blocked by the ruleset (an admin could still switch it off);
 - `release-cli.yml` granted `contents: write`, `id-token: write` and `attestations: write` to the whole workflow, so the
   jobs that only build had the power to write to the repository (Scorecard alert TokenPermissions);
 - two jobs (`sea` and `packages`) each edited the same release through a third-party action (`softprops/action-gh-release`),
@@ -24,7 +25,9 @@ checksum files and the two package tarballs the downstream edition pins by URL a
 1. **One workflow, one ordered path, one job that touches the release.** `release-cli.yml` has seven jobs: `check`, `sea`,
    `packages`, `inventory`, `attest`, `release`, `post-release`. Only `release` has `contents: write`. It creates the
    release as a **draft** with every file, checks that the draft holds exactly the expected files (names, upload state, the
-   sha256 GitHub reports), and only then makes it public. No third-party release action; the steps are in
+   sha256 GitHub reports), and only then makes it public. The draft is judged from `GET /releases/{id}`, re-read up to ten
+   times while GitHub is still processing the uploads, never from the list answer; an expected asset with no sha256 digest is a
+   problem, not a skipped check. No third-party release action; the steps are in
    `scripts/release-publish.mjs`, which has tests. An existing release (draft or public) for the tag is never touched and no
    file is ever replaced (no `--clobber`).
 2. **Permissions per job, minimum scopes.** The workflow level is `contents: read`. Build jobs have nothing more. `attest`
@@ -35,13 +38,19 @@ checksum files and the two package tarballs the downstream edition pins by URL a
    `hybridcloudworks-migration-packages-<version>.cdx.json` (the two tarballs installed the way a consumer installs them,
    with their React peers). `actions/attest` (v4.2.2, the newest stable at 2026-10-25, pinned by SHA) attests build
    provenance and the SBOM for each of the three binaries and each of the two tarballs.
-4. **The attestation check is bound to the tag.** `gh attestation verify` is run with `--signer-workflow`,
-   `--source-ref refs/tags/<tag>` and `--source-digest <commit>`, for provenance and SBOM, in the `attest` job and again in
+4. **The attestation check is bound to the tag.** `gh attestation verify` is run with `--signer-workflow`, `--signer-digest
+   <commit>`, `--source-ref refs/tags/<tag>`, `--source-digest <commit>` and `--deny-self-hosted-runners`, for provenance and SBOM, in the `attest` job and again in
    `release` on the downloaded files, and in `post-release` on the files downloaded from the public release. "Some
    attestation of these bytes exists" is not enough: a dry-run attestation of the same bytes must not satisfy a real release.
-5. **The tag guards everything.** `scripts/check-release-version.mjs` runs first in `release-cli.yml` and `publish-npm.yml`:
-   the tag must be `v` + the version in `package.json`, `repository.manifest.json` and `package-lock.json` (both places),
-   and the tagged commit must already be on `main`. Nothing is built, attested, released or published before it passes.
+5. **The tag guards each workflow.** `scripts/check-release-version.mjs` runs first in `release-cli.yml`, `publish-npm.yml` and
+   `publish-images.yml`: the tag must be `v` + the version in `package.json`, `repository.manifest.json` and
+   `package-lock.json` (both places), and the tagged commit must already be on `main`. It must also be the tip of `main`, or
+   leave `.github/workflows` as the tip has it: GitHub's REST documentation says a `GITHUB_TOKEN` cannot create or modify a
+   release whose commit adds or changes files under `.github/workflows` compared with the default branch, and an older commit
+   would otherwise fail in `release` after the permanent attestations were written. Within each workflow nothing is built,
+   attested, released or published before its check passes. The three workflows are independent runs of the same tag: none
+   waits for another, so npm can publish (and an image can be pushed) even if the release run fails. That is accepted: each is
+   gated by its own variable and an unpublished version number is cheap, but the owner must look at all of them after a tag.
 6. **A post-release job re-runs `packages:verify` against the released tarballs.** `scripts/verify-packed-consumer.mjs`
    gained `--tarballs DIR --version X.Y.Z`; the `packages` job runs it on the packed tarballs before release and
    `post-release` runs it on the files downloaded from the public release.
@@ -70,14 +79,18 @@ checksum files and the two package tarballs the downstream edition pins by URL a
 
 ## Consequences
 
-- Release assets: the existing nine names are unchanged (the downstream edition's URLs and hashes keep working) and two SBOM
+- Release assets: the existing eight names are unchanged (the downstream edition's URLs and hashes keep working) and two SBOM
   files are added. The release page appears only at the end of a successful run; between the start of `release` and its last
   step a draft is visible only to repository writers.
-- If `post-release` fails, the release is already public (it cannot be both public and unverified). The remedy is to delete
-  the release on the Releases page (the tag stays) and ship the next patch version; `docs/release/README.md` has the steps.
+- If `post-release` fails, the release is already public, so a failure there is a signal, not a rollback. A temporary failure
+  (a network or registry error while installing react) is a "Re-run failed jobs" case. A real mismatch means deleting the
+  release on the Releases page (the tag stays) and shipping the next patch version; `docs/release/README.md` has the steps.
 - Fixed names for the three binaries assume `ubuntu-latest` is x64, `macos-latest` is arm64 and `windows-latest` is x64. If
   GitHub changes a label, `inventory` fails before anything is attested or published.
-- Not changed: the repository rulesets, secrets and variables; `publish-images.yml` (the appliance image has its own gate,
-  `docs/release/docker-hub.md`), `rules-refresh.yml` and the `self-merging-pr` action. Immutable releases (a GitHub setting)
+- Not changed: the repository rulesets, secrets and variables; `publish-images.yml` apart from the same first-job check (the
+  appliance image keeps its own gate, `docs/release/docker-hub.md`; the check is inert while `DOCKERHUB_ENABLED` is unset),
+  `rules-refresh.yml` and the `self-merging-pr` action. Immutable releases (a GitHub setting)
   are off; draft-then-publish is the order GitHub documents for them, so turning them on later needs no change here.
+- Open owner decisions, not made here: tightening the tag ruleset's creation rule (admins can bypass it) and turning on
+  immutable releases. The downstream edition checks `releases/latest` and pins by URL and hash without verifying attestations.
 - Static and local evidence only: no workflow has run. The first real exercise is the dry run on `main`, then the tag.

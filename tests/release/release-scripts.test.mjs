@@ -5,8 +5,8 @@ import { copyFileSync, existsSync, mkdirSync, mkdtempSync, readFileSync, readdir
 import { tmpdir } from "node:os";
 import { basename, join } from "node:path";
 import { spawnSync } from "node:child_process";
-import { allNames, attestedNames, checkFiles, decodeJsonValues, publish, releaseNotes, verifyAttestations, verifyCommand, verifyRelease, versionOfTag, PROVENANCE, SBOM } from "../../scripts/release-publish.mjs";
-import { atLeast, check, notOnBranch, setVersion } from "../../scripts/check-release-version.mjs";
+import { allNames, attestedNames, checkFiles, decodeJsonValues, publish, releaseProblems, releaseNotes, verifyAttestations, verifyCommand, verifyRelease, versionOfTag, PROVENANCE, SBOM } from "../../scripts/release-publish.mjs";
+import { atLeast, check, notOnBranch, setVersion, workflowParity } from "../../scripts/check-release-version.mjs";
 import { addComponent, assertBom, retitle } from "../../scripts/generate-sbom.mjs";
 
 /**
@@ -31,13 +31,14 @@ function releaseDir(version = VERSION) {
 }
 
 /** A fake GitHub: remembers the release, answers the calls release-publish.mjs makes, and records every call. */
-function fakeGh({ existing = [], corrupt = null, failCreate = false, failPatch = false } = {}) {
+function fakeGh({ existing = [], corrupt = null, failCreate = false, failPatch = false, lagReads = 0, staleList = false } = {}) {
   const calls = [];
-  const state = { releases: [...existing], current: null, source: [], attestationFails: false };
+  const state = { releases: [...existing], current: null, source: [], attestationFails: false, reads: 0 };
   const gh = (args) => {
     calls.push(args);
     const [a, b] = args;
-    if (a === "api" && b === "--paginate") return ok(JSON.stringify(state.releases));
+    // staleList: the list answer lags and shows the draft without its assets (the by-id answer is the truth)
+    if (a === "api" && b === "--paginate") return ok(JSON.stringify(staleList ? state.releases.map((r) => ({ ...r, assets: [] })) : state.releases));
     if (a === "release" && b === "create") {
       if (failCreate) return bad("HTTP 422");
       const files = args.filter((x) => allNames(versionOfTag(args[2])).includes(basename(x)));
@@ -45,6 +46,7 @@ function fakeGh({ existing = [], corrupt = null, failCreate = false, failPatch =
       if (corrupt?.drop) assets = assets.filter((x) => x.name !== corrupt.drop);
       if (corrupt?.extra) assets.push({ name: corrupt.extra, state: "uploaded" });
       if (corrupt?.digest) assets = assets.map((x) => (x.name === corrupt.digest ? { ...x, digest: `sha256:${"0".repeat(64)}` } : x));
+      if (corrupt?.nullDigest) assets = assets.map((x) => (x.name === corrupt.nullDigest ? { ...x, digest: null } : x));
       if (corrupt?.state) assets = assets.map((x) => (x.name === corrupt.state ? { ...x, state: "starter" } : x));
       state.current = { id: 7, tag_name: args[2], draft: true, html_url: "https://example.test/r", assets };
       state.releases = [state.current];
@@ -55,7 +57,14 @@ function fakeGh({ existing = [], corrupt = null, failCreate = false, failPatch =
       state.current.draft = false;
       return ok();
     }
-    if (a === "api" && /releases\/7$/.test(b)) return ok(JSON.stringify(state.current));
+    if (a === "api" && /releases\/7$/.test(b)) {
+      state.reads++;
+      if (state.current.draft && state.reads <= lagReads) {
+        // GitHub still processing the uploads: assets not yet "uploaded", digests not yet known
+        return ok(JSON.stringify({ ...state.current, assets: state.current.assets.map((x) => ({ ...x, state: "starter", digest: null })) }));
+      }
+      return ok(JSON.stringify(state.current));
+    }
     if (a === "release" && b === "download") {
       const out = args[args.indexOf("--dir") + 1];
       mkdirSync(out, { recursive: true });
@@ -102,6 +111,8 @@ test("attestations are verified for provenance and SBOM, bound to this workflow,
     assert.equal(c[c.indexOf("--source-ref") + 1], `refs/tags/${TAG}`);
     assert.equal(c[c.indexOf("--source-digest") + 1], digest);
     assert.equal(c[c.indexOf("--repo") + 1], REPO);
+    assert.equal(c[c.indexOf("--signer-digest") + 1], digest, "the workflow that signed must be the one at this commit");
+    assert.ok(c.includes("--deny-self-hosted-runners"));
   }
   assert.equal(calls.filter((c) => c.includes(PROVENANCE)).length, 5);
   assert.equal(calls.filter((c) => c.includes(SBOM)).length, 5);
@@ -125,7 +136,7 @@ test("publish: draft first, every file attached, checked, and only then made pub
   const { gh, calls } = fakeGh();
   assert.deepEqual(await publish({ repo: REPO, tag: TAG, dir, workflow: WORKFLOW }, gh, noPause), []);
   const order = calls.map((c) => (c[0] === "release" ? `release ${c[1]}` : c[1] === "--method" ? "publish" : c[1] === "--paginate" ? "list" : "read"));
-  assert.deepEqual(order, ["list", "release create", "list", "publish", "read"]);
+  assert.deepEqual(order, ["list", "release create", "list", "read", "publish", "read"], "the draft is re-read by id before it is made public");
   const create = callsOf(calls, "release", "create")[0];
   for (const flag of ["--draft", "--verify-tag", "--notes-file"]) assert.ok(create.includes(flag), flag);
   assert.ok(!create.includes("--generate-notes"), "one source of notes, no flag combination to get wrong on a real tag");
@@ -163,6 +174,35 @@ test("publish never makes the release public when the draft is wrong", async () 
   }
 });
 
+test("publish: a draft asset with no sha256 digest is a problem, never a skipped check (review F2)", async () => {
+  for (const nullDigest of ["amo-linux-x64", "hybridcloudworks-migration-ui-1.2.3.tgz"]) {
+    const { gh, calls } = fakeGh({ corrupt: { nullDigest } });
+    const problems = await publish({ repo: REPO, tag: TAG, dir: releaseDir(), workflow: WORKFLOW }, gh, noPause);
+    assert.match(problems.join("\n"), new RegExp(`asset ${nullDigest.replaceAll(".", "\.")} has no sha256 digest`));
+    assert.match(problems.at(-1), /draft stays unpublished/);
+    assert.equal(callsOf(calls, "api", "--method").length, 0, "never made public");
+    assert.equal(calls.filter((c) => c[0] === "api" && /releases\/7$/.test(c[1])).length, 10, "re-read by id a bounded number of times, then stopped");
+  }
+  const dir = releaseDir();
+  const odd = await releaseProblems({ draft: true, assets: allNames(VERSION).map((n) => ({ name: n, state: "uploaded", digest: n === "amo-linux-x64" ? "md5:abc" : `sha256:${sha(join(dir, n))}` })) }, dir, VERSION, { draft: true });
+  assert.match(odd.join(), /amo-linux-x64 has no sha256 digest/, "a digest that is not sha256 counts as missing");
+});
+
+test("publish: the draft is judged from GET /releases/{id}, retried while GitHub is still processing, not from the list (review F2)", async () => {
+  // the list lags (it shows the draft without assets) and the first by-id reads show assets not yet uploaded, no digests
+  const { gh, calls } = fakeGh({ lagReads: 3, staleList: true });
+  assert.deepEqual(await publish({ repo: REPO, tag: TAG, dir: releaseDir(), workflow: WORKFLOW }, gh, noPause), []);
+  const byId = calls.filter((c) => c[0] === "api" && /releases\/7$/.test(c[1]));
+  assert.equal(byId.length, 3 + 1 + 1, "three lagging reads, one good read, then the read-back after publishing");
+  assert.equal(callsOf(calls, "api", "--method").length, 1);
+  // the same lag that never ends is bounded and never publishes
+  const never = fakeGh({ lagReads: 1000, staleList: true });
+  const problems = await publish({ repo: REPO, tag: TAG, dir: releaseDir(), workflow: WORKFLOW }, never.gh, noPause);
+  assert.match(problems.join("\n"), /in state "starter"/);
+  assert.equal(callsOf(never.calls, "api", "--method").length, 0);
+  assert.equal(never.calls.filter((c) => c[0] === "api" && /releases\/7$/.test(c[1])).length, 10);
+});
+
 test("publish reports a failed create, a failed publish and incomplete input without publishing", async () => {
   const dir = releaseDir();
   assert.match((await publish({ repo: REPO, tag: TAG, dir, workflow: WORKFLOW }, fakeGh({ failCreate: true }).gh, noPause))[0], /could not create the draft release/);
@@ -196,7 +236,11 @@ test("verify-release: downloads the public release, compares files and digests, 
 
 test("release notes say how to verify a download and name the SBOMs", () => {
   const notes = releaseNotes(TAG, REPO, WORKFLOW);
-  assert.match(notes, /gh attestation verify hybridcloudworks-migration-core-1\.2\.3\.tgz --repo owner\/repo --source-ref refs\/tags\/v1\.2\.3/);
+  for (const predicate of [PROVENANCE, SBOM]) {
+    const example = `gh attestation verify hybridcloudworks-migration-core-1.2.3.tgz --repo owner/repo --predicate-type ${predicate} --source-ref refs/tags/v1.2.3 --signer-workflow owner/repo/${WORKFLOW} --deny-self-hosted-runners`;
+    assert.ok(notes.includes(example), `both examples use the strict flags of the pipeline: ${predicate}`);
+  }
+  assert.ok(notes.includes("https://github.com/owner/repo/blob/v1.2.3/docs/release/README.md"), "a link, not a bare path");
   assert.match(notes, /amo-cli-1\.2\.3\.cdx\.json/);
   assert.match(notes, /https:\/\/github\.com\/owner\/repo\/blob\/v1\.2\.3\/CHANGELOG\.md/);
 });
@@ -314,4 +358,43 @@ test("sbom: the root is retitled to the artifact, a component is added, and a wr
 
 test("the three release scripts exist", () => {
   for (const f of ["release-publish", "check-release-version", "generate-sbom"]) assert.ok(existsSync(`scripts/${f}.mjs`), f);
+});
+
+test("version guard: a tag on an older commit is refused when .github/workflows changed since (a GITHUB_TOKEN could not create its release), before any attestation (review F1)", () => {
+  const root = fixture();
+  mkdirSync(join(root, ".github/workflows"), { recursive: true });
+  writeFileSync(join(root, ".github/workflows/a.yml"), "name: a\n");
+  git(root, "init", "-q", "-b", "main");
+  git(root, "add", "-A");
+  git(root, "commit", "-q", "-m", "one");
+  const first = git(root, "rev-parse", "HEAD");
+  writeFileSync(join(root, "docs.md"), "x");
+  git(root, "add", "-A");
+  git(root, "commit", "-q", "-m", "two: not a workflow");
+  const second = git(root, "rev-parse", "HEAD");
+  writeFileSync(join(root, ".github/workflows/a.yml"), "name: a changed\n");
+  git(root, "add", "-A");
+  git(root, "commit", "-q", "-m", "three: a workflow");
+  const tip = git(root, "rev-parse", "HEAD");
+  // the tip is always fine
+  assert.equal(workflowParity(root, tip, "main"), null);
+  assert.deepEqual(check(root, { tag: "v1.2.3", ancestorOf: "main", sha: tip }).problems, []);
+  // an older commit on main is an ancestor, but .github/workflows differs from the tip: refused
+  assert.equal(notOnBranch(root, first, "main"), null, "ancestry alone would have accepted it");
+  const refused = check(root, { tag: "v1.2.3", ancestorOf: "main", sha: first }).problems.join("\n");
+  assert.match(refused, /is not the tip of main \(.{12}\) and \.github\/workflows differs between them: a GITHUB_TOKEN cannot create a release/);
+  assert.match(refused, /Tag the tip of main/);
+  assert.match(check(root, { rehearse: true, ancestorOf: "main", sha: first }).problems.join(), /\.github\/workflows differs/, "the dry run applies the same rule");
+  // after the last workflow change, an older commit that has the same workflows as the tip is accepted
+  writeFileSync(join(root, "later.md"), "y");
+  git(root, "add", "-A");
+  git(root, "commit", "-q", "-m", "four: not a workflow");
+  assert.equal(workflowParity(root, tip, "main"), null, "workflows identical to the tip's, so the release can be created");
+  assert.deepEqual(check(root, { tag: "v1.2.3", ancestorOf: "main", sha: tip }).problems, []);
+  assert.match(workflowParity(root, second, "main"), /differs/, "this one predates the workflow change");
+  // an unresolvable ref or commit is a problem, not a pass
+  assert.match(workflowParity(root, tip, "origin/nope"), /could not resolve origin\/nope/);
+  assert.match(workflowParity(root, "0".repeat(40), "main"), /could not compare/);
+  // without --ancestor-of nothing is compared (the version check alone)
+  assert.deepEqual(check(root, { tag: "v1.2.3", sha: first }).problems, []);
 });

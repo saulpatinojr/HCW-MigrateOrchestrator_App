@@ -8,7 +8,8 @@
  *   node scripts/check-release-version.mjs                       versions agree (CI-safe, no tag needed)
  *   node scripts/check-release-version.mjs --tag v0.3.2          ... and the tag is "v" + that version
  *   node scripts/check-release-version.mjs --rehearse           the dry run: take the tag to be "v" + the version
- *   ... --ancestor-of origin/main                                ... and the tagged commit is already on that branch
+ *   ... --ancestor-of origin/main                                ... and the tagged commit is already on that branch, and is
+ *                                                                its tip or leaves .github/workflows as the tip has it
  *   ... --require-npm 11.5.1                                     ... and `npm --version` is at least that (trusted publishing)
  *   node scripts/check-release-version.mjs --set-version 0.3.2   write that version into all of the places below (the same
  *                                                                command in bash and PowerShell; then run npm test)
@@ -82,6 +83,23 @@ export function notOnBranch(root, sha, ref) {
   return `could not compare ${sha.slice(0, 12)} with ${ref}: ${(r.stderr || "git failed").trim()}`;
 }
 
+/**
+ * null when a GITHUB_TOKEN can create the release for `sha`, otherwise the reason it cannot. GitHub documents (REST API,
+ * releases) that a GITHUB_TOKEN cannot create or modify a release whose target commit adds or changes files under
+ * .github/workflows relative to the default branch. Tagging an older ancestor after a workflow-changing pull request landed
+ * would therefore only fail in the `release` job, AFTER the permanent attestations were written. So the tagged commit must be
+ * the tip of `ref` or must not differ from it under .github/workflows.
+ */
+export function workflowParity(root, sha, ref) {
+  const tip = git(root, "rev-parse", "--verify", "--quiet", `${ref}^{commit}`);
+  if (tip.status !== 0) return `could not resolve ${ref}: ${(tip.stderr || "git failed").trim()}`;
+  if (tip.stdout.trim() === sha) return null;
+  const diff = git(root, "diff", "--quiet", sha, ref, "--", ".github/workflows");
+  if (diff.status === 0) return null;
+  if (diff.status === 1) return `commit ${sha.slice(0, 12)} is not the tip of ${ref} (${tip.stdout.trim().slice(0, 12)}) and .github/workflows differs between them: a GITHUB_TOKEN cannot create a release for such a commit, so the release job would fail after the attestations were written. Tag the tip of ${ref}`;
+  return `could not compare .github/workflows between ${sha.slice(0, 12)} and ${ref}: ${(diff.stderr || "git failed").trim()}`;
+}
+
 /** { problems, warnings, version, tag }. `tag` is the tag being released (given, or derived with `rehearse`). */
 export function check(root, { tag = null, rehearse = false, ancestorOf = null, sha = null, requireNpm = null, npmVersion = null } = {}) {
   const problems = [];
@@ -114,6 +132,10 @@ export function check(root, { tag = null, rehearse = false, ancestorOf = null, s
     const commit = sha || git(root, "rev-parse", "HEAD").stdout.trim();
     const reason = notOnBranch(root, commit, ancestorOf);
     if (reason) problems.push(reason);
+    else {
+      const parity = workflowParity(root, commit, ancestorOf);
+      if (parity) problems.push(parity);
+    }
   }
   if (requireNpm !== null) {
     const have = npmVersion ?? execSync("npm --version", { encoding: "utf8" }).trim();

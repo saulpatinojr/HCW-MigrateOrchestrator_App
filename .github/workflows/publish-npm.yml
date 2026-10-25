@@ -7,6 +7,8 @@
 #                              be new enough for trusted publishing, then build, assemble at that version, run the clean-consumer
 #                              gate and keep the assembled packages as a workflow artifact. Nothing is published here.
 #   publish  (id-token: write; a tag only)  publishes the very packages `verify` gated: core first, then ui.
+# This workflow and release-cli.yml (and publish-images.yml) start from the same tag and run independently: none waits for
+# another, so npm can publish even if the release run fails. Each runs its own check first.
 # npm is the one that ships with Node 26 (setup-node `node-version: 26`); the workflow does not install `npm@latest`. If a Node
 # release ever bundles an npm older than 11.5.1, `verify` fails with a clear message instead of publishing without provenance.
 # Dry run: Actions, publish-npm, Run workflow, on the main branch only (any other ref fails at once). It runs `verify` and stops:

@@ -56,12 +56,15 @@ so the web UI calls `/api/...` on the address that served it.
 
 **The web UI and the API must share one address (same origin).** The API has no CORS support on purpose (a browser rule
 that lets one website call an API on another address): it sends no `Access-Control-*` headers, has no allowed-origins
-setting, and a web UI hosted on a different address is blocked by the browser (ADR-0031). Put one reverse proxy on a single
-address that sends `/api/*` to the API Container App and everything else to the compiled `dist/`. Options: Azure Static Web
-Apps (Standard plan) with the Container App linked as its API backend
-([Microsoft Learn](https://learn.microsoft.com/azure/static-web-apps/apis-container-apps)), Azure Front Door or Application
-Gateway path routing, or a small Caddy or nginx container in front of both. The redirect address registered above is that
-one address. Entra token validation on every protected route is unchanged. This front door is not provisioned by the
+setting, so a browser will not let a web UI hosted on a different address read the API's answers (ADR-0031). Put one reverse
+proxy on a single address that sends `/api/*` to the API Container App and everything else to the compiled `dist/`. Options:
+Azure Front Door or Application Gateway path routing, or a small Caddy or nginx container in front of both, or Azure Static Web
+Apps with the Container App linked as its API backend. The Static Web Apps option is untested here and has limits
+([Container Apps backend](https://learn.microsoft.com/azure/static-web-apps/apis-container-apps),
+[API overview](https://learn.microsoft.com/azure/static-web-apps/apis-overview)): the Standard plan is required, the API paths
+must start with `/api`, linking adds an `Azure Static Web Apps (Linked)` identity provider on the Container App that by default
+accepts only traffic proxied through the static web app, only HTTP is supported, and a request is capped at 45 seconds. That the
+proxy forwards the `Authorization` header unchanged is not verified. The redirect address registered above is that one address. Entra token validation on every protected route is unchanged. This front door is not provisioned by the
 Terraform in this repository and has not been exercised here (`VALIDATION.md`).
 
 ## 2c. Worker

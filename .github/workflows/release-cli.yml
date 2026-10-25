@@ -4,7 +4,9 @@
 # optimistic. Design and reasoning: docs/adr/ADR-0032-release-pipeline-one-release-job.md;
 # the owner's checklist, the dry run and what cannot be rehearsed: docs/release/README.md.
 #   check        (contents: read)  the tag, package.json, repository.manifest.json and package-lock.json must agree and the tagged
-#                                  commit must already be on main (scripts/check-release-version.mjs), before anything is built.
+#                                  commit must be the tip of main, or leave .github/workflows as the tip has it (a GITHUB_TOKEN
+#                                  cannot create a release for a commit that changes workflows, which would only show after the
+#                                  attestations were written): scripts/check-release-version.mjs, before this workflow builds anything.
 #   sea          (contents: read)  the single-executable `amo` CLI for Linux, macOS and Windows with checksums, smoke tested.
 #   packages     (contents: read)  the two npm package tarballs (migration-core, migration-ui), the clean-consumer gate run on
 #                                  those very tarballs, and the CycloneDX SBOMs of the CLI and of the packages.

@@ -83,7 +83,7 @@ export function checkFiles(dir, version) {
 }
 
 export function verifyCommand(path, repo, predicate, workflow, sourceRef, sourceDigest) {
-  return ["attestation", "verify", path, "--repo", repo, "--predicate-type", predicate, "--signer-workflow", `${repo}/${workflow}`, "--source-ref", sourceRef, "--source-digest", sourceDigest];
+  return ["attestation", "verify", path, "--repo", repo, "--predicate-type", predicate, "--signer-workflow", `${repo}/${workflow}`, "--signer-digest", sourceDigest, "--source-ref", sourceRef, "--source-digest", sourceDigest, "--deny-self-hosted-runners"];
 }
 
 export function verifyAttestations({ dir, version, repo, workflow, sourceRef, sourceDigest }, gh = realGh, pause = sleepMs) {
@@ -152,7 +152,10 @@ export async function releaseProblems(release, dir, version, { draft }) {
     if (!expected.includes(name)) continue;
     if (asset.state !== "uploaded") problems.push(`asset ${name} is in state ${JSON.stringify(asset.state)}, not "uploaded"`);
     const local = join(dir, name);
-    if (asset.digest && existsSync(local)) {
+    if (!/^sha256:[0-9a-f]{64}$/.test(String(asset.digest ?? ""))) {
+      // never skip the content check: an asset GitHub reports without a sha256 cannot be compared with the attested file
+      problems.push(`asset ${name} has no sha256 digest in GitHub's answer (got ${JSON.stringify(asset.digest ?? null)}), so its content cannot be checked`);
+    } else if (existsSync(local)) {
       const want = `sha256:${await sha256Of(local)}`;
       if (asset.digest !== want) problems.push(`asset ${name} on the release has digest ${asset.digest}, not the sha256 of the attested file (${want})`);
     }
@@ -168,13 +171,13 @@ export function releaseNotes(tag, repo, workflow) {
     "Verify a download (GitHub CLI):",
     "",
     "```bash",
-    `gh attestation verify hybridcloudworks-migration-core-${version}.tgz --repo ${repo} --source-ref refs/tags/${tag} --signer-workflow ${repo}/${workflow}`,
-    `gh attestation verify hybridcloudworks-migration-core-${version}.tgz --repo ${repo} --predicate-type ${SBOM}`,
+    `gh attestation verify hybridcloudworks-migration-core-${version}.tgz --repo ${repo} --predicate-type ${PROVENANCE} --source-ref refs/tags/${tag} --signer-workflow ${repo}/${workflow} --deny-self-hosted-runners`,
+    `gh attestation verify hybridcloudworks-migration-core-${version}.tgz --repo ${repo} --predicate-type ${SBOM} --source-ref refs/tags/${tag} --signer-workflow ${repo}/${workflow} --deny-self-hosted-runners`,
     "```",
     "",
     `What changed: https://github.com/${repo}/blob/${tag}/CHANGELOG.md`,
     "",
-    `The SBOMs are \`amo-cli-${version}.cdx.json\` (the command-line tool) and \`hybridcloudworks-migration-packages-${version}.cdx.json\` (the two package tarballs). How this release is built and checked: docs/release/README.md.`,
+    `The SBOMs are \`amo-cli-${version}.cdx.json\` (the command-line tool) and \`hybridcloudworks-migration-packages-${version}.cdx.json\` (the two package tarballs). How this release is built and checked: https://github.com/${repo}/blob/${tag}/docs/release/README.md.`,
     "",
   ].join("\n");
 }
@@ -188,6 +191,30 @@ const lookupDraft = (repo, tag, gh, pause) => {
   }
   return { error: `the draft release for ${tag} could not be found after it was created; nothing was made public` };
 };
+
+/**
+ * Re-read the draft BY ID (the list answer is not trusted for its assets: it can lag behind the upload) until every
+ * expected asset is uploaded with a sha256 that equals the attested file, with a bounded retry.
+ * Returns { release, problems }; `problems` is empty only when the by-id answer is complete and correct.
+ */
+export async function settleDraft(repo, id, dir, version, gh, pause) {
+  let problems = [];
+  let release = null;
+  for (let attempt = 0; attempt < LOOKUP_TRIES; attempt++) {
+    const read = gh(["api", `repos/${repo}/releases/${id}`]);
+    let value = null;
+    try { value = read.status === 0 ? JSON.parse(read.stdout) : null; } catch { value = null; }
+    if (value && typeof value === "object") {
+      release = value;
+      problems = await releaseProblems(value, dir, version, { draft: true });
+      if (!problems.length) return { release, problems };
+    } else {
+      problems = [`could not read draft release ${id}: ${(read.stderr || read.stdout || "no answer").trim()}`];
+    }
+    if (attempt + 1 < LOOKUP_TRIES) pause(LOOKUP_PAUSE_MS);
+  }
+  return { release, problems };
+}
 
 export async function publish({ repo, tag, dir, workflow }, gh = realGh, pause = sleepMs) {
   const version = versionOfTag(tag);
@@ -211,8 +238,8 @@ export async function publish({ repo, tag, dir, workflow }, gh = realGh, pause =
   const draft = found.draft;
   if (!Number.isInteger(draft.id)) return [`the draft release for ${tag} has no id; nothing was made public`];
   const stuck = "the draft stays unpublished: delete it on the Releases page before re-running";
-  const before = await releaseProblems(draft, dir, version, { draft: true });
-  if (before.length) return [...before, stuck];
+  const settled = await settleDraft(repo, draft.id, dir, version, gh, pause);
+  if (settled.problems.length) return [...settled.problems, stuck];
 
   const made = gh(["api", "--method", "PATCH", `repos/${repo}/releases/${draft.id}`, "-F", "draft=false"]);
   if (made.status !== 0) return [`could not make release ${tag} public: ${(made.stderr || made.stdout).trim()}`, stuck];
