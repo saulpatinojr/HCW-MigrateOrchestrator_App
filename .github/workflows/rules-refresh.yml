@@ -1,32 +1,40 @@
 # Actions are pinned to full commit SHAs (version in the trailing comment); Dependabot (github-actions ecosystem) proposes updates.
 # Evidence Agent in CI (ADR-0021): weekly diff of rules/azure against Microsoft Learn move-support tables → PR with the report.
+#
+# The pull request is opened by .github/actions/self-merging-pr with a GitHub App token, not GITHUB_TOKEN: the repository
+# setting "Allow GitHub Actions to create and approve pull requests" is off, so every scheduled run from 5 Oct 2026 failed
+# with "GitHub Actions is not permitted to create or approve pull requests" (ticket AMO-7). An App-token pull request also
+# starts the required checks. It is a report for a person, so auto-merge is off.
+# The credential is the admin-ops environment's App (interim, see rehearse-self-merging-pr.yml); the job only reaches it in
+# the last step, after npm has run.
 name: rules-refresh
 on:
   schedule: [{ cron: "23 5 * * 1" }]
   workflow_dispatch:
 permissions:
-  contents: write
-  pull-requests: write
+  contents: read
 jobs:
   diff:
     runs-on: ubuntu-latest
+    environment: admin-ops
     steps:
-      # persist-credentials: false — create-pull-request sets its own Authorization header for the push; with the
-      # checkout's persisted header beside it, git sends two and GitHub answers 400 (the weekly run failed this way).
+      # persist-credentials: false — create-pull-request pushes with its own token; with the checkout's persisted
+      # header beside it, git sends two and GitHub answers 400 (an earlier weekly run failed this way).
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with: { persist-credentials: false }
       - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
         with: { node-version: 26, cache: npm }
       - run: npm ci && npm run build
       - run: node scripts/refresh-rules-from-learn.mjs --out rules/reports
-      - uses: peter-evans/create-pull-request@5f6978faf089d4d20b00c7766989d076bb2fc7f1 # v8.1.1
+      - uses: ./.github/actions/self-merging-pr
         with:
+          client-id: ${{ vars.APP_CLIENT_ID }}          # credential
+          private-key: ${{ secrets.APP_PRIVATE_KEY }}   # credential
           branch: rules/learn-refresh
+          add-paths: rules/reports/
           title: "rules: Microsoft Learn move-support diff"
-          commit-message: "rules: refresh Learn move-support diff report"
-          labels: rules
+          auto-merge: "false"
           body: |
             Automated report from `scripts/refresh-rules-from-learn.mjs`. **No rule was changed automatically.**
             Review `rules/reports/learn-diff.md`; for each accepted change: edit `scripts/author-rules.mjs`, bump `ruleVersion`,
             update `retrievedOn`, run `node scripts/author-rules.mjs && npm run build && npm run rules:validate`, then `amo rules snapshot`.
-          add-paths: rules/reports/
