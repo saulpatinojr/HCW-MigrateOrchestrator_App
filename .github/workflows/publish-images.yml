@@ -62,6 +62,7 @@ jobs:
             exit 1
           fi
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with: { persist-credentials: false } # nothing below needs the token: the build context is the local checkout
       - uses: docker/setup-buildx-action@f87e5991a6d7451dcb8d9637bfbc97413f497069 # v4.4.1
       - id: meta
         uses: docker/metadata-action@dc802804100637a589fabce1cb79ff13a1411302 # v6.2.0
@@ -108,4 +109,5 @@ jobs:
           subject-digest: ${{ steps.build.outputs.digest }}
           push-to-registry: true
       - name: Record the immutable digest for deployments
-        run: echo "${{ env.IMAGE }}@${{ steps.build.outputs.digest }}" | tee -a "$GITHUB_STEP_SUMMARY"
+        env: { DIGEST: "${{ steps.build.outputs.digest }}" }
+        run: echo "${IMAGE}@${DIGEST}" | tee -a "$GITHUB_STEP_SUMMARY"

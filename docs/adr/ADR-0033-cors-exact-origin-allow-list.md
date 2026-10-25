@@ -21,8 +21,12 @@ The API implements CORS as an **exact-match allow-list** and nothing broader.
 
 1. **The setting.** `AMO_ALLOWED_ORIGINS` is a comma-separated list of exact origins, for example
    `https://app.example.com,http://localhost:5174`.
-   - An entry is `scheme://host` or `scheme://host:port`: `https` or `http`, lower case, no path, no trailing slash, no query, no
-     user name, and no port that is the default for the scheme (browsers never send one, so it could never match).
+   - An entry is `scheme://host` or `scheme://host:port`: lower case, no path, no trailing slash, no query, no user name, and no
+     port that is the default for the scheme (browsers never send one, so it could never match).
+   - The scheme is `https`. Plain `http` is accepted **only for a loopback host** (`localhost`, `127.0.0.1`, `[::1]`), for a web UI
+     started on the developer's own machine; any other `http://` origin is refused at startup with "uses http:// for a host that is
+     not loopback ... use https://". (Added after review: an `http://` entry for a real host would let a page that anyone on the
+     network can alter read the API's answers.)
    - Spaces around entries are ignored and repeated entries count once.
    - A wildcard (`*`, including `https://*.example.com`), `null`, an empty entry (a stray comma), a path or trailing slash, an upper
      case host and anything that is not a URL are **refused at startup**: the API (and the worker, which reads the same
@@ -34,7 +38,7 @@ The API implements CORS as an **exact-match allow-list** and nothing broader.
    working.
 3. **What an allowed origin gets.** When the request's `Origin` header equals an entry of the list exactly, every response to a
    `/api/` request carries `Access-Control-Allow-Origin: <that exact origin>` and `Vary: Origin`, errors included (so the browser
-   can read a 401). A preflight (`OPTIONS` with `Access-Control-Request-Method`) from an allowed origin is answered `204` with
+   can read a 401, a 404 or the 400 below). A preflight (`OPTIONS` with `Access-Control-Request-Method`) from an allowed origin is answered `204` with
    `Access-Control-Allow-Methods: GET, POST, OPTIONS` (the methods the API uses), `Access-Control-Allow-Headers: Authorization,
    Content-Type` and `Access-Control-Max-Age: 600`.
 4. **What nothing gets.** The `Origin` header is never copied into a response unless it equals a list entry. There is no
@@ -45,18 +49,27 @@ The API implements CORS as an **exact-match allow-list** and nothing broader.
 5. **Preflight is answered before authentication**, because a preflight carries no token, and only for allowed origins. A
    preflight from a disallowed origin is not answered as one: it meets the authentication guard like any other request.
    `/api/health` and `/api/agents` behave as before.
-6. **Authentication is unchanged.** Every route except `/api/health` and `/api/agents` still requires a valid Entra token
+6. **A request target that cannot be parsed is answered 400, not allowed to end the process.** `GET //` (also `///`, `//[`) cannot
+   be parsed as a URL. The parse used to sit outside the handler's `try`, so one unauthenticated request of that kind threw out of
+   an async handler and ended the process (found in review of this change, and present before it). It now answers `400
+   bad_request`, with the CORS headers for an allowed origin and never as a preflight, and the server keeps serving. As a
+   last resort `apps/appliance-api/src/fatal.ts` handles an uncaught exception or unhandled rejection by writing one
+   content-free line (the kind of event only) and exiting with code 1, so the platform restarts the container; it never swallows
+   the error.
+7. **Authentication is unchanged.** Every route except `/api/health` and `/api/agents` still requires a valid Entra token
    (signature, issuer, audience, expiry, not-before). CORS only tells a browser what a page may read; the server never uses
    `Origin` to decide whether to accept a token, and a valid token works with or without an `Origin` header. CORS is not access
    control: other clients are unaffected by it.
-7. **What a deployer must set.** Nothing for a same-origin deployment. For a web UI on a different address, set
+8. **What a deployer must set.** Nothing for a same-origin deployment. For a web UI on a different address, set
    `AMO_ALLOWED_ORIGINS` to that address on the API's Container App (and register the same address as the Entra single-page-app
    redirect URI). `docs/deployment/enterprise.md` section 2b has the steps. The repository's Terraform does not yet expose the
    variable; it is an environment variable on the Container App.
-8. **Tests keep this true.** `apps/appliance-api/src/cors.test.ts` runs the real Node request handler over `node:http` with the
+9. **Tests keep this true.** `apps/appliance-api/src/cors.test.ts` runs the real Node request handler over `node:http` with the
    `Origin` header set by hand: allowed origin, disallowed origin and look-alikes, no `Origin`, preflight allowed and disallowed,
    wildcard and malformed configuration refused (also as a real process exit), no headers when the variable is empty, `Vary`
-   present, no credentials header, and authentication still enforced after a preflight. `tests/security/cors-allow-list.test.mjs`
+   present, no credentials header, and authentication still enforced after a preflight; `apps/appliance-api/src/malformed-request.test.ts`
+   sends `GET //` and similar targets over a raw socket and checks the 400, that the server still answers `/api/health`
+   afterwards, that an allowed origin can read the 400, and the last-resort guard. `tests/security/cors-allow-list.test.mjs`
    scans the source (no wildcard, no credentials header, the origin is only echoed after an exact list match) and the documents
    (the variable is documented and no document suggests a wildcard).
 

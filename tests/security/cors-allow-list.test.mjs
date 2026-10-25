@@ -63,6 +63,9 @@ test("the variable is documented where an operator looks, with its rules, and th
   assert.match(guide, /ADR-0033/);
   assert.match(guide, /comma-separated list of exact origins/);
   assert.match(guide, /no path, no trailing slash/);
+  assert.match(guide, /`http:\/\/` is accepted only for a web UI on your own machine/, "plain http is for loopback only");
+  assert.match(read("docs/adr/ADR-0033-cors-exact-origin-allow-list.md"), /Plain `http` is accepted \*\*only for a loopback host\*\*/);
+  assert.match(read(".env.example"), /http:\/\/ only for localhost, 127\.0\.0\.1 or \[::1\]/);
   assert.match(guide, /wildcard/i, "it says a wildcard is refused");
   assert.match(guide, /no cookies or other\s+credentials are ever allowed/);
   assert.match(guide, /untested/i, "the Static Web Apps option stays marked untested");

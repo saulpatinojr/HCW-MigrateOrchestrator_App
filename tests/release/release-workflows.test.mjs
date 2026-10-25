@@ -233,3 +233,19 @@ test("release-cli: attestation checks also pin the signer commit and refuse self
   assert.match(script, /"--signer-digest", sourceDigest/);
   assert.match(script, /"--deny-self-hosted-runners"/);
 });
+
+test("publish-images: no expression is expanded inside a run script, and the build job does not keep the checkout credentials (review F11)", () => {
+  const body = code("publish-images.yml");
+  assert.doesNotMatch(body, /^\s*run:[^\n]*\$\{\{/m, "a ${{ }} expression inside a run line: pass it through env instead");
+  const j = jobs(text("publish-images.yml"))["build-scan-publish"];
+  const checkout = steps(j).find((s) => /uses: actions\/checkout@/.test(s));
+  assert.match(checkout, /persist-credentials: false/);
+  assert.match(j, /env: \{ DIGEST: "\$\{\{ steps\.build\.outputs\.digest \}\}" \}\n\s+run: echo "\$\{IMAGE\}@\$\{DIGEST\}"/);
+});
+
+test("the workflows do not call a tag permanent without the ruleset caveat (review F3)", () => {
+  for (const name of [RELEASE, NPM, "publish-images.yml"]) {
+    assert.doesNotMatch(text(name), /can never be moved|cannot be moved or deleted/, `${name}: the ruleset has an admin bypass, so say "blocked"`);
+  }
+  assert.match(text(RELEASE), /blocked from being moved or deleted \(the "Protect release tags" ruleset; repository admins can bypass it or switch it off\)/);
+});

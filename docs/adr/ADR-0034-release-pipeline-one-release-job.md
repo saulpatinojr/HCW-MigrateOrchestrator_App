@@ -70,7 +70,7 @@ checksum files and the two package tarballs the downstream edition pins by URL a
 - **Keep `softprops/action-gh-release` in both jobs and add `needs:`.** Rejected: still a third-party action holding
   `contents: write`, and still no draft-then-publish, so a failure after the first upload leaves a public partial release.
 - **`gh release create` straight from the workflow YAML.** Rejected: the logic that decides whether a release becomes public
-  would be untested shell. A script with a fake `gh` can be tested before a tag that can never be moved is pushed.
+  would be untested shell. A script with a fake `gh` can be tested before a tag that the ruleset blocks from being moved is pushed.
 - **A separate workflow per concern, joined by `workflow_run`.** Rejected: the two ends could disagree about the ref and the
   commit, and the strict attestation check needs one workflow identity.
 - **Make the tag-already-exists case an error in the dry run.** Rejected as the default: `main` carries the version of the

@@ -1,8 +1,8 @@
 #!/usr/bin/env node
 /**
  * Check that every place that names the release version agrees, before a v* tag can make a mistake permanent
- * (ADR-0034). A pushed v* tag cannot be moved or deleted (the "Protect release tags" ruleset), so a tag that disagrees with
- * the package version is a permanent mistake. This runs first in release-cli.yml and publish-npm.yml, before anything is
+ * (ADR-0034). A pushed v* tag is blocked from being moved or deleted (the "Protect release tags" ruleset; repository admins can
+ * bypass it or switch it off), so a tag that disagrees with the package version is a mistake to be treated as permanent. This runs first in release-cli.yml and publish-npm.yml, before anything is
  * built, attested, released or published. Node standard library only.
  *
  *   node scripts/check-release-version.mjs                       versions agree (CI-safe, no tag needed)
@@ -125,7 +125,7 @@ export function check(root, { tag = null, rehearse = false, ancestorOf = null, s
     wanted = `v${version}`;
     const existing = git(root, "rev-parse", "--verify", "--quiet", `refs/tags/${wanted}`);
     if (existing.status === 0) {
-      warnings.push(`dry run: the tag ${wanted} already exists, so a real tag run for this version would be refused (publish refuses a release that exists, and a tag cannot be moved); raise the version in a pull request before tagging`);
+      warnings.push(`dry run: the tag ${wanted} already exists, so a real tag run for this version would be refused (publish refuses a release that exists, and the ruleset blocks moving a tag); raise the version in a pull request before tagging`);
     }
   }
   if (ancestorOf !== null && (tag !== null || rehearse)) {

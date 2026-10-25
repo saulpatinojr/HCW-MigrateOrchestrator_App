@@ -3,7 +3,7 @@
  *
  * CORS (Cross-Origin Resource Sharing) is the browser rule that decides which websites may read an API's answers. The
  * list comes from AMO_ALLOWED_ORIGINS, a comma-separated list of exact origins (scheme, host and, when it is not the
- * default for the scheme, port; no path, no trailing slash). The default is empty, which means no CORS headers at all:
+ * default for the scheme, port; no path, no trailing slash; https, or http for a loopback host only). The default is empty, which means no CORS headers at all:
  * a web UI served from the same address as the API needs none. There is no wildcard, an Origin header is never copied
  * into a response unless it equals an entry of the list, and credentials (cookies) are never allowed: the API takes a
  * bearer token in the Authorization header, which the browser only sends because the preflight allowed that header.
@@ -11,6 +11,8 @@
 import type { IncomingMessage, ServerResponse } from "node:http";
 
 export const ALLOWED_ORIGINS_VAR = "AMO_ALLOWED_ORIGINS";
+/** The only hosts for which an http:// origin is accepted (a web UI started on the same machine). */
+export const LOOPBACK_HOSTS = ["localhost", "127.0.0.1", "[::1]"];
 /** The methods the API really uses: GET and POST (OPTIONS is the preflight itself). */
 export const CORS_METHODS = "GET, POST, OPTIONS";
 export const CORS_HEADERS = "Authorization, Content-Type";
@@ -35,23 +37,35 @@ export function parseAllowedOrigins(value: string | undefined): string[] {
     if (url.protocol !== "https:" && url.protocol !== "http:") bad("must start with https:// or http://");
     // The browser sends the origin in its canonical form: lower-case scheme and host, no default port, no path. Only that form can ever match.
     if (url.origin !== entry) bad(`is not an exact origin (no path, no trailing slash, no user name, no default port, lower case); write it as ${url.origin}`);
+    // Plain http is for a web UI on the developer's own machine only; any other web UI must be served over https.
+    if (url.protocol === "http:" && !LOOPBACK_HOSTS.includes(url.hostname)) bad(`uses http:// for a host that is not loopback (${LOOPBACK_HOSTS.join(", ")}); use https://`);
     if (!origins.includes(entry)) origins.push(entry);
   }
   return origins;
 }
 
 /**
- * Apply the allow-list to one request. Returns true when the request was a preflight that has been answered (the caller
- * stops there, before any authentication: a preflight never carries a token). With an empty list nothing is touched.
- * Otherwise `Vary: Origin` is set on every response (the answer depends on the Origin header, so a shared cache must not
- * reuse it), and the Access-Control headers are set only when the Origin header equals an entry of the list.
+ * Set the headers every answer needs, without answering anything: with an empty list nothing is touched; otherwise
+ * `Vary: Origin` (the answer depends on the Origin header, so a shared cache must not reuse it) and, only when the Origin
+ * header equals an entry of the list, `Access-Control-Allow-Origin` with that exact origin. Returns true for such an origin.
+ * The handler also uses this alone for a request whose URL could not be parsed, so that even that 400 can be read by an
+ * allowed page.
  */
-export function applyCors(allowed: readonly string[], req: IncomingMessage, res: ServerResponse): boolean {
+export function applyCorsHeaders(allowed: readonly string[], req: IncomingMessage, res: ServerResponse): boolean {
   if (allowed.length === 0) return false;
   res.setHeader("vary", "Origin");
   const origin = req.headers.origin;
   if (typeof origin !== "string" || !allowed.includes(origin)) return false;
   res.setHeader("access-control-allow-origin", origin);
+  return true;
+}
+
+/**
+ * Apply the allow-list to one request. Returns true when the request was a preflight that has been answered (the caller
+ * stops there, before any authentication: a preflight never carries a token).
+ */
+export function applyCors(allowed: readonly string[], req: IncomingMessage, res: ServerResponse): boolean {
+  if (!applyCorsHeaders(allowed, req, res)) return false;
   const isPreflight = req.method === "OPTIONS" && typeof req.headers["access-control-request-method"] === "string";
   if (!isPreflight) return false;
   res.setHeader("access-control-allow-methods", CORS_METHODS);

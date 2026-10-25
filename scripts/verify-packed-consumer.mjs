@@ -7,12 +7,13 @@
  *
  * `--tarballs DIR [--version X.Y.Z]` checks tarballs that already exist instead of packing dist-packages: the post-release
  * job of release-cli.yml passes the two files it downloaded from the public GitHub Release, so what consumers fetch is what
- * is tested (ADR-0034). With `--version` the installed packages must report exactly that version.
+ * is tested (ADR-0034). The React peers and their types are installed at the exact versions in package-lock.json, not a range. With `--version` the installed packages must report exactly that version.
  */
 import { spawnSync } from "node:child_process";
 import { cpSync, existsSync, mkdtempSync, readdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join, resolve } from "node:path";
+import { CONSUMER_PEERS, CONSUMER_TYPES, lockedSpecs } from "./lib/locked-versions.mjs";
 
 const ROOT = join(dirname(new URL(import.meta.url).pathname.replace(/^\/([A-Za-z]:)/, "$1")), "..");
 const OUT = join(ROOT, "dist-packages");
@@ -35,7 +36,7 @@ try {
   const uiTgz = TARBALLS ? releasedTarball("ui") : join(tmp, out("npm", ["pack", "--pack-destination", tmp, "--silent"], join(OUT, "migration-ui")).split(/\r?\n/).pop());
   const proj = join(tmp, "consumer"); cpSync(join(ROOT, "samples/resources-csv/sample-resources.csv"), join(proj, "sample.csv"));
   writeFileSync(join(proj, "package.json"), JSON.stringify({ name: "amo-consumer", private: true, type: "module" }));
-  run("npm", ["install", "--no-audit", "--no-fund", "--silent", coreTgz, uiTgz, "react@^19", "react-dom@^19", "@types/react@^19", "@types/react-dom@^19"], proj);
+  run("npm", ["install", "--no-audit", "--no-fund", "--silent", coreTgz, uiTgz, ...lockedSpecs([...CONSUMER_PEERS, ...CONSUMER_TYPES])], proj);
 
   // 1. nothing internal leaked
   const walk = (d) => readdirSync(d, { withFileTypes: true }).flatMap((e) => (e.isDirectory() ? walk(join(d, e.name)) : [join(d, e.name)]));

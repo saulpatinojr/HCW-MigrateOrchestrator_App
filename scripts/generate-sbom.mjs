@@ -19,6 +19,7 @@ import { existsSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
+import { CONSUMER_PEERS, lockedSpecs } from "./lib/locked-versions.mjs";
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const REPO = "https://github.com/saulpatinojr/HCW-MigrateOrchestrator_App";
@@ -83,7 +84,7 @@ export function packagesSbom(version, tarballs) {
     const ui = join(tarballs, `hybridcloudworks-migration-ui-${version}.tgz`);
     for (const f of [core, ui]) if (!existsSync(f)) throw new Error(`${f} is missing`);
     writeFileSync(join(tmp, "package.json"), JSON.stringify({ name: "consumer", version: "0.0.0", private: true, type: "module" }));
-    runNpm(["install", "--ignore-scripts", "--no-audit", "--no-fund", "--omit=dev", "--silent", core, ui, "react@^19", "react-dom@^19"], tmp);
+    runNpm(["install", "--ignore-scripts", "--no-audit", "--no-fund", "--omit=dev", "--silent", core, ui, ...lockedSpecs(CONSUMER_PEERS)], tmp);
     const bom = JSON.parse(runNpm(["sbom", "--sbom-format", "cyclonedx", "--omit", "dev"], tmp, true));
     retitle(bom, { name: "hybridcloudworks-migration-packages", version, description: "@hybridcloudworks/migration-core and @hybridcloudworks/migration-ui as installed from the release tarballs, with their React peers" });
     return assertBom(bom, { rootName: "hybridcloudworks-migration-packages", rootVersion: version, mustContain: ["@hybridcloudworks/migration-core", "@hybridcloudworks/migration-ui", "react", "react-dom"] });

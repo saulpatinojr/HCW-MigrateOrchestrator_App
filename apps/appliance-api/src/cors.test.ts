@@ -64,6 +64,8 @@ test("AMO_ALLOWED_ORIGINS: unset, empty or blank means no origins; exact origins
   assert.deepEqual(parseAllowedOrigins(APP), [APP]);
   assert.deepEqual(parseAllowedOrigins(` ${APP} , ${LOCAL} ,${APP}`), [APP, LOCAL], "spaces around entries are ignored and a repeated entry counts once");
   assert.deepEqual(parseAllowedOrigins("https://app.example.test:8443,http://127.0.0.1:3000"), ["https://app.example.test:8443", "http://127.0.0.1:3000"]);
+  assert.deepEqual(parseAllowedOrigins("http://localhost:5174,http://127.0.0.1:3000,http://[::1]:3000,http://localhost:8080"), ["http://localhost:5174", "http://127.0.0.1:3000", "http://[::1]:3000", "http://localhost:8080"], "plain http is accepted for the three loopback hosts only");
+  assert.deepEqual(parseAllowedOrigins("https://localhost:5174"), ["https://localhost:5174"], "https is fine for any host");
   assert.equal(configFromEnv({}).allowedOrigins.length, 0, "the default is empty");
   assert.deepEqual(configFromEnv({ AMO_ALLOWED_ORIGINS: APP }).allowedOrigins, [APP]);
 });
@@ -81,6 +83,13 @@ test("AMO_ALLOWED_ORIGINS: a wildcard, null, a path, a trailing slash or any mal
     ["https://APP.example.test", /not an exact origin.*write it as https:\/\/app\.example\.test/],
     ["https://app.example.test:443", /not an exact origin.*write it as https:\/\/app\.example\.test/],
     ["http://app.example.test:80", /not an exact origin/],
+    ["http://app.example.test", /http:\/\/ for a host that is not loopback.*use https:\/\//],
+    ["http://app.example.test:8080", /not loopback/],
+    ["http://localhost.evil.test:3000", /not loopback/],
+    ["http://127.0.0.2:3000", /not loopback/],
+    ["http://0.0.0.0:3000", /not loopback/],
+    ["http://10.0.0.5:8080", /not loopback/],
+    [`${APP},http://app.example.test:8080`, /not loopback/],
     ["https://user@app.example.test", /not an exact origin/],
     ["app.example.test", /not a URL/],
     ["ftp://app.example.test", /must start with https/],

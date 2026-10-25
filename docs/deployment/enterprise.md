@@ -62,8 +62,9 @@ rule that decides which websites may read an API's answers.
 - **Different addresses.** Build the web UI with `VITE_API_BASE_URL` set to the API's address, and tell the API which web address
   may call it by setting `AMO_ALLOWED_ORIGINS` on the **API** Container App (not the worker; for example in the Azure portal: the
   Container App, Containers, Environment variables, add `AMO_ALLOWED_ORIGINS` with the value, then create the new revision).
-  The value is a comma-separated list of exact origins: `https://` or `http://`, the host in lower case, a port only when it is not
-  the default, and **nothing else** (no path, no trailing slash). It is the same text as the redirect address registered above.
+  The value is a comma-separated list of exact origins: `https://`, the host in lower case, a port only when it is not
+  the default, and **nothing else** (no path, no trailing slash). `http://` is accepted only for a web UI on your own machine
+  (`localhost`, `127.0.0.1` or `[::1]`); any other `http://` entry is refused. It is the same text as the redirect address registered above.
   Examples: `https://app.example.com`, or for a local web UI started with Vite, `http://localhost:5174`; two origins are
   `https://app.example.com,http://localhost:5174`. A wildcard (`*`), `null` or a malformed entry makes the API refuse to start
   with a message that names `AMO_ALLOWED_ORIGINS`. Allowed origins get `Access-Control-Allow-Origin` with their own address,

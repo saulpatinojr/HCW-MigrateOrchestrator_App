@@ -398,3 +398,33 @@ test("version guard: a tag on an older commit is refused when .github/workflows 
   // without --ancestor-of nothing is compared (the version check alone)
   assert.deepEqual(check(root, { tag: "v1.2.3", sha: first }).problems, []);
 });
+
+// ---- the React peers installed by the gate and the SBOM are exact (review of pull request 79, F4) --------------------------
+
+test("the clean-consumer gate and the SBOM install the React peers at the exact locked versions, never a range", async () => {
+  const { lockedVersion, lockedSpecs, CONSUMER_PEERS, CONSUMER_TYPES } = await import("../../scripts/lib/locked-versions.mjs");
+  const specs = lockedSpecs([...CONSUMER_PEERS, ...CONSUMER_TYPES]);
+  assert.equal(specs.length, 4);
+  for (const spec of specs) assert.match(spec, /^(@types\/)?react(-dom)?@\d+\.\d+\.\d+$/, spec);
+  // the locked versions satisfy what the UI package asks of its consumer
+  const peers = JSON.parse(readFileSync("packages/ui/package.json", "utf8")).peerDependencies;
+  const atLeastRange = (version, range) => {
+    const [, major, minor = "0"] = /\^(\d+)\.(\d+)/.exec(range) ?? [];
+    const [vMajor, vMinor] = version.split(".").map(Number);
+    return vMajor === Number(major) && vMinor >= Number(minor);
+  };
+  for (const name of CONSUMER_PEERS) assert.ok(atLeastRange(lockedVersion(name), peers[name]), `${name} ${lockedVersion(name)} satisfies ${peers[name]}`);
+  // a lockfile without an exact version is a failure, not a silent fallback to a range
+  const root = scratch();
+  writeFileSync(join(root, "package-lock.json"), JSON.stringify({ packages: { "node_modules/react": { version: "^19.0.0" }, "node_modules/react-dom": { version: "19.x" } } }));
+  assert.throws(() => lockedVersion("react", root), /no exact version for react/);
+  assert.throws(() => lockedVersion("react-dom", root), /no exact version for react-dom/);
+  assert.throws(() => lockedVersion("@types/react", root), /no exact version for @types\/react/);
+  // and neither script spells a floating range for them
+  for (const file of ["scripts/generate-sbom.mjs", "scripts/verify-packed-consumer.mjs"]) {
+    const text = readFileSync(file, "utf8").split("\n").filter((l) => !/^\s*(\*|\/\/|\/\*)/.test(l)).join("\n");
+    assert.doesNotMatch(text, /["'`](react|react-dom|@types\/react[\w-]*)@[\^~*]|@latest\b/, `${file}: a floating dependency range`);
+    for (const line of text.split("\n").filter((l) => /"install"/.test(l))) assert.doesNotMatch(line, /["'`](react|react-dom|@types\/react[\w-]*)["'`]/, `${file}: a bare package name in an install (it would take the newest)`);
+    assert.match(text, /lockedSpecs\(/, `${file}: installs from the lockfile`);
+  }
+});

@@ -13,7 +13,7 @@ import { ResourceMoverClient, type MoverAction } from "@amo/azure-execution";
 import { gate, isAllowed, APPROVAL_REQUIRED_OPERATIONS, type Principal, type AuthorizationLevel, type ApprovalOperation } from "@amo/authorization";
 import { createLogger, type Logger } from "@amo/observability";
 import { InMemoryRepository, type AssessmentRepository } from "./repository.js";
-import { applyCors, parseAllowedOrigins } from "./cors.js";
+import { applyCors, applyCorsHeaders, parseAllowedOrigins } from "./cors.js";
 export * from "./repository.js";
 export * from "./cors.js";
 
@@ -83,7 +83,14 @@ export function createEnterpriseApi(cfg: EnterpriseConfig, deps: ApplianceDeps):
   const scopes = deps.credential && cfg.tenantId ? new ScopeInventory(deps.credential, cfg.tenantId, fetchImpl) : null;
 
   return createServer(async (req, res) => {
-    const url = new URL(req.url ?? "/", "http://localhost");
+    let url: URL;
+    try { url = new URL(req.url ?? "/", "http://localhost"); } catch {
+      // A request target such as "//" cannot be parsed. Answer 400 (an allowed origin can still read it); throwing out of an async handler would end the process.
+      applyCorsHeaders(cfg.allowedOrigins, req, res);
+      res.writeHead(400, { "content-type": "application/json", "cache-control": "no-store", "x-content-type-options": "nosniff" });
+      res.end(JSON.stringify({ error: { code: "bad_request", message: "malformed request target" } }));
+      return;
+    }
     // CORS allow-list (ADR-0033): a preflight is answered here, before the auth guard, because it carries no token.
     if (url.pathname.startsWith("/api/") && applyCors(cfg.allowedOrigins, req, res)) return;
     const send = (status: number, body: unknown) => { res.writeHead(status, { "content-type": "application/json", "cache-control": "no-store", "x-content-type-options": "nosniff" }); res.end(JSON.stringify(body)); };

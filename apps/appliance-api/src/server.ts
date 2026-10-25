@@ -1,5 +1,7 @@
+import { installFatalHandlers } from "./fatal.js";
 import { assertProductionConfig, configFromEnv, createEnterpriseApi, depsFromEnv, repositoryFromEnv } from "./index.js";
 
+installFatalHandlers();
 let cfg0: ReturnType<typeof configFromEnv>;
 try {
   cfg0 = configFromEnv();
