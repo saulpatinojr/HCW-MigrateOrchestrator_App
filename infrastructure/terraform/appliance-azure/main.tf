@@ -23,6 +23,21 @@ locals {
 
   # True when ingress_allowed_source_prefixes is exactly the tag "Internet"; the rule then uses source_address_prefix.
   ingress_from_tag = length(var.ingress_allowed_source_prefixes) == 1 && try(var.ingress_allowed_source_prefixes[0], "") == "Internet"
+
+  # Ranges that Azure Kubernetes Service and workload-profile Container Apps environments reserve; the subnet range must not
+  # overlap them (Microsoft Learn, "Virtual network configuration"). Terraform has no CIDR-overlap function, so the ranges are
+  # compared as integers: first address and size.
+  reserved_cidrs = ["169.254.0.0/16", "172.30.0.0/16", "172.31.0.0/16", "192.0.2.0/24", "100.100.0.0/17", "100.100.128.0/19", "100.100.160.0/19", "100.100.192.0/19"]
+  vnet_first     = (((tonumber(split(".", split("/", var.vnet_cidr)[0])[0]) * 256 + tonumber(split(".", split("/", var.vnet_cidr)[0])[1])) * 256 + tonumber(split(".", split("/", var.vnet_cidr)[0])[2])) * 256 + tonumber(split(".", split("/", var.vnet_cidr)[0])[3]))
+  vnet_size      = pow(2, 32 - tonumber(split("/", var.vnet_cidr)[1]))
+  reserved_bounds = [
+    for c in local.reserved_cidrs : {
+      cidr  = c
+      first = (((tonumber(split(".", split("/", c)[0])[0]) * 256 + tonumber(split(".", split("/", c)[0])[1])) * 256 + tonumber(split(".", split("/", c)[0])[2])) * 256 + tonumber(split(".", split("/", c)[0])[3]))
+      size  = pow(2, 32 - tonumber(split("/", c)[1]))
+    }
+  ]
+  vnet_overlaps = [for r in local.reserved_bounds : r.cidr if local.vnet_first < r.first + r.size && r.first < local.vnet_first + local.vnet_size]
 }
 
 resource "azurerm_resource_group" "app" {
@@ -77,6 +92,15 @@ resource "azurerm_subnet" "aca" {
   resource_group_name  = azurerm_resource_group.app.name
   virtual_network_name = azurerm_virtual_network.app.name
   address_prefixes     = [local.aca_subnet_cidr]
+  # Workload-profile environment subnet rules (Learn, "Virtual network configuration"): at least /27 (var.vnet_cidr is limited to
+  # /23 or larger, so this /26 default and any allowed range pass), delegated to Microsoft.App/environments (below), and not
+  # overlapping the reserved ranges.
+  lifecycle {
+    precondition {
+      condition     = length(local.vnet_overlaps) == 0
+      error_message = "vnet_cidr overlaps a range that Azure Kubernetes Service or a workload-profile Container Apps environment reserves: the ranges listed in local.reserved_cidrs (Microsoft Learn, Virtual network configuration). Choose another range."
+    }
+  }
   delegation {
     name = "aca"
     service_delegation {
@@ -106,14 +130,19 @@ resource "azurerm_subnet" "db" {
 # the Container Apps platform and PostgreSQL both have outbound dependencies (container registry, Microsoft Entra ID,
 # Azure Monitor, Storage) that an outbound lockdown must list exactly, and the docs for both services say what to allow.
 
-# Container Apps subnet. Rules follow "Network security groups for configuring a virtual network in Azure Container Apps"
-# for a consumption-only environment (the type this configuration creates: it has no workload_profile block).
+# Container Apps subnet, for a workload-profile environment (ADR-0032, owner decision on issue 82). Rules follow the
+# inbound table for workload profiles in "Network security groups for configuring a virtual network in Azure Container
+# Apps" (https://learn.microsoft.com/en-us/azure/container-apps/firewall-integration).
 #
-# PROVISIONAL, NOT VALIDATED (ADR-0032): this group has never been applied, and the environment it protects is not a
-# valid design as written. A consumption-only environment needs a subnet of at least /23 that is NOT delegated, while
-# snet-aca is a /26 delegated to Microsoft.App/environments; and Microsoft documents that locking down inbound traffic
-# with an NSG is not supported for an external workload-profile environment. Which environment type to use is an open
-# owner decision (ADR-0032). The db group below is not affected.
+# What this group does NOT do: Microsoft says that for an external workload-profile environment inbound traffic arrives
+# through a public IP in the managed resource group and not through this subnet, that inbound NSG rules apply only to
+# traffic that goes through the virtual network, and that locking down inbound traffic with an NSG or firewall is not
+# supported for such an environment. So these rules do NOT restrict who reaches the API from the internet. That is done by
+# the IP restrictions on the container app ingress (var.ingress_allowed_source_prefixes) and, above all, by the bearer
+# token and role check in the API (ADR-0031). The group limits traffic that does cross the virtual network.
+#
+# PROVISIONAL, NOT VALIDATED: never applied. A sandbox apply must confirm the environment starts and the API answers over
+# 443 with this group attached (issue 82, issue 53). The db group below is a separate group.
 resource "azurerm_network_security_group" "aca" {
   name                = "nsg-${local.name}-aca"
   location            = var.location
@@ -121,13 +150,14 @@ resource "azurerm_network_security_group" "aca" {
   tags                = local.tags
 }
 
-# Accepted risk, the only suppression in this configuration (ADR-0032): by default the API is reachable over HTTPS from the
-# internet, because the container app has external ingress and its users sign in from anywhere. Every request still needs a
-# valid Microsoft Entra token that carries an app role (ADR-0031). Restrict it with var.ingress_allowed_source_prefixes.
+# Accepted risk, the only suppression in this configuration (ADR-0032): by default the source is the Internet tag, because the
+# container app has external ingress and its users sign in from anywhere. Per Learn this rule only matters for traffic that
+# enters through the virtual network; the public path is limited by the ingress IP restrictions and by the Entra token with an
+# app role (ADR-0031), which every request needs.
 #trivy:ignore:AVD-AZU-0047
 resource "azurerm_network_security_rule" "aca_allow_https_from_clients" {
   name                        = "allow-https-from-clients"
-  description                 = "HTTPS to the API from var.ingress_allowed_source_prefixes. Port 80 is deliberately closed so no bearer token goes in clear text."
+  description                 = "HTTPS (443 and the edge proxy port 31443) from var.ingress_allowed_source_prefixes; only traffic through the VNet."
   network_security_group_name = azurerm_network_security_group.aca.name
   resource_group_name         = azurerm_resource_group.app.name
   priority                    = 100
@@ -139,7 +169,7 @@ resource "azurerm_network_security_rule" "aca_allow_https_from_clients" {
   source_address_prefix        = local.ingress_from_tag ? "Internet" : null
   source_address_prefixes      = local.ingress_from_tag ? null : var.ingress_allowed_source_prefixes
   destination_address_prefixes = [local.aca_subnet_cidr]
-  destination_port_range       = "443"
+  destination_port_ranges      = ["443", "31443"]
 }
 
 resource "azurerm_network_security_rule" "aca_allow_load_balancer_probes" {
@@ -324,16 +354,15 @@ resource "azurerm_container_app_environment" "app" {
   # The subnet firewall is attached before the environment is created, so the environment is built under it.
   depends_on = [azurerm_subnet_network_security_group_association.aca]
 
-  # PLAN-TIME STOP (ADR-0032, issue 82): as written this is a consumption-only environment (no workload_profile block) on
-  # a /26 subnet that is delegated to Microsoft.App/environments. Microsoft requires at least /23 and NO delegation for that
-  # type, so the first real apply would probably fail after other billed resources were already created. Until the owner
-  # decides the environment type, planning fails here unless the variable below is set on purpose, for example to review a
-  # plan. Delete this precondition and the variable when the decision is implemented.
-  lifecycle {
-    precondition {
-      condition     = var.acknowledge_container_apps_environment_is_invalid_issue_82
-      error_message = "STOP: the Container Apps environment is not a valid combination (consumption-only type with a /26 subnet that is delegated; Microsoft requires at least /23 and no delegation). Do not apply this configuration until the owner has decided the environment type and subnet: https://github.com/saulpatinojr/HCW-MigrateOrchestrator_App/issues/82 . To only review a plan, set acknowledge_container_apps_environment_is_invalid_issue_82 = true (and still do not apply)."
-    }
+  # A workload-profile environment (owner decision on issue 82, ADR-0032). Microsoft Learn, "Virtual network configuration"
+  # (https://learn.microsoft.com/en-us/azure/container-apps/custom-virtual-networks): the subnet must be at least /27 and
+  # delegated to Microsoft.App/environments (snet-aca is a /26 with that delegation). The provider documents that an
+  # environment created without a workload profile is consumption-only and cannot get profiles later (it would be recreated),
+  # and that a Consumption profile must be named "Consumption". External ingress (internal_load_balancer_enabled stays at its
+  # default, false) matches external_enabled on the API.
+  workload_profile {
+    name                  = "Consumption"
+    workload_profile_type = "Consumption"
   }
 }
 
@@ -343,6 +372,7 @@ resource "azurerm_container_app" "api" {
   resource_group_name          = azurerm_resource_group.app.name
   revision_mode                = "Single"
   tags                         = local.tags
+  workload_profile_name        = "Consumption"
   identity {
     type         = "UserAssigned"
     identity_ids = [azurerm_user_assigned_identity.app.id]
@@ -350,6 +380,19 @@ resource "azurerm_container_app" "api" {
   ingress {
     external_enabled = true
     target_port      = 8081
+    # No plain-HTTP bridge: the platform redirects http to https. Note that the NSG cannot close port 80 for the public path.
+    allow_insecure_connections = false
+    # The real source restriction for the public path (Learn, "Set up IP ingress restrictions": allow rules admit only the
+    # listed IPv4 ranges and deny the rest; with no rules everything is allowed). Empty for the default "Internet".
+    dynamic "ip_security_restriction" {
+      for_each = local.ingress_from_tag ? {} : { for i, p in var.ingress_allowed_source_prefixes : "allow-${i}" => p }
+      content {
+        name             = ip_security_restriction.key
+        description      = "Allowed client range from ingress_allowed_source_prefixes"
+        action           = "Allow"
+        ip_address_range = ip_security_restriction.value
+      }
+    }
     traffic_weight {
       latest_revision = true
       percentage      = 100
@@ -457,6 +500,7 @@ resource "azurerm_container_app" "worker" {
   resource_group_name          = azurerm_resource_group.app.name
   revision_mode                = "Single"
   tags                         = local.tags
+  workload_profile_name        = "Consumption"
   identity {
     type         = "UserAssigned"
     identity_ids = [azurerm_user_assigned_identity.app.id]

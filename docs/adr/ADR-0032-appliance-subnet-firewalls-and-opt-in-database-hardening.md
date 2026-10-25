@@ -1,6 +1,6 @@
 # ADR-0032: Appliance subnet firewalls, and database hardening that costs money stays opt-in
 
-**Status:** Accepted for the `db` firewall and the opt-in variable; the `aca` firewall is **PROVISIONAL, not validated** (see "Open question"); the private endpoint is **Rejected** (see below) · **Date:** 2026-10-25 · **Part of ticket #53 (AMO-12). Amends ADR-0022 (hosting only)**
+**Status:** Accepted for the `db` firewall and the opt-in variable; the `aca` firewall is **PROVISIONAL, not validated** (see section 1); the Container Apps environment is a **workload-profile** environment (owner decision, issue 82, see "Decision: Container Apps environment"); the private endpoint is **Rejected** (see below) · **Date:** 2026-10-25 · **Part of ticket #53 (AMO-12). Amends ADR-0022 (hosting only)**
 
 ## Context
 
@@ -19,10 +19,15 @@ subnets, and the Container Apps subnet accepted what the platform routed to it.
 ### 1. A firewall on each subnet, deny by default (`db`: done; `aca`: PROVISIONAL, not validated)
 
 **Read this first.** The `db` group is consistent with Microsoft Learn for a PostgreSQL flexible server in a delegated subnet, and has never been applied. The `aca` group is
-**provisional and not validated**: it was written for a consumption-only Container Apps environment, and that environment, as
-this Terraform describes it, is not valid (see "Open question" below). Do not treat ticket #53's "NSGs attached to both
-subnets" as met for `aca` until the owner has chosen the environment type and the rules have been checked against it.
-
+**provisional and not validated**: it has never been applied, and it **does not restrict who reaches the API from the internet**.
+Microsoft Learn ([Network security groups for Container Apps](https://learn.microsoft.com/en-us/azure/container-apps/firewall-integration)) says that for an external workload-profile
+environment inbound traffic "routes through the public IP that exists in the managed resource group rather than through your
+subnet", that "inbound NSG rules apply only to traffic that goes through your virtual network", and that "locking down inbound
+traffic via NSG or firewall on an external workload profile environment isn't supported". So the `aca` group only limits traffic
+that crosses the virtual network. What limits the public path is (a) the IP restrictions on the container app ingress, driven by
+`ingress_allowed_source_prefixes` (Learn: [Set up IP ingress restrictions](https://learn.microsoft.com/en-us/azure/container-apps/ip-restrictions)), and above all (b) the Microsoft Entra
+bearer token with an app role that the API requires on every request (ADR-0031). A sandbox apply must confirm that the environment
+starts and the API answers over 443 with this group attached before the PROVISIONAL label is removed (issues 82 and 53).
 Each subnet gets an NSG, associated with the subnet, whose last rule is an explicit **deny all inbound at priority 4096**.
 That rule also overrides Azure's built-in "allow traffic from the virtual network" rule, so a subnet is reachable only through
 the rules below. Rules are separate `azurerm_network_security_rule` resources, and the association waits for them; the
@@ -31,17 +36,21 @@ firewall.
 
 | Subnet | Priority | Allow (inbound) | Why it is needed |
 |---|---|---|---|
-| `snet-aca` | 100 | TCP 443 from `var.ingress_allowed_source_prefixes` (default `["Internet"]`) to the subnet | the API is public (external ingress) and its users sign in from anywhere; every call still needs a token with an app role (ADR-0031) |
-| `snet-aca` | 110 | TCP 30000-32767 from `AzureLoadBalancer` | the environment's load balancer health probes (Learn: NSG rules for Container Apps) |
-| `snet-aca` | 120 | any from the subnet to itself | the environment's Envoy sidecars talk to each other (Learn) |
+| `snet-aca` | 100 | TCP 443 and 31443 (the edge proxy port) from `var.ingress_allowed_source_prefixes` (default `["Internet"]`) to the subnet | Learn's workload-profile inbound rows for HTTPS; relevant only to traffic that enters through the virtual network, see above |
+| `snet-aca` | 110 | TCP 30000-32767 from `AzureLoadBalancer` | the environment's load balancer health probes (Learn: workload-profile inbound table) |
+| `snet-aca` | 120 | any from the subnet to itself | traffic inside the delegated subnet (Learn's workload-profile table lists the subnet-to-subnet rule under outbound; allowing it inbound is this configuration's reading and is unverified) |
 | `snet-db` | 100 | TCP 5432 from the `snet-aca` range to the `snet-db` range | the API and worker (in `snet-aca`) are the only database clients |
 | `snet-db` | 110 | TCP 5432 from the `snet-db` range to itself | Learn: PostgreSQL features such as high availability need port 5432 inside the delegated subnet if NSGs restrict it |
 | both | 4096 | **deny all** | default deny |
 
 Choices inside that table:
 
-- **Port 80 is not opened.** Learn lists 80 and 443 for HTTP and HTTPS. The API is only used over HTTPS, and a closed port 80
-  means a mistyped `http://` call never sends a bearer token in clear text; it fails to connect instead of being redirected.
+- **Port 80 is not opened in the NSG, and that protects nothing on the public path.** Learn's workload-profile table lists 80 and
+  31080 for HTTP as well; this configuration omits them. Because public traffic does not pass the subnet, the NSG does not stop a
+  client from reaching port 80 of the environment's public IP. The container app sets `allow_insecure_connections = false`, so the
+  platform redirects http to https, but a client that sends a bearer token over plain http before the redirect would still expose
+  it. The clients (the web page, the CLI) use https; this is a residual risk, not a control.
+- **Learn's static-IP row is not used.** That row belongs to consumption-only environments; none exists in the workload-profile table.
 - **Outbound rules are not added.** (Learn, networking with private access, for the database subnet: if outbound is ever restricted, the **Storage** service tag, port 443, and **Microsoft Entra ID** (`AzureActiveDirectory`) must be allowed, because PostgreSQL archives write-ahead logs to Storage and this server uses Entra authentication.) The defaults (allow to the virtual network and the internet) stay. The Container Apps
   platform and PostgreSQL both have outbound dependencies (container registry, Microsoft Entra ID, Azure Monitor, Storage)
   that a lockdown has to list exactly, and getting that list wrong stops the environment from starting. An outbound lockdown
@@ -50,15 +59,17 @@ Choices inside that table:
 - **`ingress_allowed_source_prefixes`** is `["Internet"]` or a list of CIDR ranges (validated: not empty, no `*`, a service tag
   is not mixed with ranges). An owner who wants the API reachable only from an office or VPN sets the ranges.
 
-### 2. Accepted risk: public HTTPS ingress is flagged by Trivy
+### 2. Accepted risk: the HTTPS allow rule is flagged by Trivy
 
 With the allow rule in place Trivy reports `AVD-AZU-0047` (CRITICAL, "security group rule allows unrestricted ingress from
-any IP address") on `aca_allow_https_from_clients`, which would fail the `iac-validate` gate. The rule is the design: the
-container app has `external_enabled = true`, so the API is meant to be reachable over the internet. This is the **only**
-suppression, an inline `#trivy:ignore:AVD-AZU-0047` directly above that one resource with the reason beside it; there is no
-`.trivyignore` file, and the workflow's severity and exit code are unchanged. A static test fails if a second suppression or an
-ignore file appears. The residual risk is that the API accepts connections (not requests: every request needs an Entra token
-with an app role) from anywhere. To close it, set `ingress_allowed_source_prefixes` to known ranges.
+any IP address") on `aca_allow_https_from_clients` when the source is the default `Internet` tag, which would fail the
+`iac-validate` gate. The container app has `external_enabled = true`, so the API is meant to be reachable over the internet, and
+per Learn this NSG rule does not decide that for the public path. It is the **only** suppression, an inline
+`#trivy:ignore:AVD-AZU-0047` directly above that one resource with the reason beside it; there is no `.trivyignore` file, and the
+workflow's severity and exit code are unchanged. A static test fails if a second suppression or an ignore file appears. The
+residual risk is that the API accepts connections (not requests: every request needs an Entra token with an app role) from
+anywhere. To close it, set `ingress_allowed_source_prefixes` to known ranges: they become Allow rules on the container app
+ingress (the control that limits the public path) and are mirrored in this rule.
 
 ### 3. Left to the owner: geo-redundant backup, opt-in, default off
 
@@ -112,49 +123,53 @@ environment, and both are covered above. The ticket's `CKV2_AZURE_31` (NSG on tw
 
 ## Consequences
 
-- The `aca` rules follow the Learn page for a **consumption-only** Container Apps environment, which is what this
-  configuration creates (it has no `workload_profile` block). That environment type is not valid as configured, so the
-  rules are provisional (next section).
-- **Not verified, and the largest risk of this change:** that the environment and the database come up under these rules, and
-  that Learn's list of Container Apps rules is complete. Nothing was applied. Two details of the `aca` group are
-  unverified: closing port 80 (Learn lists 80 and 443 for a consumption-only environment, and I assumed 443 is enough for an
-  API that is only used over HTTPS), and the extra Learn row that allows client addresses to the environment's `staticIP`
-  (I left it out because, for an external environment, that address is the public one in a managed resource group and not in
-  the subnet). If the environment fails to start or the API is unreachable after the groups are attached, review these first.
+- The `aca` rules follow Learn's inbound table for a **workload-profile** environment (443 and 31443 for HTTPS clients, the Azure
+  Load Balancer probe range, and the deny-all at the end). They are provisional (section 1).
+- **Not verified, and the largest risk of this change:** that the environment and the database come up under these rules, that
+  Learn's list is complete, and how the NSG behaves for an external workload-profile environment at all (Learn says the public path
+  does not cross the subnet). Nothing was applied. Unverified details of the `aca` group: leaving out ports 80 and 31080, reading
+  the subnet-to-subnet rule as also needed inbound, and whether the deny-all at the end affects anything the platform needs. If
+  the environment fails to start or the API is unreachable after the groups are attached, review these first.
 - The rule that allows the internet passes the tag in the singular `source_address_prefix`, and the ranges in the plural
   `source_address_prefixes`, because the azurerm documentation says the plural argument does not accept tags.
 
-## Open question for the owner: Container Apps environment type and subnet (not decided here)
+## Decision: Container Apps environment (owner, issue 82)
 
-Found while reviewing, and not changed: `snet-aca` is a /26 (the default `vnet_cidr` is a /22 split into sixteenths), it is
-**delegated** to `Microsoft.App/environments`, and the environment resource has no `workload_profile` block, which makes it a
-**consumption-only** environment. Per Microsoft Learn ([Virtual network configuration](https://learn.microsoft.com/en-us/azure/container-apps/custom-virtual-networks))
-a consumption-only environment needs a subnet of at least **/23** and the subnet **must not be delegated** to any service.
-So resizing the subnet alone does not make the configuration valid, and the delegation as written suits the other type.
-It has never been applied, so this probably fails at the first real apply. A second Learn constraint
-([Network security groups for Container Apps](https://learn.microsoft.com/en-us/azure/container-apps/firewall-integration)):
-for an **external workload-profile** environment, inbound traffic arrives through a public IP in a managed resource group and
-locking down inbound traffic with an NSG or firewall is **not supported**.
+Found in review and decided by the owner on 2026-10-25 in a comment on [issue 82](https://github.com/saulpatinojr/HCW-MigrateOrchestrator_App/issues/82):
+**a workload-profile Container Apps environment** (subnet at least /27, delegated to `Microsoft.App/environments`, with a
+`workload_profile` block). Label note: the comment calls this "option A", while the issue text lists workload profiles as option B and
+consumption-only as option A; the description in the comment (workload profile, /27 or larger, delegated) is what is implemented.
 
-| | Option A: consumption-only, /23, not delegated | Option B: workload profiles, /27 or larger, delegated |
-|---|---|---|
-| Learn status | the legacy type | the default type |
-| `snet-aca` | enlarge to at least /23 and remove the delegation, which changes the address plan (and `snet-db` moves) | the current /26 is large enough and already delegated; add a `workload_profile` block (a Consumption profile) |
-| Environment | stays consumption-only; no UDRs or NAT gateway | new environment type; an existing environment cannot be converted, it is recreated |
-| NSG on `snet-aca` | applicable (the provisional rules are written for this type) | inbound lockdown by NSG is **not supported** for an external environment, so the `aca` group would not protect the API |
-| Limiting who reaches the API | NSG source ranges | container app ingress IP restrictions instead of NSG inbound rules |
-| What this ADR's `aca` group becomes | validated against Learn, then kept | removed or reduced to the rules Learn supports; the `db` group is unchanged |
+**Why the previous configuration was invalid.** It had no `workload_profile` block, so the environment was consumption-only, which
+per Learn ([Virtual network configuration](https://learn.microsoft.com/en-us/azure/container-apps/custom-virtual-networks)) needs a subnet of at least /23 that must not be delegated, while
+`snet-aca` was a /26 delegated to `Microsoft.App/environments`. The azurerm provider documents the same split (/23 for
+consumption-only, /27 for workload profiles) and that an environment created without a profile cannot get one later.
 
-Either option is a new ADR and a changed address plan or environment resource, so it needs an owner decision and its own
-ticket ([issue 82](https://github.com/saulpatinojr/HCW-MigrateOrchestrator_App/issues/82)). Until then the `aca` group is provisional.
+**What changed, with the Learn basis:**
 
-**Do not apply until [issue 82](https://github.com/saulpatinojr/HCW-MigrateOrchestrator_App/issues/82) is decided.** To make that safe, `terraform plan` now **fails on purpose**: the
-environment resource has a `lifecycle` precondition that is satisfied only by the variable
-`acknowledge_container_apps_environment_is_invalid_issue_82` (default `false`), so a default `terraform apply` cannot create
-a partial, billed deployment (the resource group, database and network would otherwise be created before the environment
-fails). The error message names the issue. Setting the variable to `true` is only for reviewing a plan; it is not a licence
-to apply. When the decision is implemented, delete the precondition, the variable, the matching `terraform test` runs and the
-static test together (the static test fails if a `workload_profile` block appears while the stop is still there).
+| Change | Basis |
+|---|---|
+| `azurerm_container_app_environment.app` has one `workload_profile` named and typed `Consumption` | provider docs: a `Consumption` profile must be named `Consumption`, one per environment; Learn: workload-profile environments are the default type |
+| `snet-aca` stays delegated to `Microsoft.App/environments` and must be at least a /27 | Learn, workload profile tab: "The minimum subnet size required ... is /27. You must delegate your subnet to Microsoft.App/environments" |
+| `snet-aca` stays a /26 (the first sixteenth of the default /22) | Learn's table: a /26 has 50 available addresses and fits 250 Consumption-profile replicas; this configuration runs at most 3 API replicas and 1 worker, and a revision change temporarily doubles the need |
+| `vnet_cidr` must be an IPv4 range from /8 to /23, so the first sixteenth is never smaller than a /27 | arithmetic on the above |
+| `vnet_cidr` must not overlap `169.254.0.0/16`, `172.30.0.0/16`, `172.31.0.0/16`, `192.0.2.0/24`, `100.100.0.0/17`, `100.100.128.0/19`, `100.100.160.0/19`, `100.100.192.0/19` (a precondition on the subnet, compared as integers because Terraform has no overlap function) | Learn, "Restrictions for subnet address ranges", workload profile tab |
+| `snet-aca` and `snet-db` are the first two sixteenths of `vnet_cidr`, so they cannot overlap each other; the default plan is `10.60.0.0/26` and `10.60.0.64/26`, unchanged | `cidrsubnet(vnet_cidr, 4, 0)` and `(…, 4, 1)`; tested |
+| Both container apps set `workload_profile_name = "Consumption"` | provider docs: names the profile to place the app on |
+| The API ingress sets `allow_insecure_connections = false` and turns `ingress_allowed_source_prefixes` into Allow rules (`ip_security_restriction`) when ranges are given; the default `Internet` adds none | Learn, "Set up IP ingress restrictions": allow rules admit only the listed IPv4 CIDR ranges and deny the rest, all rules must be the same type, and with no rules everything is allowed |
+| The plan-time stop (`acknowledge_container_apps_environment_is_invalid_issue_82` and the precondition) is **removed** | the combination is now valid per Learn; nothing in it is known to be invalid, so no narrower precondition was kept except the address-range one above |
+
+**Cost and recreate impact.** Nothing is deployed, so nothing is recreated now. For the record: an environment cannot be converted
+between types (the provider recreates it), and for a workload-profile environment in your own network Learn lists extra managed
+resources that are billed on top of the app: a `ME_`-prefixed resource group with a standard public IP for ingress (external
+environment), a second public IP for egress, and a standard load balancer. I did not estimate a monetary figure.
+
+**What I did not decide.** Whether to use dedicated profiles (not needed: the code has no hardware requirement), an internal
+environment, NAT gateway or user-defined routes (workload profiles support them; not used), or a custom resource group name for the
+managed resources (the default is used). Region support and quotas for workload profiles were not checked.
+
+**Status.** `terraform plan` is no longer stopped; the configuration has still **never been applied**. A sandbox apply is pending
+and is the evidence that closes issue 82 and the `aca` part of ticket #53.
 
 ## Rollback
 

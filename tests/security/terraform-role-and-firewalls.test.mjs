@@ -120,7 +120,7 @@ test("allow rules are the minimum: HTTPS and probes in, PostgreSQL only from the
   const allowed = [...main.matchAll(/^resource "azurerm_network_security_rule" "([a-z0-9_]+)"/gm)].map((m) => m[1]).filter((n) => !n.endsWith("_deny_all_inbound")).sort();
   assert.deepEqual(allowed, ["aca_allow_https_from_clients", "aca_allow_load_balancer_probes", "aca_allow_subnet_internal", "db_allow_postgres_from_aca", "db_allow_postgres_within_subnet"]);
   const https = rule("aca_allow_https_from_clients");
-  assert.equal(attr(https, "destination_port_range"), '"443"', "only 443 is opened; port 80 stays closed");
+  assert.equal(attr(https, "destination_port_ranges"), '["443", "31443"]', "Learn workload-profile table: 443 and the edge proxy port 31443, HTTPS only (80/31080 are not opened here; the NSG cannot close 80 on the public path)");
   // A service tag is only accepted in the singular argument (azurerm docs: the plural one "may not" use tags), so the rule
   // switches between the two and nulls the other.
   assert.equal(attr(https, "source_address_prefix"), 'local.ingress_from_tag ? "Internet" : null');
@@ -175,21 +175,33 @@ test("the aca firewall is marked provisional where it is defined", () => {
   assert.match(main.slice(Math.max(0, at - 1200), at), /PROVISIONAL, NOT VALIDATED/);
 });
 
-test("the invalid Container Apps environment stops the plan unless a loudly named variable acknowledges it (issue 82)", () => {
-  const v = block(variables, "variable", "acknowledge_container_apps_environment_is_invalid_issue_82");
-  assert.equal(attr(v, "default"), "false", "the stop must be on by default");
-  assert.equal(attr(v, "type"), "bool");
+test("the Container Apps environment is a workload-profile environment on a subnet that meets Learn's rules (issue 82, ADR-0032)", () => {
   const env = block(main, "resource", "azurerm_container_app_environment", "app");
-  assert.ok(env.includes("precondition {"), "the environment needs a precondition");
-  assert.ok(env.includes("condition     = var.acknowledge_container_apps_environment_is_invalid_issue_82"), "the precondition must depend only on the acknowledgement");
-  const message = env.match(/error_message = "([^"]*)"/)?.[1] ?? "";
-  assert.match(message, /: https:\/\/github\.com\/saulpatinojr\/HCW-MigrateOrchestrator_App\/issues\/82 \./, "the message must point at the decision ticket");
-  // While the environment is consumption-only on a delegated /26, the stop must stay: this fails if someone adds a
-  // workload_profile block (the decision is then made) without also removing the stop on purpose.
-  const envCode = env.split("\n").filter((l) => !l.trim().startsWith("#")).join("\n");
-  assert.ok(!envCode.includes("workload_profile"),"a workload_profile block means the environment decision was made: remove the stop, the variable, this test and the PROVISIONAL notes together (ADR-0032)");
+  const code = (b) => b.split("\n").filter((l) => !l.trim().startsWith("#")).join("\n");
+  // Microsoft Learn, Virtual network configuration: a workload-profile environment needs a subnet of at least /27 that is
+  // delegated to Microsoft.App/environments; a consumption-only one needs /23 and NO delegation. The provider says an
+  // environment without a workload_profile block is consumption-only.
+  const profile = code(env).match(/workload_profile \{([^}]*)\}/)?.[1] ?? "";
+  assert.equal(attr(profile, "name"), '"Consumption"');
+  assert.equal(attr(profile, "workload_profile_type"), '"Consumption"');
+  assert.ok(!code(env).includes("internal_load_balancer_enabled = true"), "the environment stays external, like the API ingress");
+  assert.ok(!/precondition/.test(code(env)), "the plan-time stop is gone now that the combination is valid");
+  assert.ok(!main.includes("acknowledge_container_apps_environment_is_invalid_issue_82") && !variables.includes("acknowledge_container_apps_environment_is_invalid_issue_82"));
   const subnet = block(main, "resource", "azurerm_subnet", "aca");
-  assert.ok(subnet.includes("Microsoft.App/environments") && main.includes("aca_subnet_cidr = cidrsubnet(var.vnet_cidr, 4, 0)"));
+  assert.ok(code(subnet).includes('name = "Microsoft.App/environments"') || /name\s*=\s*"Microsoft.App\/environments"/.test(code(subnet)), "snet-aca must be delegated to Microsoft.App/environments");
+  assert.equal(attr(subnet, "address_prefixes"), "[local.aca_subnet_cidr]");
+  assert.ok(main.includes("aca_subnet_cidr = cidrsubnet(var.vnet_cidr, 4, 0)") && main.includes("db_subnet_cidr  = cidrsubnet(var.vnet_cidr, 4, 1)"), "the two subnets are the first two sixteenths: they cannot overlap");
+  // The default /22 gives a /26, which is at least a /27; var.vnet_cidr is limited so a smaller range cannot be chosen.
+  const vnet = block(variables, "variable", "vnet_cidr");
+  assert.equal(attr(vnet, "default"), '"10.60.0.0/22"');
+  assert.ok(vnet.includes("<= 23"), "vnet_cidr must leave snet-aca at least a /27");
+  // Both apps run on the Consumption profile; the public path is limited by the ingress IP restrictions.
+  assert.equal([...main.matchAll(/workload_profile_name\s*=\s*"Consumption"/g)].length, 2);
+  assert.ok(main.includes('dynamic "ip_security_restriction"') && main.includes('action           = "Allow"'));
+  assert.ok(main.includes("allow_insecure_connections = false"));
+  // The reserved ranges Learn lists are all checked.
+  for (const r of ["169.254.0.0/16", "172.30.0.0/16", "172.31.0.0/16", "192.0.2.0/24", "100.100.0.0/17", "100.100.128.0/19", "100.100.160.0/19", "100.100.192.0/19"]) assert.ok(main.includes('"' + r + '"'), r);
+  assert.ok(block(main, "resource", "azurerm_subnet", "aca").includes("length(local.vnet_overlaps) == 0"));
 });
 
 test("providers stay pinned to a major version and the database stays private", () => {

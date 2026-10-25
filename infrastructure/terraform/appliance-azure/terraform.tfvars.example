@@ -3,9 +3,6 @@ assessment_scope_ids = ["/subscriptions/00000000-0000-0000-0000-000000000000"]
 # Required, and deliberately not set here: image_ref, the appliance image by exact digest. Copy the line that ends the
 # publish-images run summary (docker.io/hybridcloudworks/img-mo-appliance-app@sha256: followed by 64 hexadecimal
 # characters) and pass it as shown in docs/deployment/enterprise.md. Tags such as :latest are refused.
-# STOP SWITCH. While the Container Apps environment decision is open (https://github.com/saulpatinojr/HCW-MigrateOrchestrator_App/issues/82)
-# terraform plan fails on purpose. Set this only to REVIEW a plan, and do not apply it:
-# acknowledge_container_apps_environment_is_invalid_issue_82 = true
 # Optional. Who may reach the API over HTTPS: ["Internet"] (default) or a list of CIDR ranges, for example your office or VPN.
 # ingress_allowed_source_prefixes = ["203.0.113.0/24"]
 # Optional, costs money, can only be chosen before the first apply (ADR-0032). Leave it off unless you have decided.

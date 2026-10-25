@@ -18,8 +18,13 @@ variable "tenant_id" {
   type = string
 }
 variable "vnet_cidr" {
-  type    = string
-  default = "10.60.0.0/22"
+  type        = string
+  description = "Address range of the virtual network. It is split into sixteenths: snet-aca is the first and snet-db the second, so the range must be an IPv4 /23 or larger (snet-aca must be at least a /27, the minimum Microsoft Learn gives for a workload-profile Container Apps environment: https://learn.microsoft.com/en-us/azure/container-apps/custom-virtual-networks) and must not overlap the ranges Azure Kubernetes Service and workload-profile environments reserve, which a precondition on the subnet checks (169.254.0.0/16, 172.30.0.0/16, 172.31.0.0/16, 192.0.2.0/24, 100.100.0.0/17, 100.100.128.0/19, 100.100.160.0/19, 100.100.192.0/19). The default /22 gives snet-aca a /26."
+  default     = "10.60.0.0/22"
+  validation {
+    condition     = try(can(regex("^[0-9]{1,3}([.][0-9]{1,3}){3}/[0-9]{1,2}$", var.vnet_cidr)) && cidrhost(var.vnet_cidr, 0) == split("/", var.vnet_cidr)[0] && tonumber(split("/", var.vnet_cidr)[1]) <= 23 && tonumber(split("/", var.vnet_cidr)[1]) >= 8, false)
+    error_message = "vnet_cidr must be an IPv4 range in network form with a prefix length from /8 to /23 (so that snet-aca, a sixteenth of it, is at least a /27), for example 10.60.0.0/22."
+  }
 }
 variable "postgres_sku" {
   type    = string
@@ -44,7 +49,7 @@ variable "tags" {
 }
 variable "ingress_allowed_source_prefixes" {
   type        = list(string)
-  description = "Who may reach the API over HTTPS (port 443) through the Container Apps subnet firewall: the single value \"Internet\" (the default; the API is public, and every request still needs an Entra token that carries an app role, ADR-0031), or a list of IPv4 CIDR ranges in their network form (for example 203.0.113.0/24 or 198.51.100.7/32, not 203.0.113.7/24) such as your office or VPN addresses, which is stricter. IPv6, 0.0.0.0/0 and a tag mixed with ranges are refused. Provisional until the Container Apps environment type is decided (ADR-0032)."
+  description = "Who may reach the API over HTTPS (port 443) through the Container Apps subnet firewall: the single value \"Internet\" (the default; the API is public, and every request still needs an Entra token that carries an app role, ADR-0031), or a list of IPv4 CIDR ranges in their network form (for example 203.0.113.0/24 or 198.51.100.7/32, not 203.0.113.7/24) such as your office or VPN addresses, which is stricter. IPv6, 0.0.0.0/0 and a tag mixed with ranges are refused. It is enforced twice: as IP restrictions on the container app ingress (the control that limits the public path, Learn: Set up IP ingress restrictions) and, only for traffic that crosses the virtual network, in the subnet firewall (ADR-0032)."
   default     = ["Internet"]
   validation {
     condition = length(var.ingress_allowed_source_prefixes) > 0 && (
@@ -73,9 +78,4 @@ variable "app_role_assignments" {
     condition     = alltrue([for a in values(var.app_role_assignments) : contains(["Migration.Read", "Migration.Plan", "Migration.Execute", "Migration.Execute.Destructive"], a.role)])
     error_message = "Each role must be exactly Migration.Read, Migration.Plan, Migration.Execute or Migration.Execute.Destructive."
   }
-}
-variable "acknowledge_container_apps_environment_is_invalid_issue_82" {
-  type        = bool
-  description = "STOP SWITCH, default false. The Container Apps environment is not a valid combination as written (a consumption-only environment needs a subnet of at least /23 that is not delegated; snet-aca is a /26 and delegated). Until the owner decides the environment type and subnet (https://github.com/saulpatinojr/HCW-MigrateOrchestrator_App/issues/82, ADR-0032), terraform plan fails on purpose. Set this to true only to review a plan; do not apply. Remove the variable and the precondition when the decision is implemented."
-  default     = false
 }

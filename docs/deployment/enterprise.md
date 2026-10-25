@@ -5,11 +5,11 @@ with dependency-free credentials.
 
 ## 1. Provision
 
-> **Do not run `terraform apply` yet.** The Container Apps environment in this Terraform is not a valid combination (a
-> consumption-only environment on a /26 subnet that is delegated; see the box in section 2d) and the owner has not decided how
-> to fix it: [issue 82](https://github.com/saulpatinojr/HCW-MigrateOrchestrator_App/issues/82). `terraform plan` stops on purpose with an error that names that issue, so a plain
-> `apply` cannot create a half-built, billed deployment. You can set `acknowledge_container_apps_environment_is_invalid_issue_82 = true`
-> to review a plan; do not apply it. Everything below describes the intended flow once the decision is made.
+> **Status: never applied; a sandbox apply is pending.** The Container Apps environment is a workload-profile environment (owner
+> decision on [issue 82](https://github.com/saulpatinojr/HCW-MigrateOrchestrator_App/issues/82), ADR-0032) and the configuration passes `terraform validate` and the mocked-provider tests, but
+> nothing has been created in any subscription. Do the first apply in a non-production subscription and read the plan first. The
+> subnet firewall for the Container Apps subnet is provisional until that apply shows the environment starts and the API answers
+> over 443 (section 2d).
 
 Sign in with `az login` first (no secrets). Both shells use the subscription you are signed in to as the hosting subscription.
 
@@ -175,30 +175,42 @@ operations recorded by the API and auditing their completion (ADR-0026). Locally
 The two subnets each have a network security group (a firewall for a subnet) with a deny-all-inbound rule at the end, so
 only the traffic below gets in (ADR-0032). Outbound traffic is left at Azure's defaults.
 
-> **Provisional, not validated: the Container Apps group (`snet-aca`).** The database group is consistent with Microsoft Learn but has never been applied. The
-> Container Apps group is written for a consumption-only Container Apps environment, and that environment as configured is
-> not valid: Microsoft says a consumption-only environment needs a subnet of at least /23 that is **not delegated**, while
-> `snet-aca` is a /26 delegated to `Microsoft.App/environments`. Microsoft also says locking down inbound traffic with an NSG
-> is **not supported** for an external workload-profile environment, the other type. Which environment type to use is an open
-> decision for the owner, with both options and what each changes written up in ADR-0032 ("Open question"). Until it is
-> decided, do not apply (`terraform plan` is stopped on purpose, see [issue 82](https://github.com/saulpatinojr/HCW-MigrateOrchestrator_App/issues/82)), and do not rely on this group to
-> protect the API.
+> **Provisional, not validated: the Container Apps group (`snet-aca`).** The database group is consistent with Microsoft Learn but
+> has never been applied. The Container Apps environment is a **workload-profile** environment (owner decision, issue 82): its
+> subnet must be at least a /27 and delegated to `Microsoft.App/environments`; `snet-aca` is a /26 with that delegation. For
+> that kind of environment Microsoft says inbound traffic from the internet "routes through the public IP that exists in the
+> managed resource group rather than through your subnet", that inbound subnet rules "apply only to traffic that goes through
+> your virtual network", and that locking down inbound traffic with an NSG or firewall "isn't supported"
+> ([Network security groups for Container Apps](https://learn.microsoft.com/en-us/azure/container-apps/firewall-integration)).
+> So this firewall **does not restrict who reaches the API from the internet**. What does: the IP restrictions on the container app
+> ingress (`ingress_allowed_source_prefixes`, below) and, above all, the sign-in token with an app role that every call needs
+> (section 2). Whether the firewall itself lets the environment start has not been shown: a sandbox apply must confirm it.
 
 | Subnet | Allowed in | Everything else |
 |---|---|---|
-| Container Apps (`snet-aca`) | HTTPS (443) from `ingress_allowed_source_prefixes`; the Azure Load Balancer health probes; the subnet's own addresses | denied, including the database subnet |
+| Container Apps (`snet-aca`) | HTTPS (443 and the edge proxy port 31443) from `ingress_allowed_source_prefixes`; the Azure Load Balancer health probes; the subnet's own addresses | denied, including the database subnet |
 | Database (`snet-db`) | PostgreSQL (5432) from the Container Apps subnet; 5432 inside the database subnet (PostgreSQL features such as high availability need it) | denied |
 
-- **Port 80 is closed on purpose.** A browser or script that calls `http://` instead of `https://` fails to connect; it is
-  never redirected, so a sign-in token cannot be sent in clear text by mistake. This is unverified: Microsoft's list of
-  rules for a consumption-only environment names ports 80 and 443, and I did not test that 443 alone is enough. The same page
-  has a row allowing client addresses to the environment's static IP, which I left out because for an external environment
-  that address is not in the subnet; that is also unverified.
-- **Who can reach the API.** `ingress_allowed_source_prefixes` defaults to `["Internet"]`, because the API is public and
-  every call still needs a token with an app role. To allow only your office or VPN, set it to a list of ranges in
-  `terraform.tfvars`, for example `ingress_allowed_source_prefixes = ["203.0.113.0/24"]`. Ranges must be IPv4 in their
-  network form (`203.0.113.0/24` or `198.51.100.7/32`, not `203.0.113.7/24`); IPv6, `0.0.0.0/0` and `"Internet"` mixed with
-  ranges are refused. Like the rest of the Container Apps group, this is provisional (see the box above).
+- **Port 80 is not blocked by this firewall.** Public traffic does not cross the subnet (see the box above), so the firewall cannot
+  close port 80 for it. The API app does not accept plain http (`allow_insecure_connections = false`: the platform redirects to
+  https), but a client that sends its sign-in token over `http://` before the redirect would still expose it. Use `https://`. The
+  rules for ports 80 and 31080 that Microsoft lists are not opened here; whether that matters was not tested.
+- **Who can reach the API.** `ingress_allowed_source_prefixes` defaults to `["Internet"]`, because the API is public and every
+  call still needs a token with an app role. To allow only your office or VPN, set it to a list of ranges in `terraform.tfvars`,
+  for example `ingress_allowed_source_prefixes = ["203.0.113.0/24"]`. They become **Allow rules on the container app ingress**
+  (Microsoft Learn, [Set up IP ingress restrictions](https://learn.microsoft.com/en-us/azure/container-apps/ip-restrictions):
+  only the listed IPv4 ranges are admitted and everything else is denied; with no rules everything is allowed, which is the
+  `Internet` default). That is the control that limits the public path. Ranges must be IPv4 in their network form
+  (`203.0.113.0/24` or `198.51.100.7/32`, not `203.0.113.7/24`); IPv6, `0.0.0.0/0` and `"Internet"` mixed with ranges are refused.
+  Not verified against a live environment.
+- **Address plan.** `vnet_cidr` (default `10.60.0.0/22`) is split into sixteenths: `snet-aca` is the first (`10.60.0.0/26`) and
+  `snet-db` the second (`10.60.0.64/26`). The environment needs `snet-aca` to be at least a /27, so `vnet_cidr` must be an IPv4
+  range from /8 to /23, and it must not overlap the ranges Azure reserves for these environments (169.254.0.0/16, 172.30.0.0/16,
+  172.31.0.0/16, 192.0.2.0/24, 100.100.0.0/17, 100.100.128.0/19, 100.100.160.0/19, 100.100.192.0/19; Microsoft Learn, [Virtual
+  network configuration](https://learn.microsoft.com/en-us/azure/container-apps/custom-virtual-networks)); Terraform checks both.
+- **Extra cost of a workload-profile environment in your own network.** Learn lists a managed resource group (name starts with
+  `ME_`) with a public IP for inbound traffic, a public IP for outbound traffic and a standard load balancer, billed on top of the
+  apps. Region support and quotas for workload profiles were not checked.
 - **Geo-redundant database backup is off.** `postgres_geo_redundant_backup_enabled = true` keeps a second copy of the
   backups in the paired Azure region. It costs money (backup storage is billed for twice the backup size beyond the free
   allowance, see [Backup and restore](https://learn.microsoft.com/azure/postgresql/backup-restore/concepts-backup-restore))
