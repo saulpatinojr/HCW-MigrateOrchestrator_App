@@ -184,6 +184,12 @@ rule that decides which websites may read an API's answers.
   `AMO_ALLOWED_ORIGINS=http://localhost:5174` in `.env` (see `.env.example`). The Terraform in this repository does not set the
   variable.
 
+- **Which Host names the API answers (local use).** `docker compose` publishes the API on `127.0.0.1:8081` only (not on your network), and sets
+  `AMO_ALLOWED_HOSTS=localhost:8081,127.0.0.1:8081,[::1]:8081`. The API then answers `421` to a request whose `Host` header is any other name. This is a
+  defence against DNS rebinding: a web page on another site that gets its own name to point at your machine would otherwise be able to read the
+  API's public routes (`/api/health`, `/api/agents`). The variable is empty by default and is not set by the Terraform in this repository, because in
+  Azure the platform and its health probes use addresses the application cannot know; leave it empty there. An IP address as the Host (for example `127.0.0.1`, which the image's own health check uses) is always served, because rebinding needs a domain name. Set it on the **API** only; the worker ignores it.
+
 Front door options for the same-address layout: Azure Front Door or Application Gateway path routing, a small Caddy or nginx
 container in front of both, or Azure Static Web Apps with the Container App linked as its API backend. The Static Web Apps option
 is **untested** here and has limits

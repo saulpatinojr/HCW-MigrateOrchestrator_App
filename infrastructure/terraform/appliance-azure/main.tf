@@ -489,7 +489,7 @@ resource "azuread_service_principal" "api" {
 resource "azuread_app_role_assignment" "api" {
   for_each            = var.app_role_assignments
   app_role_id         = azuread_service_principal.api.app_role_ids[each.value.role]
-  principal_object_id = each.value.principal_object_id
+  principal_object_id = lower(each.value.principal_object_id)
   resource_object_id  = azuread_service_principal.api.object_id
 }
 
