@@ -182,7 +182,8 @@ test("the invalid Container Apps environment stops the plan unless a loudly name
   const env = block(main, "resource", "azurerm_container_app_environment", "app");
   assert.ok(env.includes("precondition {"), "the environment needs a precondition");
   assert.ok(env.includes("condition     = var.acknowledge_container_apps_environment_is_invalid_issue_82"), "the precondition must depend only on the acknowledgement");
-  assert.ok(env.includes("https://github.com/saulpatinojr/HCW-MigrateOrchestrator_App/issues/82"), "the message must point at the decision ticket");
+  const message = env.match(/error_message = "([^"]*)"/)?.[1] ?? "";
+  assert.match(message, /: https:\/\/github\.com\/saulpatinojr\/HCW-MigrateOrchestrator_App\/issues\/82 \./, "the message must point at the decision ticket");
   // While the environment is consumption-only on a delegated /26, the stop must stay: this fails if someone adds a
   // workload_profile block (the decision is then made) without also removing the stop on purpose.
   const envCode = env.split("\n").filter((l) => !l.trim().startsWith("#")).join("\n");
