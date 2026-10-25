@@ -22,12 +22,17 @@ import { fileURLToPath } from "node:url";
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const REPO = "https://github.com/saulpatinojr/HCW-MigrateOrchestrator_App";
-const npm = process.platform === "win32" ? "npm.cmd" : "npm";
+/** The npm that ships with the Node running this script (no PATH lookup, no shell): next to node on Windows, under lib/ elsewhere. */
+function npmCli() {
+  const bin = dirname(process.execPath);
+  const found = [join(bin, "node_modules", "npm", "bin", "npm-cli.js"), join(bin, "..", "lib", "node_modules", "npm", "bin", "npm-cli.js")].find((f) => existsSync(f));
+  if (!found) throw new Error("cannot find the npm that ships with this Node (looked next to " + process.execPath + ")");
+  return found;
+}
 
-/** Run npm; on Windows through the .cmd shim without a shell string. */
 const runNpm = (args, cwd, capture = false) => {
-  const r = spawnSync(process.platform === "win32" ? "cmd.exe" : npm, process.platform === "win32" ? ["/d", "/s", "/c", npm, ...args] : args, { cwd, encoding: "utf8", maxBuffer: 256 * 1024 * 1024, stdio: capture ? ["ignore", "pipe", "inherit"] : "inherit" });
-  if (r.status !== 0) throw new Error(`npm ${args.join(" ")} failed (${r.status})`);
+  const r = spawnSync(process.execPath, [npmCli(), ...args], { cwd, encoding: "utf8", maxBuffer: 256 * 1024 * 1024, stdio: capture ? ["ignore", "pipe", "inherit"] : "inherit" });
+  if (r.status !== 0) throw new Error("npm " + args.join(" ") + " failed (" + r.status + ")");
   return r.stdout;
 };
 

@@ -178,7 +178,7 @@ test("publish: a draft asset with no sha256 digest is a problem, never a skipped
   for (const nullDigest of ["amo-linux-x64", "hybridcloudworks-migration-ui-1.2.3.tgz"]) {
     const { gh, calls } = fakeGh({ corrupt: { nullDigest } });
     const problems = await publish({ repo: REPO, tag: TAG, dir: releaseDir(), workflow: WORKFLOW }, gh, noPause);
-    assert.match(problems.join("\n"), new RegExp(`asset ${nullDigest.replaceAll(".", "\.")} has no sha256 digest`));
+    assert.ok(problems.some((p) => p.startsWith(`asset ${nullDigest} has no sha256 digest`)), problems.join("\n"));
     assert.match(problems.at(-1), /draft stays unpublished/);
     assert.equal(callsOf(calls, "api", "--method").length, 0, "never made public");
     assert.equal(calls.filter((c) => c[0] === "api" && /releases\/7$/.test(c[1])).length, 10, "re-read by id a bounded number of times, then stopped");
