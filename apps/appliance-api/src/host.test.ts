@@ -64,3 +64,15 @@ test("without AMO_ALLOWED_HOSTS nothing changes: any Host is served (Azure sets 
   const port = await start();
   assert.equal((await get(port, "/api/health", "ca-example.azurecontainerapps.io")).status, 200);
 });
+
+test("an IP address as the Host is always served, because DNS rebinding needs a name (the image's own health check uses 127.0.0.1)", () => {
+  const list = ["localhost:9000"];
+  assert.equal(hostAllowed(list, "127.0.0.1:8081"), true);
+  assert.equal(hostAllowed(list, "127.0.0.1"), true);
+  assert.equal(hostAllowed(list, "[::1]:8081"), true);
+  assert.equal(hostAllowed(list, "10.0.0.5:8081"), true);
+  assert.equal(hostAllowed(list, "127.0.0.1.attacker.example:8081"), false);
+  assert.equal(hostAllowed(list, "999.0.0.1:8081"), false);
+  assert.equal(hostAllowed(list, "attacker.example"), false);
+  assert.equal(hostAllowed(list, "[::1"), false);
+});

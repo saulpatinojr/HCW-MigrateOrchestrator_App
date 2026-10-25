@@ -15,3 +15,7 @@ test("the worker starts even when the API-only variables are malformed", () => {
 test("the worker still refuses what it must refuse: a client secret", () => {
   assert.throws(() => workerConfigFromEnv({ AMO_CLIENT_SECRET: "x" }), /client secret/);
 });
+
+test("the worker's configuration carries no host allow-list either", () => {
+  assert.deepEqual(workerConfigFromEnv({ AMO_ALLOWED_HOSTS: "localhost:8081" }).allowedHosts, []);
+});

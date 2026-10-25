@@ -74,9 +74,9 @@ These happen only on a real tag, so the first real tag is also their first test.
 
 | Not rehearsed | Why | What to look at on the first real tag |
 |---|---|---|
-| The tag run itself starting, and the tag-only jobs `release` and `post-release` | A manual run is not a tag push, and those jobs are tag-only on purpose | The run lists seven jobs, all green |
+| The tag run itself starting, and the tag-only jobs `release` and `post-release` | A manual run is not a tag push, and those jobs are tag-only on purpose | The run lists eight jobs, all green |
 | Creating the draft release, uploading ten files, making it public | Needs `contents: write` and a real tag; a manual run must never have that | The release page lists exactly the ten files |
-| The attestation check bound to `refs/tags/<tag>` | The dry run, even with "attest" ticked, is bound to `refs/heads/main` | `attest` and `release` jobs are green |
+| The attestation check bound to `refs/tags/<tag>` | The dry run, even with "attest" ticked, is bound to `refs/heads/main` | `attest`, `verify-attestations` and `release` jobs are green |
 | The released tarballs passing `packages:verify` | They exist only after publication | `post-release` is green |
 | `gh` flags on the real runner (`release create --draft --verify-tag`, `attestation verify --signer-workflow --signer-digest --source-ref --source-digest --deny-self-hosted-runners`) | They were run against a fake in the tests | No error annotation in `release` |
 | GitHub's rule that a `GITHUB_TOKEN` cannot create or modify a release whose commit changes files under `.github/workflows` compared with `main` ([REST docs, releases](https://docs.github.com/en/rest/releases/releases)) | Only a real `release` job tries to create a release. `check` refuses a tag on a commit that is not the tip of `main` unless `.github/workflows` is identical to the tip's, which is proven by tests on a scratch git repository, not by GitHub | `release` creates the draft without an authorisation error |

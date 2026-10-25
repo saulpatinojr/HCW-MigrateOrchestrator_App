@@ -12,6 +12,7 @@
  * composition sets it (docker-compose.appliance.yml).
  */
 import type { IncomingMessage } from "node:http";
+import { isIP } from "node:net";
 
 export const ALLOWED_HOSTS_VAR = "AMO_ALLOWED_HOSTS";
 
@@ -33,8 +34,24 @@ export function parseAllowedHosts(value: string | undefined): string[] {
   return hosts;
 }
 
-/** True when the list is empty (check off) or the whole Host header equals an entry, ignoring case. */
+/** The host part of a Host header value: `[::1]:8081` gives `::1`, `127.0.0.1:8081` gives `127.0.0.1`, `name:80` gives `name`. */
+function hostPart(value: string): string {
+  if (value.startsWith("[")) {
+    const end = value.indexOf("]");
+    return end > 0 ? value.slice(1, end) : "";
+  }
+  const colon = value.lastIndexOf(":");
+  return colon < 0 ? value : value.slice(0, colon);
+}
+
+/**
+ * True when the list is empty (check off), the whole Host header equals an entry (ignoring case), or the Host is an IP
+ * address. DNS rebinding needs a domain name, so an IP address is never a rebinding attempt; letting it through also keeps
+ * the image's own health check (which calls 127.0.0.1) working whatever port or name the list names.
+ */
 export function hostAllowed(allowed: readonly string[], hostHeader: IncomingMessage["headers"]["host"]): boolean {
   if (allowed.length === 0) return true;
-  return typeof hostHeader === "string" && allowed.includes(hostHeader.toLowerCase());
+  if (typeof hostHeader !== "string") return false;
+  const host = hostHeader.toLowerCase();
+  return allowed.includes(host) || isIP(hostPart(host)) !== 0;
 }

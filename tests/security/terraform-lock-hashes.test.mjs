@@ -23,7 +23,7 @@ export function h1CountsByProvider(text) {
 }
 
 test("every provider in the committed lock file has a checksum for each of the five platforms", () => {
-  const counts = h1CountsByProvider(readFileSync(LOCK, "utf8"));
+  const counts = h1CountsByProvider(readFileSync(LOCK, "utf8").replaceAll("\r\n", "\n")); // a Windows checkout has CRLF
   assert.deepEqual(Object.keys(counts).sort(), ["registry.terraform.io/hashicorp/azuread", "registry.terraform.io/hashicorp/azurerm"]);
   for (const [provider, n] of Object.entries(counts)) {
     assert.ok(n >= PLATFORMS, `${provider} has ${n} h1: checksums in ${LOCK}, expected at least ${PLATFORMS}; regenerate with: terraform -chdir=infrastructure/terraform/appliance-azure providers lock -platform=linux_amd64 -platform=linux_arm64 -platform=darwin_amd64 -platform=darwin_arm64 -platform=windows_amd64`);
