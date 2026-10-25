@@ -7,6 +7,7 @@
  */
 import { readFileSync, writeFileSync, mkdirSync } from "node:fs";
 import { join } from "node:path";
+import { escapeTableCell } from "./lib/escape-table-cell.mjs";
 import { loadRules, defaultRulesDir, parseLearnMoveSupport, diffRulesAgainstMatrix } from "@amo/evidence-engine";
 
 // [VERIFY] Source paths in MicrosoftDocs/azure-docs. The support tables are maintained as include files; adjust if moved.
@@ -43,7 +44,7 @@ writeFileSync(join(outDir, "learn-diff.json"), JSON.stringify(report, null, 2) +
 const md = [
   `# Learn move-support diff — ${retrievedOn}`, "", `Source: ${source} · matrix rows: ${matrix.length} · rules checked: ${loaded.rules.length}`, "",
   `## Disagreements (${diffs.length})`, "", "| Rule | Field | Rule says | Learn says | Learn cell |", "|---|---|---|---|---|",
-  ...diffs.map((d) => `| ${d.ruleId} | ${d.field} | ${d.rule} | ${d.learn} | ${d.learnRaw.replace(/\|/g, "\\|").slice(0, 80)} |`),
+  ...diffs.map((d) => `| ${d.ruleId} | ${d.field} | ${d.rule} | ${d.learn} | ${escapeTableCell(d.learnRaw.slice(0, 80))} |`),
   "", `## Resource types in the matrix without a rule (${uncovered.length})`, "", ...uncovered.slice(0, 200).map((u) => `- ${u}`),
   "", `## Rule types not found in the matrix (${notInMatrix.length})`, "", ...notInMatrix.map((u) => `- ${u}`),
   "", "Region-move disagreements are expected where a rule encodes a service-native relocation path rather than Resource Mover support. Review each row; update `scripts/author-rules.mjs`, bump `ruleVersion`, set `retrievedOn`, regenerate and re-snapshot.", "",

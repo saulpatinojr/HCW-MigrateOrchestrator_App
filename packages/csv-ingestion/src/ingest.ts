@@ -7,14 +7,17 @@ import { canonicalType, mapHeaders, parseTags, REQUIRED_COLUMNS } from "./normal
 export interface IngestOptions {
   maxRows?: number;
   maxBytes?: number;
+  /** Longest single cell, in characters. A row with a longer cell is skipped with a warning. */
+  maxFieldLength?: number;
 }
 
-export const DEFAULT_INGEST_LIMITS = { maxRows: 5000, maxBytes: 5 * 1024 * 1024 };
+export const DEFAULT_INGEST_LIMITS = { maxRows: 5000, maxBytes: 5 * 1024 * 1024, maxFieldLength: 65536 };
 
 /** Ingest a resources.csv export into normalized resources with full provenance (§16). */
 export function ingestResourcesCsv(text: string, opts: IngestOptions = {}): IngestionResult {
   const maxRows = opts.maxRows ?? DEFAULT_INGEST_LIMITS.maxRows;
   const maxBytes = opts.maxBytes ?? DEFAULT_INGEST_LIMITS.maxBytes;
+  const maxFieldLength = opts.maxFieldLength ?? DEFAULT_INGEST_LIMITS.maxFieldLength;
   const errors: string[] = [];
   const warnings: string[] = [];
   const bytes = Buffer.byteLength(text, "utf8");
@@ -26,6 +29,7 @@ export function ingestResourcesCsv(text: string, opts: IngestOptions = {}): Inge
   const parsed = parseCsv(text, { maxRows });
   warnings.push(...parsed.warnings);
   if (parsed.headers.length === 0) return emptyResult(inputHash, ["no header row found"], warnings);
+  if (parsed.headers.some((h) => h.length > maxFieldLength)) return emptyResult(inputHash, [`a header cell is longer than ${maxFieldLength} characters; not a resource export`], warnings);
   const { map, extra, missing } = mapHeaders(parsed.headers);
   const hardMissing = REQUIRED_COLUMNS.filter((c) => map[c] === null);
   if (hardMissing.length) return emptyResult(inputHash, [`required columns missing: ${hardMissing.join(", ")}`], warnings, map, missing, extra);
@@ -40,6 +44,13 @@ export function ingestResourcesCsv(text: string, opts: IngestOptions = {}): Inge
   let duplicateCount = 0;
   parsed.rows.forEach((row, i) => {
     const rowNo = i + 2;
+    // A single cell can be as long as the whole upload (5 MB). Nothing downstream needs that: an Azure resource id is
+    // about 2,000 characters and a name at most 260. Skip the row rather than truncate it, so a cut-off id is never used.
+    const tooLong = row.findIndex((cell) => cell.length > maxFieldLength);
+    if (tooLong >= 0) {
+      warnings.push(`row ${rowNo}: column '${(parsed.headers[tooLong] ?? "").slice(0, 40)}' has a value longer than ${maxFieldLength} characters; row skipped`);
+      return;
+    }
     const rowWarnings: string[] = [];
     const prov: FieldProvenance[] = [];
     const get = (canon: string): string | undefined => (idx[canon] >= 0 ? row[idx[canon]] : undefined);
