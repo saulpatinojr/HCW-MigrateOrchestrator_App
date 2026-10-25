@@ -110,8 +110,10 @@ A `v*` tag publishes, only after the checks pass:
 | Artifact | Where | Gate |
 |---|---|---|
 | Appliance image | `docker.io/hybridcloudworks/img-mo-appliance-app` | Built locally, scanned (Trivy, HIGH/CRITICAL fixed), then pushed through the Docker OIDC connection with provenance and SBOM (`docs/release/docker-hub.md`). Deploy by digest, never by tag. **Only while the repository variable `DOCKERHUB_ENABLED` is `true`:** the job was skipped (not failed) for `v0.3.0` and `v0.3.1`, so no image exists for them yet (ticket #42). Terraform refuses any `image_ref` that is not an exact digest |
-| CLI binaries | GitHub Releases, three platforms, with `SHA256SUMS-*.txt` and provenance | Each binary smoke-tested (`rules validate` + a sample `assess`) |
-| `@hybridcloudworks/migration-core`, `@hybridcloudworks/migration-ui` | GitHub Release assets (`hybridcloudworks-migration-{core,ui}-<version>.tgz`) with provenance; the downstream edition pins them by URL and hash. npm publishing is optional ([`docs/release/npm-publishing.md`](docs/release/npm-publishing.md)) | Clean-consumer gate (`npm run packages:verify`) against the packed tarballs |
+| CLI binaries | GitHub Releases, three platforms, with `SHA256SUMS-*.txt`, signed build provenance and a signed CycloneDX SBOM (`amo-cli-<version>.cdx.json`) | Each binary smoke-tested (`rules validate` + a sample `assess`) |
+| `@hybridcloudworks/migration-core`, `@hybridcloudworks/migration-ui` | GitHub Release assets (`hybridcloudworks-migration-{core,ui}-<version>.tgz`) with signed build provenance and a signed CycloneDX SBOM (`hybridcloudworks-migration-packages-<version>.cdx.json`); the downstream edition pins them by URL and hash. npm publishing is optional ([`docs/release/npm-publishing.md`](docs/release/npm-publishing.md)) | Clean-consumer gate (`npm run packages:verify`) against the packed tarballs before release and again against the released tarballs |
+
+The GitHub Release is created by one job, as a draft, and made public only after the files and their attestations have been checked; the tag, the package version and `main` must agree before anything is built. How to rehearse a release without publishing, how to cut one and what to do when a step fails: [`docs/release/README.md`](docs/release/README.md) (design: ADR-0032).
 
 Actions are pinned to commit SHAs; Dependabot keeps them current.
 

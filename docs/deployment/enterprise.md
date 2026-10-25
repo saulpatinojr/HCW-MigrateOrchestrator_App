@@ -51,8 +51,18 @@ identity federation in CI, Azure CLI for local development. `AMO_*SECRET` / `AZU
 
 `apps/appliance-web` (Vite + React + MSAL). Register a **second**, public-client SPA app registration with redirect URI
 set to the exact web address where you host the UI, with no slash at the end (the app sends `window.location.origin`, for example `https://` followed by the host name that Static Web Apps shows once you create it, and Microsoft Entra compares the address exactly), expose the API's `access_as_user` scope on the API registration, and pre-authorize the SPA. Build with
-`VITE_ENTRA_TENANT_ID`, `VITE_ENTRA_SPA_CLIENT_ID`, `VITE_API_SCOPE`, `VITE_API_BASE_URL` (all public values) and host the
-`dist/` on Static Web Apps or a second Container App. Add the web origin to the API's allowed origins when hosted separately.
+`VITE_ENTRA_TENANT_ID`, `VITE_ENTRA_SPA_CLIENT_ID` and `VITE_API_SCOPE` (public values), and leave `VITE_API_BASE_URL` empty
+so the web UI calls `/api/...` on the address that served it.
+
+**The web UI and the API must share one address (same origin).** The API has no CORS support on purpose (a browser rule
+that lets one website call an API on another address): it sends no `Access-Control-*` headers, has no allowed-origins
+setting, and a web UI hosted on a different address is blocked by the browser (ADR-0031). Put one reverse proxy on a single
+address that sends `/api/*` to the API Container App and everything else to the compiled `dist/`. Options: Azure Static Web
+Apps (Standard plan) with the Container App linked as its API backend
+([Microsoft Learn](https://learn.microsoft.com/azure/static-web-apps/apis-container-apps)), Azure Front Door or Application
+Gateway path routing, or a small Caddy or nginx container in front of both. The redirect address registered above is that
+one address. Entra token validation on every protected route is unchanged. This front door is not provisioned by the
+Terraform in this repository and has not been exercised here (`VALIDATION.md`).
 
 ## 2c. Worker
 
