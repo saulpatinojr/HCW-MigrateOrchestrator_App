@@ -81,8 +81,15 @@ run_terraform() {
     -e TF_PLUGIN_CACHE_DIR=/plugins -v "$TF_PLUGIN_VOLUME:/plugins" -v "$REPO:/work:ro" \
     --entrypoint sh "$TERRAFORM_IMAGE" -c "
       set -e
-      cp -R /work/$TF_DIR /scratch/tf && cd /scratch/tf
-      rm -rf .terraform
+      # Copy everything except a .terraform directory (a local init can leave hundreds of megabytes of providers there; they
+      # would fill the tmpfs and are not wanted). The lock file is copied on purpose: init runs with -lockfile=readonly.
+      mkdir -p /scratch/tf && cd /work/$TF_DIR
+      for f in * .[!.]*; do
+        [ -e \"\$f\" ] || continue
+        [ \"\$f\" = .terraform ] && continue
+        cp -R \"\$f\" /scratch/tf/
+      done
+      cd /scratch/tf
       terraform fmt -check -recursive -diff
       terraform init -backend=false -input=false -lockfile=readonly
       terraform validate -no-color

@@ -53,6 +53,28 @@ test("the app roles in Terraform and the roles the API recognises are the same s
   assert.ok(!/:\s*"discovery"|"discovery"\s*;/.test(api.slice(api.indexOf("export function principalFromClaims"), api.indexOf("export interface ApplianceDeps"))), "principalFromClaims must never hand out a default level");
 });
 
+test("the app role descriptions admins see when assigning match what the code does (commit is Execute, Destructive is reserved)", () => {
+  const app = block(main, "resource", "azuread_application", "api");
+  const desc = Object.fromEntries([...app.matchAll(/^\s*"(Migration\.[A-Za-z.]+)"\s*=\s*"([^"]*)"/gm)].map((m) => [m[1], m[2]]));
+  // Pinned on purpose: changing what a role is said to allow should be a deliberate edit of this test.
+  assert.deepEqual(desc, {
+    "Migration.Read": "Assess only: run discovery assessments and read your own results (no move validation, plans or execution)",
+    "Migration.Plan": "Plan migrations (validation evidence, plans and bundles; no execution)",
+    "Migration.Execute": "Record approvals and run gated Resource Mover actions: prepare, initiateMove, commit (each with its recorded approval) and discard",
+    "Migration.Execute.Destructive": "Reserved for irreversible operations such as source deletion; the API exposes none yet, so today it grants nothing beyond Migration.Execute",
+  });
+  // The facts behind the wording, read from the code: commit needs only controlled execution plus a recorded approval.
+  const mover = readFileSync("packages/azure-execution/src/resource-mover.ts", "utf8");
+  assert.ok(mover.includes('commit: "data-cutover"'));
+  const authz = readFileSync("packages/authorization/src/index.ts", "utf8");
+  assert.ok(authz.includes('operation === "source-delete" || operation === "destructive-change" || operation === "irreversible-operation" ? "destructive-execution" : "controlled-execution"'));
+  assert.ok(!/commit cutover/i.test(desc["Migration.Execute.Destructive"]), "Destructive must not claim commit");
+  const guide = readFileSync("docs/deployment/enterprise.md", "utf8").replace(/\r\n/g, "\n");
+  const row = (r) => guide.split("\n").find((l) => l.startsWith("| `" + r + "` |")) ?? "";
+  assert.ok(row("Migration.Execute").includes("commit (approval `data-cutover`)"), "the guide must say Execute can commit");
+  assert.ok(!/commit/i.test(row("Migration.Execute.Destructive")), "the guide must not give commit to Destructive");
+});
+
 test("the API fails closed when the principal is null, before any route runs", () => {
   const guard = api.indexOf("const principal = principalFromClaims(v.claims);");
   assert.ok(guard > 0, "principalFromClaims(v.claims) not found");
@@ -151,6 +173,22 @@ test("geo-redundant backup is opt-in, defaults off, and is the only thing the fl
 test("the aca firewall is marked provisional where it is defined", () => {
   const at = main.indexOf('resource "azurerm_network_security_group" "aca"');
   assert.match(main.slice(Math.max(0, at - 1200), at), /PROVISIONAL, NOT VALIDATED/);
+});
+
+test("the invalid Container Apps environment stops the plan unless a loudly named variable acknowledges it (issue 82)", () => {
+  const v = block(variables, "variable", "acknowledge_container_apps_environment_is_invalid_issue_82");
+  assert.equal(attr(v, "default"), "false", "the stop must be on by default");
+  assert.equal(attr(v, "type"), "bool");
+  const env = block(main, "resource", "azurerm_container_app_environment", "app");
+  assert.ok(env.includes("precondition {"), "the environment needs a precondition");
+  assert.ok(env.includes("condition     = var.acknowledge_container_apps_environment_is_invalid_issue_82"), "the precondition must depend only on the acknowledgement");
+  assert.ok(env.includes("https://github.com/saulpatinojr/HCW-MigrateOrchestrator_App/issues/82"), "the message must point at the decision ticket");
+  // While the environment is consumption-only on a delegated /26, the stop must stay: this fails if someone adds a
+  // workload_profile block (the decision is then made) without also removing the stop on purpose.
+  const envCode = env.split("\n").filter((l) => !l.trim().startsWith("#")).join("\n");
+  assert.ok(!envCode.includes("workload_profile"),"a workload_profile block means the environment decision was made: remove the stop, the variable, this test and the PROVISIONAL notes together (ADR-0032)");
+  const subnet = block(main, "resource", "azurerm_subnet", "aca");
+  assert.ok(subnet.includes("Microsoft.App/environments") && main.includes("aca_subnet_cidr = cidrsubnet(var.vnet_cidr, 4, 0)"));
 });
 
 test("providers stay pinned to a major version and the database stays private", () => {

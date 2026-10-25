@@ -56,9 +56,12 @@ Both layers, because each covers a failure of the other:
    who wants assess-only access assigns `Migration.Read`, not `Migration.Plan`. The public routes `/api/health` and `/api/agents`
    are unchanged. A token that
    fails validation is still 401.
-2. **Entra enforces assignment.** Terraform creates `azuread_service_principal.api` with
-   `app_role_assignment_required = true`, so Entra issues a token for the API only to users, groups and applications that
-   hold an assigned app role. Assignments are made in the Entra portal (steps in `docs/deployment/enterprise.md`) or
+2. **Entra assignment required (a first layer).** Terraform creates `azuread_service_principal.api` with
+   `app_role_assignment_required = true`. This is a **first layer, not the control**: Entra is meant to refuse to sign in an
+   unassigned user and to issue a token to an unassigned application, but administrators who can manage the application are
+   documented exceptions (a Global Administrator is reported to bypass it; unverified here), the built-in "Default Access"
+   assignment is a placeholder and not a role, and none of this was verified live. The API role check above is the
+   authoritative control. Assignments are made in the Entra portal (steps in `docs/deployment/enterprise.md`) or
    declaratively with the optional variable `app_role_assignments`, which is empty by default and validated against the
    four roles. Outputs print the enterprise application's object ID and the role IDs.
 
@@ -109,6 +112,17 @@ in the pipeline. Use the variable for a lab or for your own first assignment.
   checks run in `iac-validate` (`terraform test`, mocked providers).
 - **Not verified:** behaviour against a real tenant, that the `roles` claim appears in a real access token for an assigned
   user, and Entra's refusal to issue a token to an unassigned user. Recorded in `VALIDATION.md`.
+
+**Known limitations (pre-existing, not changed by this ADR).** Holding a role is not the same as being scoped to your own data:
+
+- `GET /api/operations/{targetKey}` is not scoped to the caller. Any holder of `Migration.Plan` or higher can read the operations
+  recorded for any move collection, if they know or guess its name.
+- Approvals are not scoped to the caller either. An approval recorded by one `Migration.Execute` holder is picked up for any
+  execution request on the same collection name, and nothing stops the person who records an approval from also being the
+  person who executes it, so there is no separation of duties yet.
+- Assessments are scoped to their owner (a different owner gets 404); that part works.
+
+Fixing these changes behaviour and is a separate decision; this ADR only records them so nobody reads a role as more than it is.
 
 ## Rollback and lock-out
 

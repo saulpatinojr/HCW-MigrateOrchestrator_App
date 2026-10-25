@@ -74,3 +74,8 @@ variable "app_role_assignments" {
     error_message = "Each role must be exactly Migration.Read, Migration.Plan, Migration.Execute or Migration.Execute.Destructive."
   }
 }
+variable "acknowledge_container_apps_environment_is_invalid_issue_82" {
+  type        = bool
+  description = "STOP SWITCH, default false. The Container Apps environment is not a valid combination as written (a consumption-only environment needs a subnet of at least /23 that is not delegated; snet-aca is a /26 and delegated). Until the owner decides the environment type and subnet (https://github.com/saulpatinojr/HCW-MigrateOrchestrator_App/issues/82, ADR-0032), terraform plan fails on purpose. Set this to true only to review a plan; do not apply. Remove the variable and the precondition when the decision is implemented."
+  default     = false
+}

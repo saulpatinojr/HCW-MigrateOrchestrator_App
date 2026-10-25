@@ -10,9 +10,10 @@ import { FixtureDiscoveryProvider, type DiscoveryProvider } from "@amo/azure-dis
 import { ResourceGraphDiscoveryProvider, MoveValidator, ScopeInventory } from "@amo/azure-arm";
 import { credentialFromEnv, refuseUnsupportedIdentityEnv, EntraTokenValidator, StaticTokenCredential, type TokenCredential } from "@amo/azure-auth";
 import { ResourceMoverClient, type MoverAction } from "@amo/azure-execution";
-import { gate, isAllowed, APPROVAL_REQUIRED_OPERATIONS, type Principal, type AuthorizationLevel, type ApprovalOperation } from "@amo/authorization";
+import { gate, APPROVAL_REQUIRED_OPERATIONS, type Principal, type AuthorizationLevel, type ApprovalOperation } from "@amo/authorization";
 import { createLogger, type Logger } from "@amo/observability";
 import { InMemoryRepository, type AssessmentRepository } from "./repository.js";
+import { FORBIDDEN_MESSAGE, levelAllows } from "./route-levels.js";
 export * from "./repository.js";
 
 export interface EnterpriseConfig {
@@ -119,6 +120,9 @@ export function createEnterpriseApi(cfg: EnterpriseConfig, deps: ApplianceDeps):
         return fail(403, "forbidden", "no application role assigned: ask an administrator to assign you one of the Migration.* app roles (docs/deployment/enterprise.md, section 2)");
       }
 
+      // Minimum level for the route, from one table, before any body is read or any repository is touched (ADR-0031).
+      if (!levelAllows(principal, url.pathname)) return fail(403, "forbidden", FORBIDDEN_MESSAGE);
+
       if (url.pathname === "/api/me") return send(200, { oid: actor, level: principal.grantedLevel, roles: v.claims.roles });
 
       if (url.pathname === "/api/scopes") {
@@ -127,7 +131,6 @@ export function createEnterpriseApi(cfg: EnterpriseConfig, deps: ApplianceDeps):
         return send(200, { homeTenantId: cfg.tenantId, subscriptions: subs, delegatedCount: subs.filter((x) => x.delegated).length });
       }
       if (url.pathname === "/api/assessments" && req.method === "POST") {
-        if (!isAllowed(principal, "discovery")) return fail(403, "forbidden", "discovery level required");
         const body = (await readJson(req)) as { scope?: { kind: "subscription" | "management-group" | "resource-group"; id: string }; intent?: Record<string, unknown>; destinationSubscriptionId?: string };
         if (!body.scope?.id) return fail(400, "scope_required", "scope {kind,id} required");
         const intent: Record<string, unknown> = { ...(body.intent ?? {}) };
@@ -151,7 +154,6 @@ export function createEnterpriseApi(cfg: EnterpriseConfig, deps: ApplianceDeps):
         if (!item || item.ownerOid !== actor) return fail(404, "not_found", "assessment not found");
         if (!m[2]) return send(200, { assessment: item.assessment });
         // Authenticated evidence: ARM validateMoveResources for the native-move candidates.
-        if (!isAllowed(principal, "validation")) return fail(403, "forbidden", "validation level required");
         if (!moveValidator) return fail(503, "not_configured", "no Azure credential configured");
         const body = (await readJson(req)) as { targetResourceGroupId?: string };
         if (!body.targetResourceGroupId) return fail(400, "target_required", "targetResourceGroupId required");
@@ -170,7 +172,6 @@ export function createEnterpriseApi(cfg: EnterpriseConfig, deps: ApplianceDeps):
       }
 
       if (url.pathname === "/api/approvals" && req.method === "POST") {
-        if (!isAllowed(principal, "controlled-execution")) return fail(403, "forbidden", "controlled-execution level required to record approvals");
         const body = (await readJson(req)) as { operation?: ApprovalOperation; targetKey?: string; note?: string };
         if (!body.operation || !APPROVAL_REQUIRED_OPERATIONS.includes(body.operation) || !body.targetKey) return fail(400, "invalid", "operation and targetKey required");
         const rec = { id: randomUUID(), operation: body.operation, targetKey: body.targetKey, approvedBy: actor, approvedAt: new Date().toISOString(), note: body.note ?? null };
@@ -198,7 +199,6 @@ export function createEnterpriseApi(cfg: EnterpriseConfig, deps: ApplianceDeps):
       }
       const ops = url.pathname.match(/^\/api\/operations\/([^/]+)$/);
       if (ops && req.method === "GET") {
-        if (!isAllowed(principal, "planning")) return fail(403, "forbidden", "planning level required");
         return send(200, await repo.operationsFor(decodeURIComponent(ops[1])));
       }
       if (url.pathname.startsWith("/api/execution/")) return fail(403, "approval_required", gate(principal, "production-deploy", url.pathname).reason);

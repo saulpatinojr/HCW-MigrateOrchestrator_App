@@ -5,6 +5,12 @@ with dependency-free credentials.
 
 ## 1. Provision
 
+> **Do not run `terraform apply` yet.** The Container Apps environment in this Terraform is not a valid combination (a
+> consumption-only environment on a /26 subnet that is delegated; see the box in section 2d) and the owner has not decided how
+> to fix it: [issue 82](https://github.com/saulpatinojr/HCW-MigrateOrchestrator_App/issues/82). `terraform plan` stops on purpose with an error that names that issue, so a plain
+> `apply` cannot create a half-built, billed deployment. You can set `acknowledge_container_apps_environment_is_invalid_issue_82 = true`
+> to review a plan; do not apply it. Everything below describes the intended flow once the decision is made.
+
 Sign in with `az login` first (no secrets). Both shells use the subscription you are signed in to as the hosting subscription.
 
 The appliance image is always deployed by its exact digest, never by a tag such as `:latest` (a tag can change under a running deployment, so Terraform refuses it). The digest is the last line of the `publish-images` run summary (see `docs/release/docker-hub.md`) and looks like `docker.io/hybridcloudworks/img-mo-appliance-app@sha256:` followed by 64 hexadecimal characters. Copy that line first. Until a release has published an image there is no digest to deploy; the repository variables in `docs/release/docker-hub.md` start the publishing.
@@ -48,7 +54,7 @@ no "signed in, no role" level (ADR-0031).
 | (no role, or an unknown role) | none | nothing: every protected route answers 403 |
 | `Migration.Read` | discovery | **assess only:** list scopes, run discovery assessments on permitted scopes, read your own assessments. No move validation, plans, approvals or execution |
 | `Migration.Plan` | planning | + validate-move evidence, plans, bundles, operation status (no execution) |
-| `Migration.Execute` | controlled-execution | + record approvals; Resource Mover prepare / initiateMove (approval `production-deploy`) / discard |
+| `Migration.Execute` | controlled-execution | + record approvals; Resource Mover prepare / initiateMove (approval `production-deploy`) / commit (approval `data-cutover`) / discard |
 | `Migration.Execute.Destructive` | destructive-execution | + the destructive operations the approval gate reserves for it (source deletion workflows, future) |
 
 If a person holds several roles, the highest one counts. `Migration.Read` is what a signed-in user without a role used to
@@ -72,11 +78,12 @@ assessment is only visible to the person who created it):
 No route today needs more than `Migration.Execute`: the extra level of `Migration.Execute.Destructive` is reserved by the approval
 gate for operations such as source deletion, which the API does not expose yet.
 
-Two layers enforce this. Terraform sets `app_role_assignment_required = true` on the enterprise application, so Entra
-itself should issue no token to anyone who is not assigned a role (Microsoft documents that Entra refuses the sign-in of an
-unassigned user and a token request from an unassigned application; **this has not been verified live here**). The API checks
-the role again in every token, so a token obtained some other way, or an environment where the setting was switched off,
-still gets 403.
+Two layers apply this, and only the second is the control. First, Terraform sets `app_role_assignment_required = true` on the
+enterprise application: Entra is meant to refuse to sign in an unassigned user and to issue a token to an unassigned
+application, but it is a first layer only. Administrators who can manage the application are documented exceptions (a Global
+Administrator is reported to bypass it), the portal's "Default Access" assignment is a placeholder and not a role, and **none of
+this has been verified live here**. Second, the **API checks the role in every token and is the authoritative control**: a
+token obtained any other way, or an environment where the setting was switched off, still gets 403.
 
 **Before you apply: this locks out everyone who has no role, including you.** Enabling "assignment required" (or adopting an
 enterprise application that had it off) takes effect at apply time. Put your own role in `app_role_assignments` in the **same**
@@ -88,6 +95,12 @@ Learn). To cut someone off sooner, remove the role and revoke their sessions in 
 
 If a person is refused at sign-in because they have no role, the sign-in page of the appliance web now says so and tells them
 to ask an administrator (Entra error code `AADSTS50105`; unverified against a real redirect).
+
+**Known limitations (pre-existing, not changed).** A role is not a data scope. Operation status
+(`GET /api/operations/{targetKey}`) can be read by any `Migration.Plan` holder or higher for any collection name. Approvals are
+matched on the collection name only, so an approval recorded by one `Migration.Execute` holder counts for anyone's execution of
+that collection, and the person who records an approval can also be the person who executes it: there is no separation of
+duties yet. Assessments are the exception: they are visible only to their creator. See ADR-0031.
 
 ### Assign a role to a person
 
@@ -162,13 +175,14 @@ operations recorded by the API and auditing their completion (ADR-0026). Locally
 The two subnets each have a network security group (a firewall for a subnet) with a deny-all-inbound rule at the end, so
 only the traffic below gets in (ADR-0032). Outbound traffic is left at Azure's defaults.
 
-> **Provisional, not validated: the Container Apps group (`snet-aca`).** The database group is a sound design. The
+> **Provisional, not validated: the Container Apps group (`snet-aca`).** The database group is consistent with Microsoft Learn but has never been applied. The
 > Container Apps group is written for a consumption-only Container Apps environment, and that environment as configured is
 > not valid: Microsoft says a consumption-only environment needs a subnet of at least /23 that is **not delegated**, while
 > `snet-aca` is a /26 delegated to `Microsoft.App/environments`. Microsoft also says locking down inbound traffic with an NSG
 > is **not supported** for an external workload-profile environment, the other type. Which environment type to use is an open
 > decision for the owner, with both options and what each changes written up in ADR-0032 ("Open question"). Until it is
-> decided, expect the first real apply of the environment to need changes, and do not rely on this group to protect the API.
+> decided, do not apply (`terraform plan` is stopped on purpose, see [issue 82](https://github.com/saulpatinojr/HCW-MigrateOrchestrator_App/issues/82)), and do not rely on this group to
+> protect the API.
 
 | Subnet | Allowed in | Everything else |
 |---|---|---|

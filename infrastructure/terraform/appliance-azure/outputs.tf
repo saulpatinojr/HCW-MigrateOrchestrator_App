@@ -16,5 +16,5 @@ output "managed_identity_principal_id" {
   value = azurerm_user_assigned_identity.app.principal_id
 }
 output "post_apply" {
-  value = "1) Set identifier_uris = [\"api://<api_client_id>\"] and re-apply. 2) Assign an app role to every person or application that may use the API (Enterprise applications > the app > Users and groups, or var.app_role_assignments): without a role Entra issues no token and the API answers 403. 3) For Resource Mover, grant the managed identity Contributor on the source and target resource groups per engagement, then remove it."
+  value = "1) Set identifier_uris = [\"api://<api_client_id>\"] and re-apply. 2) Assign an app role to every person or application that may use the API (Enterprise applications > the app > Users and groups, or var.app_role_assignments): without a role the API answers 403 (Entra's assignment requirement is a first layer on top of that). 3) For Resource Mover, grant the managed identity Contributor on the source and target resource groups per engagement, then remove it."
 }

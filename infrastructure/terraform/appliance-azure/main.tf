@@ -323,6 +323,18 @@ resource "azurerm_container_app_environment" "app" {
   tags                       = local.tags
   # The subnet firewall is attached before the environment is created, so the environment is built under it.
   depends_on = [azurerm_subnet_network_security_group_association.aca]
+
+  # PLAN-TIME STOP (ADR-0032, issue 82): as written this is a consumption-only environment (no workload_profile block) on
+  # a /26 subnet that is delegated to Microsoft.App/environments. Microsoft requires at least /23 and NO delegation for that
+  # type, so the first real apply would probably fail after other billed resources were already created. Until the owner
+  # decides the environment type, planning fails here unless the variable below is set on purpose, for example to review a
+  # plan. Delete this precondition and the variable when the decision is implemented.
+  lifecycle {
+    precondition {
+      condition     = var.acknowledge_container_apps_environment_is_invalid_issue_82
+      error_message = "STOP: the Container Apps environment is not a valid combination (consumption-only type with a /26 subnet that is delegated; Microsoft requires at least /23 and no delegation). Do not apply this configuration until the owner has decided the environment type and subnet: https://github.com/saulpatinojr/HCW-MigrateOrchestrator_App/issues/82 . To only review a plan, set acknowledge_container_apps_environment_is_invalid_issue_82 = true (and still do not apply)."
+    }
+  }
 }
 
 resource "azurerm_container_app" "api" {
@@ -385,8 +397,8 @@ resource "azurerm_container_app" "api" {
 }
 
 # Entra app registration for the appliance API with app roles mapped to authorization levels. The API refuses a token
-# that carries none of these roles (403, ADR-0031), and the service principal below makes Entra refuse to issue a token
-# to anyone who has not been assigned a role.
+# that carries none of these roles (403, ADR-0031). That API check is the authoritative control; the service principal
+# below adds Entra's assignment requirement as a first layer (see the note there).
 resource "azuread_application" "api" {
   display_name     = "Azure Migration Orchestrator (${var.environment})"
   sign_in_audience = "AzureADMyOrg"
@@ -396,8 +408,8 @@ resource "azuread_application" "api" {
     for_each = {
       "Migration.Read"                = "Assess only: run discovery assessments and read your own results (no move validation, plans or execution)"
       "Migration.Plan"                = "Plan migrations (validation evidence, plans and bundles; no execution)"
-      "Migration.Execute"             = "Record approvals and run gated, reversible execution (Resource Mover prepare/initiate/discard)"
-      "Migration.Execute.Destructive" = "Commit cutovers and destructive operations"
+      "Migration.Execute"             = "Record approvals and run gated Resource Mover actions: prepare, initiateMove, commit (each with its recorded approval) and discard"
+      "Migration.Execute.Destructive" = "Reserved for irreversible operations such as source deletion; the API exposes none yet, so today it grants nothing beyond Migration.Execute"
     }
     content {
       allowed_member_types = ["User", "Application"]
@@ -410,9 +422,11 @@ resource "azuread_application" "api" {
   }
 }
 
-# The enterprise application (service principal) behind the registration. app_role_assignment_required = true means Entra
-# issues a token for this API only to users, groups and applications that have been assigned one of the app roles above
-# (ticket #46, ADR-0031). Without it, any user in the tenant could obtain a token (the API would still refuse it, 403).
+# The enterprise application (service principal) behind the registration. app_role_assignment_required = true is a FIRST
+# layer: Entra is meant to refuse to sign in users, and to issue tokens to applications, that have no assigned app role.
+# It is not the control: administrators who can manage the application are documented exceptions to it, the portal's
+# "Default Access" assignment is a placeholder and not a role, and none of this has been verified live (ADR-0031). The
+# authoritative control is the role check in the API, which answers 403 to any token without a recognised app role.
 resource "azuread_service_principal" "api" {
   client_id                    = azuread_application.api.client_id
   app_role_assignment_required = true

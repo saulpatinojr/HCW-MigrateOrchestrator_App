@@ -32,8 +32,8 @@ explorer components. It builds and runs on its own.
 Who can use the appliance: every call except the health and agent-list routes needs a valid Microsoft Entra token **that
 carries an app role** (`Migration.Read`, `Migration.Plan`, `Migration.Execute` or `Migration.Execute.Destructive`; the lowest, `Migration.Read`, is assess only). A valid token with no
 role, or an unknown one, is answered with 403; there is no default access for a signed-in user. Terraform also turns on
-"assignment required" for the Entra application, so Entra issues tokens only to assigned people. See
-[`docs/deployment/enterprise.md`](docs/deployment/enterprise.md) (sections 2 and 2d) and ADR-0031 and ADR-0032.
+"assignment required" for the Entra application as a first layer (the role check in the API is the authoritative control). See
+[`docs/deployment/enterprise.md`](docs/deployment/enterprise.md) (sections 2 and 2d) and ADR-0031 and ADR-0032. **Do not apply the Terraform yet:** `terraform plan` stops on purpose until the Container Apps environment type is decided ([issue 82](https://github.com/saulpatinojr/HCW-MigrateOrchestrator_App/issues/82)).
 
 > **Status:** reference implementation, not production. Sign-in, Resource Graph and Resource Mover are implemented against
 > REST with fakes in tests; nothing has been validated against a live tenant yet. Every limitation is recorded in

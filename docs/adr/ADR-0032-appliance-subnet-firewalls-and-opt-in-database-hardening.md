@@ -18,7 +18,7 @@ subnets, and the Container Apps subnet accepted what the platform routed to it.
 
 ### 1. A firewall on each subnet, deny by default (`db`: done; `aca`: PROVISIONAL, not validated)
 
-**Read this first.** The `db` group is a sound design for a PostgreSQL server in a delegated subnet. The `aca` group is
+**Read this first.** The `db` group is consistent with Microsoft Learn for a PostgreSQL flexible server in a delegated subnet, and has never been applied. The `aca` group is
 **provisional and not validated**: it was written for a consumption-only Container Apps environment, and that environment, as
 this Terraform describes it, is not valid (see "Open question" below). Do not treat ticket #53's "NSGs attached to both
 subnets" as met for `aca` until the owner has chosen the environment type and the rules have been checked against it.
@@ -42,7 +42,7 @@ Choices inside that table:
 
 - **Port 80 is not opened.** Learn lists 80 and 443 for HTTP and HTTPS. The API is only used over HTTPS, and a closed port 80
   means a mistyped `http://` call never sends a bearer token in clear text; it fails to connect instead of being redirected.
-- **Outbound rules are not added.** The defaults (allow to the virtual network and the internet) stay. The Container Apps
+- **Outbound rules are not added.** (Learn, networking with private access, for the database subnet: if outbound is ever restricted, the **Storage** service tag, port 443, and **Microsoft Entra ID** (`AzureActiveDirectory`) must be allowed, because PostgreSQL archives write-ahead logs to Storage and this server uses Entra authentication.) The defaults (allow to the virtual network and the internet) stay. The Container Apps
   platform and PostgreSQL both have outbound dependencies (container registry, Microsoft Entra ID, Azure Monitor, Storage)
   that a lockdown has to list exactly, and getting that list wrong stops the environment from starting. An outbound lockdown
   is a separate, larger decision.
@@ -146,7 +146,15 @@ locking down inbound traffic with an NSG or firewall is **not supported**.
 | What this ADR's `aca` group becomes | validated against Learn, then kept | removed or reduced to the rules Learn supports; the `db` group is unchanged |
 
 Either option is a new ADR and a changed address plan or environment resource, so it needs an owner decision and its own
-ticket. Until then the `aca` group is provisional.
+ticket ([issue 82](https://github.com/saulpatinojr/HCW-MigrateOrchestrator_App/issues/82)). Until then the `aca` group is provisional.
+
+**Do not apply until [issue 82](https://github.com/saulpatinojr/HCW-MigrateOrchestrator_App/issues/82) is decided.** To make that safe, `terraform plan` now **fails on purpose**: the
+environment resource has a `lifecycle` precondition that is satisfied only by the variable
+`acknowledge_container_apps_environment_is_invalid_issue_82` (default `false`), so a default `terraform apply` cannot create
+a partial, billed deployment (the resource group, database and network would otherwise be created before the environment
+fails). The error message names the issue. Setting the variable to `true` is only for reviewing a plan; it is not a licence
+to apply. When the decision is implemented, delete the precondition, the variable, the matching `terraform test` runs and the
+static test together (the static test fails if a `workload_profile` block appears while the stop is still there).
 
 ## Rollback
 

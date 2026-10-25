@@ -7,6 +7,7 @@ import { FixtureDiscoveryProvider } from "@amo/azure-discovery";
 import type { NormalizedResource } from "@amo/domain";
 import { spawnSync } from "node:child_process";
 import { fileURLToPath } from "node:url";
+import { FORBIDDEN_MESSAGE } from "./route-levels.js";
 import { assertProductionConfig, configFromEnv, principalFromClaims, createEnterpriseApi, InMemoryRepository, PostgresRepository, SCHEMA_SQL } from "./index.js";
 
 const TENANT = "11111111-2222-3333-4444-555555555555";
@@ -16,6 +17,8 @@ const jwk = publicKey.export({ format: "jwk" }) as { n: string; e: string };
 const b64 = (o: unknown) => Buffer.from(JSON.stringify(o)).toString("base64url");
 const mint = (roles: string[], oid = "oid-1") => { const h = b64({ alg: "RS256", kid: "k1" }); const p = b64({ iss: `https://login.microsoftonline.com/${TENANT}/v2.0`, tid: TENANT, aud: "api://amo", oid, sub: "s", roles, nbf: Math.floor(Date.now() / 1000) - 5, exp: Math.floor(Date.now() / 1000) + 600 }); return `${h}.${p}.${sign("RSA-SHA256", Buffer.from(`${h}.${p}`), privateKey).toString("base64url")}`; };
 const armCalls: string[] = [];
+/** Level names must never appear in a 403 body (ADR-0031). */
+const LEVEL_WORDS = /sign-in|discovery|validation|artifact-generation|planning|controlled-execution|destructive-execution/i;
 const fakeFetch = (async (url: string, init?: RequestInit) => {
   if (url.includes("discovery/v2.0/keys")) return new Response(JSON.stringify({ keys: [{ kid: "k1", kty: "RSA", n: jwk.n, e: jwk.e }] }), { status: 200 });
   armCalls.push(`${init?.method ?? "GET"} ${url}`);
@@ -263,6 +266,11 @@ test("Migration.Read is assess-only: allowed routes answer, validation, approval
   assert.equal((await call("/api/assessments", reader, "POST", {})).status, 400, "a malformed request is still a 400, not a 403");
   // Forbidden: everything that needs validation, planning or execution.
   const col = { subscriptionId: SUB, resourceGroup: "rg-mover", name: "mc-reader" };
+  // Pre-record the approvals initiateMove (production-deploy) and commit (data-cutover) need, by someone who may, so those
+  // rows are refused for the reader's LEVEL and not merely because no approval exists (they passed for the wrong reason before).
+  const approver = mint(["Migration.Execute"], "approver-oid");
+  for (const operation of ["production-deploy", "data-cutover"]) assert.equal((await call("/api/approvals", approver, "POST", { operation, targetKey: "mc-reader" })).status, 201, operation);
+  const eventsAfterApprovals = repo.events.length;
   const armBefore = armCalls.length;
   const forbidden: Array<[string, string, unknown?]> = [
     ["POST", `/api/assessments/${assessmentId}/validate-move`, { targetResourceGroupId: `/subscriptions/${SUB}/resourceGroups/rg2` }],
@@ -271,20 +279,53 @@ test("Migration.Read is assess-only: allowed routes answer, validation, approval
     ["POST", "/api/execution/resource-mover/initiateMove", { collection: col, moveResourceIds: ["/r1"] }],
     ["POST", "/api/execution/resource-mover/commit", { collection: col, moveResourceIds: ["/r1"] }],
     ["POST", "/api/execution/resource-mover/discard", { collection: col, moveResourceIds: ["/r1"] }],
+    ["GET", "/api/execution/resource-mover/unknown"],
     ["GET", "/api/operations/mc-reader"],
   ];
+  const notRefused: string[] = [];
   for (const [method, path, body] of forbidden) {
     const r = await call(path, reader, method, body);
-    assert.equal(r.status, 403, `${method} ${path}`);
-    const j = (await r.json()) as { accepted?: boolean; operationId?: unknown; error?: { code: string } };
-    assert.ok(j.error?.code === "forbidden" || j.accepted === false, "refused by the level check or the gate");
-    assert.ok(!j.operationId, "no operation was recorded");
+    const text = await r.text();
+    let j: { accepted?: boolean; operationId?: unknown; error?: { code: string; message: string } } = {};
+    try { j = JSON.parse(text); } catch { /* reported below */ }
+    // One soft check per row, so a failing row is named and no row can hide behind another one failing first.
+    const problems: string[] = [];
+    if (r.status !== 403) problems.push(`status ${r.status}`);
+    if (j.error?.code !== "forbidden" || j.error?.message !== FORBIDDEN_MESSAGE) problems.push("not the one generic forbidden body from the route table");
+    if (j.accepted !== undefined || j.operationId) problems.push("an execution result or operation was returned");
+    if (LEVEL_WORDS.test(text)) problems.push("a level is named");
+    if (problems.length) notRefused.push(`${method} ${path}: ${problems.join("; ")}`);
   }
+  assert.deepEqual(notRefused, [], "every row must be refused for the reader's level; each row is listed so none can pass for another reason");
   assert.equal(armCalls.length, armBefore, "no Azure call was made on behalf of a reader");
-  // The reader's assessment was created. The gate audits refused execution attempts (existing behaviour), but nothing was
-  // approved, validated or accepted.
-  const added = repo.events.slice(eventsBefore);
+  // The reader's assessment was created. Nothing was approved, validated, executed or even audited as an attempt, because the
+  // table refuses before the gate runs.
+  const added = repo.events.slice(eventsBefore, eventsAfterApprovals);
   assert.ok(added.some((e) => e.event === "assessment.created"));
-  assert.ok(!added.some((e) => e.event === "approval.granted" || e.event === "assessment.validate-move"));
-  for (const e of added.filter((x) => x.event.startsWith("execution."))) assert.equal((e.details as { accepted: boolean }).accepted, false, e.event);
+  assert.deepEqual(repo.events.slice(eventsAfterApprovals), [], "a refused reader leaves no event behind");
+});
+
+test("a role that is too low is refused before the body is read and before the repository is touched, with no level named (ADR-0031)", async () => {
+  const raw = (path: string, token: string, method: string, body: string) => fetch(`${base}${path}`, { method, headers: { authorization: `Bearer ${token}`, "content-type": "application/json" }, body });
+  const reader = mint(["Migration.Read"], "reader-3");
+  const planner = mint(["Migration.Plan"], "planner-3");
+  const eventsBefore = repo.events.length;
+  // A broken JSON body would be a 500 if it were parsed first; a missing assessment would be a 404 if the repository were read first.
+  for (const [token, path] of [[reader, "/api/approvals"], [planner, "/api/approvals"], [reader, "/api/execution/resource-mover/commit"], [planner, "/api/execution/resource-mover/initiateMove"], [reader, "/api/assessments/0f8fad5b-d9cb-469f-a165-70867728950e/validate-move"]] as const) {
+    const r = await raw(path, token, "POST", "{not json");
+    assert.equal(r.status, 403, path);
+    const text = await r.text();
+    assert.equal((JSON.parse(text) as { error: { message: string } }).error.message, FORBIDDEN_MESSAGE);
+    assert.ok(!LEVEL_WORDS.test(text), text);
+  }
+  assert.equal((await call("/api/assessments/0f8fad5b-d9cb-469f-a165-70867728950e/validate-move", reader, "POST", { targetResourceGroupId: "/x" })).status, 403, "403 and not 404 for an assessment that does not exist");
+  // The planner may validate: for the same missing assessment the answer is 404, which proves the 403 above came from the level.
+  assert.equal((await call("/api/assessments/0f8fad5b-d9cb-469f-a165-70867728950e/validate-move", planner, "POST", { targetResourceGroupId: "/x" })).status, 404);
+  assert.equal(repo.events.length, eventsBefore);
+});
+
+test("the 403 for a caller with no role names no level either (ADR-0031)", async () => {
+  const r = await call("/api/approvals", mint([], "roleless-4"), "POST", { operation: "production-deploy", targetKey: "x" });
+  assert.equal(r.status, 403);
+  assert.ok(!LEVEL_WORDS.test(await r.text()));
 });

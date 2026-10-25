@@ -8,6 +8,9 @@ mock_provider "azuread" {}
 variables {
   tenant_id = "00000000-0000-0000-0000-000000000000"
   image_ref = "docker.io/hybridcloudworks/img-mo-appliance-app@sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+  # Every run below checks one rule of the configuration, so the plan-time stop (issue 82) is acknowledged here and tested on
+  # its own at the end of the file.
+  acknowledge_container_apps_environment_is_invalid_issue_82 = true
 }
 
 run "enterprise_application_requires_an_app_role" {
@@ -253,5 +256,28 @@ run "geo_redundant_backup_is_opt_in" {
   assert {
     condition     = azurerm_postgresql_flexible_server.db.geo_redundant_backup_enabled == true
     error_message = "Setting postgres_geo_redundant_backup_enabled must turn the backup copy on."
+  }
+}
+
+run "default_plan_is_stopped_while_the_environment_decision_is_open" {
+  command = plan
+
+  variables {
+    acknowledge_container_apps_environment_is_invalid_issue_82 = false
+  }
+
+  expect_failures = [azurerm_container_app_environment.app]
+}
+
+run "acknowledged_plan_goes_through_for_review_only" {
+  command = plan
+
+  variables {
+    acknowledge_container_apps_environment_is_invalid_issue_82 = true
+  }
+
+  assert {
+    condition     = azurerm_container_app_environment.app.name != ""
+    error_message = "With the explicit acknowledgement the plan must succeed (for reviewing only; do not apply)."
   }
 }
