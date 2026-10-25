@@ -1,11 +1,11 @@
 import type { Assessment, ResourceDecisionRecord } from "@amo/domain";
+import { tfName } from "./tf-name.js";
 
 /**
  * Infrastructure as Code Agent output (§12.9, §21). Generates modular, illustrative Terraform for
  * resources whose infrastructure disposition is recreate. Never emits secrets; uses placeholders
  * only in variables/tfvars.example. Not production-approved until fmt/validate/scan/plan/approval.
  */
-const tfName = (s: string): string => s.toLowerCase().replace(/[^a-z0-9_]+/g, "_").replace(/^_+|_+$/g, "").replace(/^(\d)/, "r$1") || "resource";
 const hcl = (s: string): string => JSON.stringify(s);
 
 const MODULE_FOR: Record<string, string> = {
