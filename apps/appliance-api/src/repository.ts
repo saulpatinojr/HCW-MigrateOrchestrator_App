@@ -122,7 +122,47 @@ export class PostgresRepository implements AssessmentRepository {
   async operationsFor(targetKey: string) { const { rows } = await this.sql.query("SELECT * FROM operations WHERE target_key = $1 ORDER BY started_at DESC", [targetKey]); return rows.map((r) => this.rowToOp(r)); }
 }
 
-export interface PoolFactory { (config: { connectionString: string; ssl?: { rejectUnauthorized: boolean }; password?: () => Promise<string> }): SqlClient }
+/**
+ * What the API hands to `pg.Pool`. A database reached with an Entra token is described by separate fields, never by a
+ * `connectionString`: with `pg` 8.23.1 a connection string next to a `password` function silently replaces the function with
+ * `null`, so the server receives an empty password and answers "Password returned by client is empty". The first sandbox
+ * apply (2026-10-26) showed this: the container exited at start. A local database (no token) keeps the connection string.
+ */
+export interface PoolConfig {
+  connectionString?: string;
+  host?: string;
+  port?: number;
+  user?: string;
+  database?: string;
+  application_name?: string;
+  ssl?: { rejectUnauthorized: boolean };
+  password?: () => Promise<string>;
+}
+export interface PoolFactory { (config: PoolConfig): SqlClient }
+
+/**
+ * The pool settings for an Azure database address (`postgres://<identity name>@<server>.postgres.database.azure.com:5432/<database>`).
+ * TLS is always on and always verified: the password is an access token and must never cross the network in the clear,
+ * whatever `sslmode` the address says. A malformed address is refused without echoing it (it can carry a user name).
+ */
+export function entraPoolConfig(databaseUrl: string, credential: TokenCredential): PoolConfig {
+  let u: URL;
+  try { u = new URL(databaseUrl); } catch { throw new Error("DATABASE_URL is not a valid postgres:// address"); }
+  if (u.protocol !== "postgres:" && u.protocol !== "postgresql:") throw new Error("DATABASE_URL must start with postgres:// or postgresql://");
+  const user = decodeURIComponent(u.username);
+  const database = decodeURIComponent(u.pathname.replace(/^\//, ""));
+  if (!u.hostname || !user || !database) throw new Error("DATABASE_URL must name a host, a user (the managed identity) and a database");
+  const applicationName = u.searchParams.get("application_name");
+  return {
+    host: u.hostname.replace(/^\[|\]$/g, ""),
+    port: u.port ? Number(u.port) : 5432,
+    user,
+    database,
+    ...(applicationName ? { application_name: applicationName } : {}),
+    ssl: { rejectUnauthorized: true },
+    password: pgEntraPasswordProvider(credential),
+  };
+}
 
 export async function repositoryFromEnv(env: NodeJS.ProcessEnv = process.env, credential: TokenCredential | null = null, poolFactory?: PoolFactory): Promise<AssessmentRepository> {
   if (!env.DATABASE_URL) return new InMemoryRepository();
@@ -130,7 +170,10 @@ export async function repositoryFromEnv(env: NodeJS.ProcessEnv = process.env, cr
   if (embedsPassword(env.DATABASE_URL) && !local) throw new Error("DATABASE_URL must not embed a password for non-local hosts; use Entra authentication for PostgreSQL (docs/deployment/enterprise.md)");
   if (!local && !credential) throw new Error("Azure Database for PostgreSQL requires a TokenCredential for Entra authentication (AMO_CREDENTIAL_KIND)");
   const factory: PoolFactory = poolFactory ?? ((cfg) => new (require_pg().Pool)(cfg) as unknown as SqlClient);
-  const pool = factory({ connectionString: env.DATABASE_URL, ssl: /sslmode=require/.test(env.DATABASE_URL) ? { rejectUnauthorized: true } : undefined, ...(local ? {} : { password: pgEntraPasswordProvider(credential!) }) });
+  const config: PoolConfig = local
+    ? { connectionString: env.DATABASE_URL, ssl: /sslmode=require/.test(env.DATABASE_URL) ? { rejectUnauthorized: true } : undefined }
+    : entraPoolConfig(env.DATABASE_URL, credential!);
+  const pool = factory(config);
   const repo = new PostgresRepository(pool);
   await repo.init();
   return repo;
