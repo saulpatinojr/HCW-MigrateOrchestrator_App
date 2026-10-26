@@ -164,6 +164,9 @@ export function entraPoolConfig(databaseUrl: string, credential: TokenCredential
   if (!u.hostname || !user || !database) throw new Error("DATABASE_URL must name a host, a user (the managed identity) and a database");
   for (const name of new Set(u.searchParams.keys())) {
     if (!PASSED_ON_OPTIONS.has(name)) throw new Error(`DATABASE_URL has an option this appliance does not pass on: ${/^[a-z_]{1,40}$/.test(name) ? name : "(unsupported name)"}`);
+    // A repeated option would be read from its first value here but its last value by pg's own address parser, so the setting that
+    // was asked for (for example a search_path) could be silently ignored. Refuse it instead of choosing one.
+    if (u.searchParams.getAll(name).length !== 1) throw new Error("DATABASE_URL must not repeat an option");
   }
   const sslmode = u.searchParams.get("sslmode");
   if (sslmode !== null && !VERIFIED_SSLMODES.has(sslmode)) throw new Error("DATABASE_URL sslmode must be require, verify-ca or verify-full for an Azure database: TLS is always verified");
