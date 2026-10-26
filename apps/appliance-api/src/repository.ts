@@ -135,15 +135,25 @@ export interface PoolConfig {
   user?: string;
   database?: string;
   application_name?: string;
+  options?: string;
   ssl?: { rejectUnauthorized: boolean };
   password?: () => Promise<string>;
 }
 export interface PoolFactory { (config: PoolConfig): SqlClient }
 
 /**
+ * The options an Azure address may carry. `sslmode` is accepted only as a verified mode (TLS is always verified), and
+ * `application_name` and `options` (server settings such as `-c search_path=...`) are passed on. Any other option is refused
+ * by name: dropping a setting silently would let a deployment run without something it asked for.
+ */
+const PASSED_ON_OPTIONS = new Set(["sslmode", "application_name", "options"]);
+const VERIFIED_SSLMODES = new Set(["require", "verify-ca", "verify-full"]);
+
+/**
  * The pool settings for an Azure database address (`postgres://<identity name>@<server>.postgres.database.azure.com:5432/<database>`).
- * TLS is always on and always verified: the password is an access token and must never cross the network in the clear,
- * whatever `sslmode` the address says. A malformed address is refused without echoing it (it can carry a user name).
+ * TLS is always on and always verified: the password is an access token and must never cross the network in the clear, so an
+ * address that asks for a weaker `sslmode` is refused. Options the appliance does not pass on are refused by name. A malformed
+ * address is refused without echoing it (it can carry a user name).
  */
 export function entraPoolConfig(databaseUrl: string, credential: TokenCredential): PoolConfig {
   let u: URL;
@@ -152,13 +162,20 @@ export function entraPoolConfig(databaseUrl: string, credential: TokenCredential
   const user = decodeURIComponent(u.username);
   const database = decodeURIComponent(u.pathname.replace(/^\//, ""));
   if (!u.hostname || !user || !database) throw new Error("DATABASE_URL must name a host, a user (the managed identity) and a database");
+  for (const name of new Set(u.searchParams.keys())) {
+    if (!PASSED_ON_OPTIONS.has(name)) throw new Error(`DATABASE_URL has an option this appliance does not pass on: ${/^[a-z_]{1,40}$/.test(name) ? name : "(unsupported name)"}`);
+  }
+  const sslmode = u.searchParams.get("sslmode");
+  if (sslmode !== null && !VERIFIED_SSLMODES.has(sslmode)) throw new Error("DATABASE_URL sslmode must be require, verify-ca or verify-full for an Azure database: TLS is always verified");
   const applicationName = u.searchParams.get("application_name");
+  const options = u.searchParams.get("options");
   return {
     host: u.hostname.replace(/^\[|\]$/g, ""),
     port: u.port ? Number(u.port) : 5432,
     user,
     database,
     ...(applicationName ? { application_name: applicationName } : {}),
+    ...(options ? { options } : {}),
     ssl: { rejectUnauthorized: true },
     password: pgEntraPasswordProvider(credential),
   };

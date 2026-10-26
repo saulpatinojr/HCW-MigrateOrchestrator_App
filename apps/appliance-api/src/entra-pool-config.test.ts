@@ -40,10 +40,28 @@ test("the real pg library keeps the password function for that configuration", a
   assert.ok(p.ssl, "TLS must stay on");
 });
 
-test("TLS stays on and verified whatever sslmode the address says", () => {
-  for (const url of [AZURE_URL, AZURE_URL.replace("?sslmode=require", "?sslmode=disable"), AZURE_URL.replace("?sslmode=require", "")]) {
-    assert.deepEqual(entraPoolConfig(url, credential).ssl, { rejectUnauthorized: true }, url);
+test("TLS stays on and verified; an address that asks for a weaker sslmode is refused", () => {
+  for (const mode of ["require", "verify-ca", "verify-full"]) {
+    assert.deepEqual(entraPoolConfig(AZURE_URL.replace("sslmode=require", `sslmode=${mode}`), credential).ssl, { rejectUnauthorized: true }, mode);
   }
+  assert.deepEqual(entraPoolConfig(AZURE_URL.replace("?sslmode=require", ""), credential).ssl, { rejectUnauthorized: true }, "no sslmode");
+  for (const mode of ["disable", "allow", "prefer", "no-verify"]) {
+    assert.throws(() => entraPoolConfig(AZURE_URL.replace("sslmode=require", `sslmode=${mode}`), credential), /sslmode must be require, verify-ca or verify-full/, mode);
+  }
+});
+
+test("server settings in the address (options) are passed on, to the real pg library too (CodeRabbit, major)", () => {
+  const url = "postgres://id-x@db.example.postgres.database.azure.com:5432/amo?sslmode=require&options=-c%20search_path%3Damo_data";
+  const cfg = entraPoolConfig(url, credential);
+  assert.equal(cfg.options, "-c search_path=amo_data");
+  const client = new pg.Client(new pg.Pool(cfg).options) as unknown as { connectionParameters: { options?: string } };
+  assert.equal(client.connectionParameters.options, "-c search_path=amo_data");
+});
+
+test("any other option is refused by name, not dropped", () => {
+  assert.throws(() => entraPoolConfig(AZURE_URL + "&connect_timeout=5", credential), /does not pass on: connect_timeout/);
+  assert.throws(() => entraPoolConfig(AZURE_URL + "&uselibpqcompat=true", credential), /does not pass on: uselibpqcompat/);
+  assert.throws(() => entraPoolConfig(AZURE_URL + "&Weird-Name=1", credential), (e: Error) => /does not pass on: \(unsupported name\)/.test(e.message) && !e.message.includes("Weird"));
 });
 
 test("a port that is left out defaults to 5432, and application_name passes through", () => {
