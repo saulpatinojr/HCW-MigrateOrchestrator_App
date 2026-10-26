@@ -58,6 +58,16 @@ test("server settings in the address (options) are passed on, to the real pg lib
   assert.equal(client.connectionParameters.options, "-c search_path=amo_data");
 });
 
+test("a repeated option is refused, so the first value can never silently win (CodeRabbit, minor)", () => {
+  const repeats = [
+    AZURE_URL + "&options=&options=-c%20search_path%3Dx", // the first value is empty: the requested search_path would be lost
+    AZURE_URL + "&application_name=a&application_name=b",
+    AZURE_URL + "&sslmode=verify-full", // sslmode is already in AZURE_URL, so this repeats it
+  ];
+  for (const url of repeats) assert.throws(() => entraPoolConfig(url, credential), /must not repeat an option/, url);
+  assert.ok(entraPoolConfig(AZURE_URL + "&application_name=a&options=-c%20search_path%3Dx", credential), "each option once is fine");
+});
+
 test("any other option is refused by name, not dropped", () => {
   assert.throws(() => entraPoolConfig(AZURE_URL + "&connect_timeout=5", credential), /does not pass on: connect_timeout/);
   assert.throws(() => entraPoolConfig(AZURE_URL + "&uselibpqcompat=true", credential), /does not pass on: uselibpqcompat/);
