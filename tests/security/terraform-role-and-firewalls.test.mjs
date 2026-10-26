@@ -188,13 +188,13 @@ test("the Container Apps environment is a workload-profile environment on a subn
   assert.ok(!/precondition/.test(code(env)), "the plan-time stop is gone now that the combination is valid");
   assert.ok(!main.includes("acknowledge_container_apps_environment_is_invalid_issue_82") && !variables.includes("acknowledge_container_apps_environment_is_invalid_issue_82"));
   const subnet = block(main, "resource", "azurerm_subnet", "aca");
-  assert.ok(code(subnet).includes('name = "Microsoft.App/environments"') || /name\s*=\s*"Microsoft.App\/environments"/.test(code(subnet)), "snet-aca must be delegated to Microsoft.App/environments");
+  assert.ok(code(subnet).includes('name = "Microsoft.App/environments"') || /name\s*=\s*"Microsoft.App\/environments"/.test(code(subnet)), "snet-amo-aca-… must be delegated to Microsoft.App/environments");
   assert.equal(attr(subnet, "address_prefixes"), "[local.aca_subnet_cidr]");
   assert.ok(main.includes("aca_subnet_cidr = cidrsubnet(var.vnet_cidr, 4, 0)") && main.includes("db_subnet_cidr  = cidrsubnet(var.vnet_cidr, 4, 1)"), "the two subnets are the first two sixteenths: they cannot overlap");
   // The default /22 gives a /26, which is at least a /27; var.vnet_cidr is limited so a smaller range cannot be chosen.
   const vnet = block(variables, "variable", "vnet_cidr");
   assert.equal(attr(vnet, "default"), '"10.60.0.0/22"');
-  assert.ok(vnet.includes("<= 23"), "vnet_cidr must leave snet-aca at least a /27");
+  assert.ok(vnet.includes("<= 23"), "vnet_cidr must leave snet-amo-aca-… at least a /27");
   // Both apps run on the Consumption profile; the public path is limited by the ingress IP restrictions.
   assert.equal([...main.matchAll(/workload_profile_name\s*=\s*"Consumption"/g)].length, 2);
   assert.ok(main.includes('dynamic "ip_security_restriction"') && main.includes('action           = "Allow"'));

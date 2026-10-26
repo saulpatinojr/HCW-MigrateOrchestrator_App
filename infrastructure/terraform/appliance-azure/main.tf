@@ -15,13 +15,18 @@ provider "azuread" {}
 
 locals {
   name = "${var.prefix}-${var.environment}-${var.location_short}"
-  tags = merge({ application = "azure-migration-orchestrator", component = "appliance", environment = var.environment }, var.tags)
+  # Names follow the Cloud Adoption Framework (CAF) abbreviations and this estate's house style (type-workload[-function]-environment-region-nn,
+  # for example vnet-site-prod-cus-01 and snet-site-func-prod-cus-01; resource groups are rg-function-workload-environment-region with no number).
+  # Learn: "Abbreviation recommendations for Azure resources" and "Define your naming convention". A PostgreSQL flexible server is `pgsql`,
+  # a network security group rule is `nsgsr`. The private DNS zone must end in postgres.database.azure.com, and has no abbreviation.
+  env_region = "${var.environment}-${var.location_short}"
+  tags       = merge({ application = "azure-migration-orchestrator", component = "appliance", environment = var.environment }, var.tags)
 
   # The API's Container App name, and the Host names it accepts (AMO_ALLOWED_HOSTS, ADR-0033 addendum): its own address,
   # which is "<app name>.<environment default domain>", plus any custom names. Written from the name and the environment,
   # not from the app's own attributes, because a resource cannot read itself. The API turns its Host check on when this
   # list is not empty (it is off by default, because only the deployment knows its own address) and lets IP addresses pass.
-  api_app_name = "ca-${local.name}-api"
+  api_app_name = "ca-${var.prefix}-api-${local.env_region}-01"
   # The short app name is listed too: other container apps in the same environment call it as http://<app name> (Learn,
   # "Communicate between container apps"), and that is the Host header they send.
   api_allowed_hosts = join(",", concat([local.api_app_name, "${local.api_app_name}.${azurerm_container_app_environment.app.default_domain}"], var.additional_allowed_hosts))
@@ -50,7 +55,7 @@ locals {
 }
 
 resource "azurerm_resource_group" "app" {
-  name     = "rg-${local.name}-01"
+  name     = "rg-app-${var.prefix}-${local.env_region}"
   location = var.location
   tags     = local.tags
 }
@@ -97,7 +102,7 @@ resource "azurerm_virtual_network" "app" {
 }
 
 resource "azurerm_subnet" "aca" {
-  name                 = "snet-aca"
+  name                 = "snet-${var.prefix}-aca-${local.env_region}-01"
   resource_group_name  = azurerm_resource_group.app.name
   virtual_network_name = azurerm_virtual_network.app.name
   address_prefixes     = [local.aca_subnet_cidr]
@@ -120,7 +125,7 @@ resource "azurerm_subnet" "aca" {
 }
 
 resource "azurerm_subnet" "db" {
-  name                 = "snet-db"
+  name                 = "snet-${var.prefix}-db-${local.env_region}-01"
   resource_group_name  = azurerm_resource_group.app.name
   virtual_network_name = azurerm_virtual_network.app.name
   address_prefixes     = [local.db_subnet_cidr]
@@ -158,7 +163,7 @@ resource "azurerm_subnet" "db" {
 # PROVISIONAL, NOT VALIDATED: never applied. A sandbox apply must confirm the environment starts and the API answers over
 # 443 with this group attached (issue 82, issue 53). The db group below is a separate group.
 resource "azurerm_network_security_group" "aca" {
-  name                = "nsg-${local.name}-aca"
+  name                = "nsg-${var.prefix}-aca-${local.env_region}-01"
   location            = var.location
   resource_group_name = azurerm_resource_group.app.name
   tags                = local.tags
@@ -170,7 +175,7 @@ resource "azurerm_network_security_group" "aca" {
 # app role (ADR-0031), which every protected request needs (all routes except the public health and agent-list routes).
 #trivy:ignore:AVD-AZU-0047
 resource "azurerm_network_security_rule" "aca_allow_https_from_clients" {
-  name                        = "allow-https-from-clients"
+  name                        = "nsgsr-allow-https-from-clients"
   description                 = "HTTPS (443 and the edge proxy port 31443) from var.ingress_allowed_source_prefixes; only traffic through the VNet."
   network_security_group_name = azurerm_network_security_group.aca.name
   resource_group_name         = azurerm_resource_group.app.name
@@ -187,7 +192,7 @@ resource "azurerm_network_security_rule" "aca_allow_https_from_clients" {
 }
 
 resource "azurerm_network_security_rule" "aca_allow_load_balancer_probes" {
-  name                         = "allow-azure-load-balancer-probes"
+  name                         = "nsgsr-allow-azure-load-balancer-probes"
   description                  = "Azure Load Balancer health probes of the environment (the platform allocates a port in this range)."
   network_security_group_name  = azurerm_network_security_group.aca.name
   resource_group_name          = azurerm_resource_group.app.name
@@ -202,7 +207,7 @@ resource "azurerm_network_security_rule" "aca_allow_load_balancer_probes" {
 }
 
 resource "azurerm_network_security_rule" "aca_allow_subnet_internal" {
-  name                         = "allow-subnet-internal"
+  name                         = "nsgsr-allow-subnet-internal"
   description                  = "Traffic inside the Container Apps subnet (the environment's Envoy sidecars talk to each other)."
   network_security_group_name  = azurerm_network_security_group.aca.name
   resource_group_name          = azurerm_resource_group.app.name
@@ -217,7 +222,7 @@ resource "azurerm_network_security_rule" "aca_allow_subnet_internal" {
 }
 
 resource "azurerm_network_security_rule" "aca_deny_all_inbound" {
-  name                        = "deny-all-inbound"
+  name                        = "nsgsr-deny-all-inbound"
   description                 = "Default deny: everything not allowed above, including other subnets of the virtual network."
   network_security_group_name = azurerm_network_security_group.aca.name
   resource_group_name         = azurerm_resource_group.app.name
@@ -245,14 +250,14 @@ resource "azurerm_subnet_network_security_group_association" "aca" {
 
 # Database subnet: PostgreSQL only, and only from the Container Apps subnet.
 resource "azurerm_network_security_group" "db" {
-  name                = "nsg-${local.name}-db"
+  name                = "nsg-${var.prefix}-db-${local.env_region}-01"
   location            = var.location
   resource_group_name = azurerm_resource_group.app.name
   tags                = local.tags
 }
 
 resource "azurerm_network_security_rule" "db_allow_postgres_from_aca" {
-  name                         = "allow-postgres-from-aca-subnet"
+  name                         = "nsgsr-allow-postgres-from-aca-subnet"
   description                  = "PostgreSQL (5432) from the Container Apps subnet, where the API and the worker run."
   network_security_group_name  = azurerm_network_security_group.db.name
   resource_group_name          = azurerm_resource_group.app.name
@@ -267,7 +272,7 @@ resource "azurerm_network_security_rule" "db_allow_postgres_from_aca" {
 }
 
 resource "azurerm_network_security_rule" "db_allow_postgres_within_subnet" {
-  name                         = "allow-postgres-within-db-subnet"
+  name                         = "nsgsr-allow-postgres-within-db-subnet"
   description                  = "Port 5432 inside the database subnet, which PostgreSQL features such as high availability need (Microsoft Learn)."
   network_security_group_name  = azurerm_network_security_group.db.name
   resource_group_name          = azurerm_resource_group.app.name
@@ -282,7 +287,7 @@ resource "azurerm_network_security_rule" "db_allow_postgres_within_subnet" {
 }
 
 resource "azurerm_network_security_rule" "db_deny_all_inbound" {
-  name                        = "deny-all-inbound"
+  name                        = "nsgsr-deny-all-inbound"
   description                 = "Default deny: everything not allowed above."
   network_security_group_name = azurerm_network_security_group.db.name
   resource_group_name         = azurerm_resource_group.app.name
@@ -323,7 +328,7 @@ resource "azurerm_private_dns_zone_virtual_network_link" "pg" {
 resource "azurerm_postgresql_flexible_server" "db" {
   #checkov:skip=CKV_AZURE_136:Geo-redundant backup costs money and can only be chosen when the server is created, so it is the opt-in variable postgres_geo_redundant_backup_enabled (default false, validated against region pairs); an owner decision, ADR-0032 section 3.
   #checkov:skip=CKV2_AZURE_57:The server is private through virtual network integration (delegated subnet, private DNS zone, public network access disabled). Microsoft Learn: a server created with virtual network integration cannot have a private endpoint, and the networking mode cannot change after creation; ADR-0032 section 4.
-  name                          = "psql-${local.name}-01"
+  name                          = "pgsql-${local.name}-01"
   location                      = var.location
   resource_group_name           = azurerm_resource_group.app.name
   version                       = "16"
@@ -366,13 +371,16 @@ resource "azurerm_container_app_environment" "app" {
   resource_group_name        = azurerm_resource_group.app.name
   log_analytics_workspace_id = azurerm_log_analytics_workspace.app.id
   infrastructure_subnet_id   = azurerm_subnet.aca.id
-  tags                       = local.tags
+  # Azure creates a second, platform-managed resource group for the environment (ME_<environment>_<group>_<region> if left unnamed).
+  # Naming it keeps it in the same convention as every other group (workload-profile environments only; Learn, "Virtual network configuration").
+  infrastructure_resource_group_name = "rg-caeinfra-${var.prefix}-${local.env_region}"
+  tags                               = local.tags
   # The subnet firewall is attached before the environment is created, so the environment is built under it.
   depends_on = [azurerm_subnet_network_security_group_association.aca]
 
   # A workload-profile environment (owner decision on issue 82, ADR-0032). Microsoft Learn, "Virtual network configuration"
   # (https://learn.microsoft.com/en-us/azure/container-apps/custom-virtual-networks): the subnet must be at least /27 and
-  # delegated to Microsoft.App/environments (snet-aca is a /26 with that delegation). The provider documents that an
+  # delegated to Microsoft.App/environments (the Container Apps subnet is a /26 with that delegation). The provider documents that an
   # environment created without a workload profile is consumption-only and cannot get profiles later (it would be recreated),
   # and that a Consumption profile must be named "Consumption". External ingress (internal_load_balancer_enabled stays at its
   # default, false) matches external_enabled on the API.
@@ -516,7 +524,7 @@ resource "azuread_app_role_assignment" "api" {
 
 # Worker: same image, different command; polls Azure long-running operations and updates the repository (ADR-0026).
 resource "azurerm_container_app" "worker" {
-  name                         = "ca-${local.name}-worker"
+  name                         = "ca-${var.prefix}-worker-${local.env_region}-01"
   container_app_environment_id = azurerm_container_app_environment.app.id
   resource_group_name          = azurerm_resource_group.app.name
   revision_mode                = "Single"

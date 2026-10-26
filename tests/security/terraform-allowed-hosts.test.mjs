@@ -29,7 +29,7 @@ test("the API Container App is given AMO_ALLOWED_HOSTS from the local, and the w
 });
 
 test("the host list is the app's own address on the environment's default domain, then additional_allowed_hosts", () => {
-  assert.match(main, /api_app_name\s*=\s*"ca-\$\{local\.name\}-api"/);
+  assert.match(main, /api_app_name\s*=\s*"ca-\$\{var\.prefix\}-api-\$\{local\.env_region\}-01"/);
   assert.match(main, /api_allowed_hosts\s*=\s*join\(",", concat\(\[local\.api_app_name, "\$\{local\.api_app_name\}\.\$\{azurerm_container_app_environment\.app\.default_domain\}"\], var\.additional_allowed_hosts\)\)/);
 });
 

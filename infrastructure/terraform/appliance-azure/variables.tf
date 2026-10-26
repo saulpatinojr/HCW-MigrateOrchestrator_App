@@ -19,11 +19,11 @@ variable "tenant_id" {
 }
 variable "vnet_cidr" {
   type        = string
-  description = "Address range of the virtual network. It is split into sixteenths: snet-aca is the first and snet-db the second, so the range must be an IPv4 /23 or larger (snet-aca must be at least a /27, the minimum Microsoft Learn gives for a workload-profile Container Apps environment: https://learn.microsoft.com/en-us/azure/container-apps/custom-virtual-networks) and must not overlap the ranges Azure Kubernetes Service and workload-profile environments reserve, which a precondition on the subnet checks (169.254.0.0/16, 172.30.0.0/16, 172.31.0.0/16, 192.0.2.0/24, 100.100.0.0/17, 100.100.128.0/19, 100.100.160.0/19, 100.100.192.0/19). The default /22 gives snet-aca a /26."
+  description = "Address range of the virtual network. It is split into sixteenths: snet-amo-aca-… is the first and snet-amo-db-… the second, so the range must be an IPv4 /23 or larger (snet-amo-aca-… must be at least a /27, the minimum Microsoft Learn gives for a workload-profile Container Apps environment: https://learn.microsoft.com/en-us/azure/container-apps/custom-virtual-networks) and must not overlap the ranges Azure Kubernetes Service and workload-profile environments reserve, which a precondition on the subnet checks (169.254.0.0/16, 172.30.0.0/16, 172.31.0.0/16, 192.0.2.0/24, 100.100.0.0/17, 100.100.128.0/19, 100.100.160.0/19, 100.100.192.0/19). The default /22 gives snet-amo-aca-… a /26."
   default     = "10.60.0.0/22"
   validation {
     condition     = try(can(regex("^[0-9]{1,3}([.][0-9]{1,3}){3}/[0-9]{1,2}$", var.vnet_cidr)) && cidrhost(var.vnet_cidr, 0) == split("/", var.vnet_cidr)[0] && tonumber(split("/", var.vnet_cidr)[1]) <= 23 && tonumber(split("/", var.vnet_cidr)[1]) >= 8, false)
-    error_message = "vnet_cidr must be an IPv4 range in network form with a prefix length from /8 to /23 (so that snet-aca, a sixteenth of it, is at least a /27), for example 10.60.0.0/22."
+    error_message = "vnet_cidr must be an IPv4 range in network form with a prefix length from /8 to /23 (so that snet-amo-aca-…, a sixteenth of it, is at least a /27), for example 10.60.0.0/22."
   }
 }
 variable "postgres_sku" {
