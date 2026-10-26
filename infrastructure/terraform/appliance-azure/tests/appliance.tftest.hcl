@@ -299,6 +299,11 @@ run "aca_subnet_meets_the_workload_profile_requirements" {
     condition     = length(azurerm_subnet.db.delegation) == 1 && one([for d in azurerm_subnet.db.delegation : one([for s in d.service_delegation : s.name])]) == "Microsoft.DBforPostgreSQL/flexibleServers"
     error_message = "snet-db must stay delegated to PostgreSQL flexible servers."
   }
+
+  assert {
+    condition     = contains(azurerm_subnet.db.service_endpoints, "Microsoft.Storage")
+    error_message = "snet-db must declare the Microsoft.Storage service endpoint that Azure adds for a flexible server; without it Terraform plans to remove it, which can disrupt the server's connectivity."
+  }
 }
 
 run "vnet_range_must_leave_the_aca_subnet_at_least_a_27" {

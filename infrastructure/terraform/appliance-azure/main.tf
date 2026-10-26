@@ -124,6 +124,11 @@ resource "azurerm_subnet" "db" {
   resource_group_name  = azurerm_resource_group.app.name
   virtual_network_name = azurerm_virtual_network.app.name
   address_prefixes     = [local.db_subnet_cidr]
+  # Azure adds this endpoint to the delegated subnet itself when it provisions the first server (Learn, "Network with
+  # private access (virtual network integration) in Azure Database for PostgreSQL flexible server": it carries the
+  # write-ahead-log traffic to Azure Storage, and removing it "may disrupt connectivity"). It is declared here so that
+  # Terraform does not plan to strip it again on every run, which the first sandbox apply (2026-10-26) showed it would.
+  service_endpoints = ["Microsoft.Storage"]
   delegation {
     name = "pg"
     service_delegation {
