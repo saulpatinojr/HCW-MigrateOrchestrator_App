@@ -27,6 +27,10 @@ locals {
   # not from the app's own attributes, because a resource cannot read itself. The API turns its Host check on when this
   # list is not empty (it is off by default, because only the deployment knows its own address) and lets IP addresses pass.
   api_app_name = "ca-${var.prefix}-api-${local.env_region}-01"
+  # Azure Container Apps names: 2 to 32 characters, lower case letters, digits and single hyphens, starting with a letter and ending with a letter
+  # or digit (Learn, "Resource naming rules": Microsoft.App/containerApps). Both names are checked by a precondition on the resource, so a long
+  # prefix, environment or region abbreviation is refused at plan time instead of failing at apply.
+  worker_app_name = "ca-${var.prefix}-worker-${local.env_region}-01"
   # The short app name is listed too: other container apps in the same environment call it as http://<app name> (Learn,
   # "Communicate between container apps"), and that is the Host header they send.
   api_allowed_hosts = join(",", concat([local.api_app_name, "${local.api_app_name}.${azurerm_container_app_environment.app.default_domain}"], var.additional_allowed_hosts))
@@ -328,7 +332,12 @@ resource "azurerm_private_dns_zone_virtual_network_link" "pg" {
 resource "azurerm_postgresql_flexible_server" "db" {
   #checkov:skip=CKV_AZURE_136:Geo-redundant backup costs money and can only be chosen when the server is created, so it is the opt-in variable postgres_geo_redundant_backup_enabled (default false, validated against region pairs); an owner decision, ADR-0032 section 3.
   #checkov:skip=CKV2_AZURE_57:The server is private through virtual network integration (delegated subnet, private DNS zone, public network access disabled). Microsoft Learn: a server created with virtual network integration cannot have a private endpoint, and the networking mode cannot change after creation; ADR-0032 section 4.
-  name                          = "pgsql-${local.name}-01"
+  name = "pgsql-${local.name}-01"
+  # No availability zone is pinned, so Azure picks one (the first sandbox apply got zone 2) and Terraform then plans to remove it on every
+  # run. The zone cannot be changed without recreating a server, and the platform choice is acceptable for a single non-HA server.
+  lifecycle {
+    ignore_changes = [zone]
+  }
   location                      = var.location
   resource_group_name           = azurerm_resource_group.app.name
   version                       = "16"
@@ -391,7 +400,13 @@ resource "azurerm_container_app_environment" "app" {
 }
 
 resource "azurerm_container_app" "api" {
-  name                         = local.api_app_name
+  name = local.api_app_name
+  lifecycle {
+    precondition {
+      condition     = length(local.api_app_name) <= 32 && can(regex("^[a-z]([a-z0-9]|-[a-z0-9])*$", local.api_app_name))
+      error_message = "The container app name ${local.api_app_name} must be at most 32 characters: lower case letters, digits and single hyphens, starting with a letter and ending with a letter or digit (Azure Container Apps naming rule). Shorten var.prefix, var.environment or var.location_short."
+    }
+  }
   container_app_environment_id = azurerm_container_app_environment.app.id
   resource_group_name          = azurerm_resource_group.app.name
   revision_mode                = "Single"
@@ -524,7 +539,13 @@ resource "azuread_app_role_assignment" "api" {
 
 # Worker: same image, different command; polls Azure long-running operations and updates the repository (ADR-0026).
 resource "azurerm_container_app" "worker" {
-  name                         = "ca-${var.prefix}-worker-${local.env_region}-01"
+  name = local.worker_app_name
+  lifecycle {
+    precondition {
+      condition     = length(local.worker_app_name) <= 32 && can(regex("^[a-z]([a-z0-9]|-[a-z0-9])*$", local.worker_app_name))
+      error_message = "The container app name ${local.worker_app_name} must be at most 32 characters: lower case letters, digits and single hyphens, starting with a letter and ending with a letter or digit (Azure Container Apps naming rule). Shorten var.prefix, var.environment or var.location_short."
+    }
+  }
   container_app_environment_id = azurerm_container_app_environment.app.id
   resource_group_name          = azurerm_resource_group.app.name
   revision_mode                = "Single"

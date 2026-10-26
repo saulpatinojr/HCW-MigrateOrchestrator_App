@@ -465,3 +465,39 @@ run "resource_names_follow_the_caf_convention" {
     error_message = "Every name must be lower case letters, digits and hyphens, and within 32 characters (the Container Apps limit is the tightest)."
   }
 }
+
+# Azure Container Apps names are 2 to 32 characters of lower case letters, digits and single hyphens (Learn, "Resource naming rules").
+# The names are built from prefix, environment and region, so a long or odd value is refused at plan time (review of the naming change).
+run "a_prefix_that_makes_a_container_app_name_too_long_is_refused" {
+  command = plan
+
+  variables {
+    prefix = "a-very-long-workload-prefix"
+  }
+
+  expect_failures = [azurerm_container_app.api, azurerm_container_app.worker]
+}
+
+run "a_prefix_that_leaves_a_double_hyphen_in_a_container_app_name_is_refused" {
+  command = plan
+
+  variables {
+    prefix = "amo-"
+  }
+
+  expect_failures = [azurerm_container_app.api, azurerm_container_app.worker]
+}
+
+run "the_longest_default_names_still_fit_the_container_app_limit" {
+  command = plan
+
+  variables {
+    environment    = "production"
+    location_short = "scus"
+  }
+
+  assert {
+    condition     = length(azurerm_container_app.worker.name) <= 32 && length(azurerm_container_app.api.name) <= 32
+    error_message = "With environment production and region scus both container app names must fit 32 characters."
+  }
+}
