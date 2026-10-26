@@ -19,7 +19,7 @@ so turning it on later needs no change here).
 
 Three workflows start from the same tag and run **independently** of each other: `release-cli.yml` (this runbook),
 `publish-npm.yml` (optional, section 5) and `publish-images.yml` (the appliance image, skipped while `DOCKERHUB_ENABLED` is not
-`true`). Each runs its own version check first. `release-cli.yml` and `publish-images.yml` do not wait for each other (the image
+`true`; only a `v*` tag logs in to Docker Hub and pushes, a manual run of it only builds and scans, section 2). Each runs its own version check first. `release-cli.yml` and `publish-images.yml` do not wait for each other (the image
 can be pushed even if the release run fails); `publish-npm.yml` does wait for the release to be public and verified, so npm never
 gets a package from a failed release run. Look at all of them after a tag.
 
@@ -67,6 +67,22 @@ It can never create a release: only a pushed tag does.
 What the green dry run tells you: the version check passes, all three binaries build and pass their smoke test, the two tarballs
 pass the clean-consumer gate, both SBOMs are generated, and exactly the ten expected files exist. If `main` still has the version
 of the last release, the run prints a warning that the tag already exists: a real tag would be refused until the version is raised.
+
+### Rehearsing the appliance image (builds and scans, pushes nothing)
+
+`publish-images.yml` can be run by hand too, and a manual run is a rehearsal by design. It runs the same version check as a tag,
+builds the appliance image into the runner's own Docker, and scans it with the same Trivy settings (HIGH and CRITICAL, fixed
+only). It does **not** log in to Docker Hub, push, tag or attest, and its job has no `id-token` or `attestations` permission. The
+Docker Home OIDC connection trusts tag refs only, so a login from `main` would be refused with `400 access_denied`; the manual
+run never asks for one. Only a pushed `v*` tag (with `DOCKERHUB_ENABLED` set to `true`) reaches the job that logs in and pushes.
+It is skipped, not failed, while `DOCKERHUB_ENABLED` is not `true`. bash or PowerShell:
+
+```bash
+gh workflow run publish-images.yml --repo saulpatinojr/HCW-MigrateOrchestrator_App --ref main
+```
+
+Success: the run is green, the `rehearse` job is the only job after `check`, and its summary says "Rehearsal only". What it cannot
+prove: the Docker login, the push, the tag and the attestation (all need a real tag; see `docs/release/docker-hub.md`).
 
 ### What the dry run cannot prove
 

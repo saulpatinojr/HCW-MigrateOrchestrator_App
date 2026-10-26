@@ -4,10 +4,18 @@
 # that digest -> tag it. A failing scan gives the image no tag and no attestation. Deployments reference the digest this run
 # prints, never a tag.
 #
+# Two paths, two jobs, and only one of them can reach Docker Hub:
+#   - A v* tag push runs build-scan-publish: the Docker OIDC login, the push, the tag, the attestation. It is the ONLY job with
+#     id-token: write and attestations: write, and its `if` is the push gate: DOCKERHUB_ENABLED and a refs/tags/v* ref.
+#   - A manual run (workflow_dispatch, on main) runs rehearse: it builds the same image into the runner's local Docker, scans
+#     it with the same Trivy settings, and stops. It has contents: read only, does no login and pushes nothing. The Docker Home
+#     rule for the OIDC connection trusts tag refs only, so a login from main would be refused (400 access_denied, run
+#     40254017571): the rehearsal never asks for one.
+#
 # Login is the Docker OIDC connection, never a long-lived token: docker/login-action v4.5.0+ with no password, registry
 # docker.io and DOCKERHUB_OIDC_CONNECTIONID set exchanges a GitHub ID token at identity.docker.com for a short-lived Docker
 # access token. The repository variables DOCKERHUB_ENABLED and DOCKERHUB_CONNECTION are owner steps (docs/release/docker-hub.md);
-# until they are set the job is skipped.
+# until they are set the jobs are skipped.
 name: publish-images
 on:
   push:
@@ -42,9 +50,47 @@ jobs:
           set -euo pipefail
           if [ "$EVENT_NAME" = "push" ]; then mode=(--tag "$REF_NAME"); else mode=(--rehearse); fi
           node scripts/check-release-version.mjs "${mode[@]}" --ancestor-of origin/main
+
+  # The manual run: build, prove (scan) and stop. No Docker Hub login, no push, no token request: this job has no id-token and
+  # no attestations permission, and its image never leaves the runner. It does not wait for or feed the tag path.
+  rehearse:
+    needs: check
+    if: vars.DOCKERHUB_ENABLED == 'true' && github.event_name == 'workflow_dispatch'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read # the checkout, and nothing else
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with: { persist-credentials: false }
+      - uses: docker/setup-buildx-action@f87e5991a6d7451dcb8d9637bfbc97413f497069 # v4.4.1
+      # load: true puts the single-platform image into the runner's local Docker; provenance and SBOM attestations cannot be
+      # loaded that way, and the rehearsal publishes nothing to attach them to.
+      - id: build
+        name: Build the image into the local Docker (nothing is pushed)
+        uses: docker/build-push-action@c3c9e263c25d99ce0380d002d59b67737d91b0dc # v7.4.0
+        with:
+          context: .
+          file: infrastructure/docker/Dockerfile.appliance
+          load: true
+          push: false
+          tags: ${{ env.IMAGE }}:rehearsal
+          provenance: false
+          sbom: false
+      - name: Scan the local image (HIGH/CRITICAL, fixed only)
+        uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25 # v0.36.0
+        with: { image-ref: "${{ env.IMAGE }}:rehearsal", exit-code: "1", severity: "HIGH,CRITICAL", ignore-unfixed: true }
+      - name: Say what this run did and did not do
+        run: |
+          {
+            echo "Rehearsal only: the image was built and scanned on this runner."
+            echo "Nothing was pushed, tagged or attested, and there was no Docker Hub login."
+            echo "An image is published only by pushing a v* tag (docs/release/docker-hub.md)."
+          } | tee -a "$GITHUB_STEP_SUMMARY"
+
+  # The tag push: the only path that logs in to Docker Hub, pushes, tags and attests. The `if` below is the push gate.
   build-scan-publish:
     needs: check
-    if: vars.DOCKERHUB_ENABLED == 'true'
+    if: vars.DOCKERHUB_ENABLED == 'true' && github.event_name == 'push' && startsWith(github.ref, 'refs/tags/v')
     runs-on: ubuntu-latest
     permissions:
       contents: read

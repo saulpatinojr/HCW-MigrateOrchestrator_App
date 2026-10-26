@@ -243,8 +243,9 @@ test("the release workflows use no dependency cache (a poisoned cache would reac
 test("publish-images: the same tag, version and main check runs before an image can be built (review F8)", () => {
   const name = "publish-images.yml";
   const j = jobs(text(name));
-  assert.deepEqual(Object.keys(j), ["check", "build-scan-publish"]);
+  assert.deepEqual(Object.keys(j), ["check", "rehearse", "build-scan-publish"]);
   assert.deepEqual(needs(j["build-scan-publish"]), ["check"]);
+  assert.deepEqual(needs(j.rehearse), ["check"]);
   assert.match(head(j.check), /if: vars\.DOCKERHUB_ENABLED == 'true'/, "inert while DOCKERHUB_ENABLED is unset, like the build");
   assert.match(j.check, /fetch-depth: 0/);
   assert.match(j.check, /check-release-version\.mjs "\$\{mode\[@\]\}" --ancestor-of origin\/main/);
@@ -271,8 +272,9 @@ test("publish-images: no expression is expanded inside a run script, and the bui
 test("publish-images: one build, pushed by digest, that digest scanned, and only then tagged and attested (follow-up of issue 83)", () => {
   const j = jobs(text("publish-images.yml"))["build-scan-publish"];
   const c = code("publish-images.yml");
-  assert.equal([...c.matchAll(/docker\/build-push-action@/g)].length, 1, "the image is built once");
-  assert.doesNotMatch(c, /load: true|:scan\b/, "no separate local build that is scanned instead of the pushed one");
+  assert.equal([...j.matchAll(/docker\/build-push-action@/g)].length, 1, "the image is built once on the tag path");
+  assert.equal([...c.matchAll(/docker\/build-push-action@/g)].length, 2, "and once more, local only, in the rehearsal");
+  assert.doesNotMatch(j, /load: true|:rehearsal\b/, "the tag path has no separate local build that is scanned instead of the pushed one");
   const build = j.indexOf("push-by-digest=true,name-canonical=true,push=true");
   const scan = j.indexOf("aquasecurity/trivy-action@");
   const tag = j.indexOf("docker buildx imagetools create");
@@ -281,6 +283,64 @@ test("publish-images: one build, pushed by digest, that digest scanned, and only
   assert.match(j, /image-ref: "\$\{\{ env\.IMAGE \}\}@\$\{\{ steps\.build\.outputs\.digest \}\}"/, "the scan reads the pushed digest");
   assert.doesNotMatch(j, /^\s+tags: \$\{\{ steps\.meta\.outputs\.tags \}\}/m, "the build itself pushes no tag");
   assert.match(j, /docker buildx imagetools create "\$\{args\[@\]\}" "\$\{IMAGE\}@\$\{DIGEST\}"/);
+});
+
+/** The push gate: the one condition under which an image may reach Docker Hub. */
+const PUSH_GATE = `vars.DOCKERHUB_ENABLED == 'true' && ${TAG_ONLY}`;
+
+test("publish-images: the Docker Hub login, the push and the attestation run only behind the push gate (run 40254017571)", () => {
+  const j = jobs(text("publish-images.yml"));
+  const publish = j["build-scan-publish"];
+  assert.ok(head(publish).includes(`if: ${PUSH_GATE}`), "the publish job is gated by DOCKERHUB_ENABLED and a refs/tags/v* push");
+  // every step that logs in, pushes, tags or attests lives in the gated job and in no other
+  const risky = /docker\/login-action@|push-by-digest|push: true|push-to-registry|imagetools create|attest-build-provenance@|DOCKERHUB_OIDC_CONNECTIONID|docker login/;
+  for (const [name, body] of Object.entries(j)) {
+    if (name === "build-scan-publish") continue;
+    assert.doesNotMatch(body, risky, `job ${name} must not log in to, push to or attest for a registry`);
+  }
+  assert.equal(steps(publish).filter((s) => /docker\/login-action@/.test(s)).length, 2, "the two logins (push, then tag) are both in the gated job");
+  // a manual run is never a tag push, so the gate cannot select the dispatch path
+  assert.doesNotMatch(PUSH_GATE, /workflow_dispatch/);
+  assert.match(head(publish), /github\.event_name == 'push'/);
+});
+
+test("publish-images: id-token and attestations are granted only to the gated publish job, never to the manual run (least privilege)", () => {
+  const j = jobs(text("publish-images.yml"));
+  assert.deepEqual(grants(j["build-scan-publish"]), ["attestations: write", "contents: read", "id-token: write"]);
+  assert.deepEqual(grants(j.rehearse), ["contents: read"]);
+  assert.deepEqual(grants(j.check), []);
+  assert.doesNotMatch(code("publish-images.yml").split("\njobs:\n")[0], /id-token|attestations/, "the workflow level grants neither");
+  assert.equal([...code("publish-images.yml").matchAll(/id-token: write/g)].length, 1, "id-token: write appears once");
+});
+
+test("publish-images: a manual run builds and scans locally, with no login, no push and no tag (run 40254017571)", () => {
+  const j = jobs(text("publish-images.yml"));
+  assert.ok(head(j.rehearse).includes("github.event_name == 'workflow_dispatch'"));
+  assert.doesNotMatch(head(j.rehearse), /startsWith\(github\.ref, 'refs\/tags\//, "the rehearsal is not the tag path");
+  const build = steps(j.rehearse).find((s) => /docker\/build-push-action@/.test(s));
+  assert.match(build, /load: true/);
+  assert.match(build, /push: false/);
+  assert.doesNotMatch(build, /outputs:|push: true|provenance: true|sbom: true/);
+  assert.match(j.rehearse, /aquasecurity\/trivy-action@[0-9a-f]{40} # v[\d.]+\n\s+with: \{ image-ref: "\$\{\{ env\.IMAGE \}\}:rehearsal", exit-code: "1", severity: "HIGH,CRITICAL", ignore-unfixed: true \}/, "the same scan settings as the tag path");
+  assert.doesNotMatch(j.rehearse, /secrets\.|vars\.DOCKERHUB_CONNECTION|docker\/login-action|id-token/);
+});
+
+test("publish-images: the push-gate checks fail on a mutation (the tests would notice)", () => {
+  const body = text("publish-images.yml");
+  const publishGate = (b) => head(jobs(b)["build-scan-publish"]).includes(`if: ${PUSH_GATE}`);
+  assert.ok(publishGate(body));
+  // dropping the tag condition, or the enable variable, from the publish job is caught
+  assert.ok(!publishGate(body.replace(" && github.event_name == 'push' && startsWith(github.ref, 'refs/tags/v')", "")));
+  assert.ok(!publishGate(body.replace("vars.DOCKERHUB_ENABLED == 'true' && github.event_name == 'push'", "github.event_name == 'push'")));
+  // a login step moved into the rehearsal is caught by the same pattern the test above uses
+  const login = /docker\/login-action@/;
+  const moved = body.replace("      - name: Say what this run did", "      - uses: docker/login-action@dbcb813823bdd20940b903addbd779551569679f # v4.6.0\n      - name: Say what this run did");
+  assert.match(jobs(moved).rehearse, login);
+  assert.doesNotMatch(jobs(body).rehearse, login);
+  // id-token granted to the rehearsal is caught
+  const widened = body.replace("      contents: read # the checkout, and nothing else\n", "      contents: read # the checkout, and nothing else\n      id-token: write\n");
+  assert.notEqual(widened, body);
+  assert.notDeepEqual(grants(jobs(widened).rehearse), ["contents: read"]);
 });
 
 test("the workflows do not call a tag permanent without the ruleset caveat (review F3)", () => {
