@@ -42,6 +42,26 @@ Flexible Server (private, **Entra-only auth**, the identity is the DB admin), Lo
 environment + app, Entra app registration with app roles, and its enterprise application with **assignment required**
 switched on (section 2). Follow the `post_apply` output (identifier URI, role assignments).
 
+**Resource names.** Names follow the Cloud Adoption Framework (CAF) abbreviations and this estate's house style: `<type>-<workload>[-<function>]-<environment>-<region>-<nn>` (resource groups have no number). For `prefix = amo`, `environment = sandbox` and `location_short = scus` (South Central US):
+
+| Resource | Name | CAF abbreviation |
+| --- | --- | --- |
+| Resource group (app) | `rg-app-amo-sandbox-scus` | `rg` |
+| Resource group (platform-managed, Container Apps environment) | `rg-caeinfra-amo-sandbox-scus` | `rg` |
+| Managed identity | `id-amo-sandbox-scus-01` | `id` |
+| Log Analytics workspace | `log-amo-sandbox-scus-01` | `log` |
+| Application Insights | `appi-amo-sandbox-scus-01` | `appi` |
+| Virtual network | `vnet-amo-sandbox-scus-01` | `vnet` |
+| Subnets | `snet-amo-aca-sandbox-scus-01`, `snet-amo-db-sandbox-scus-01` | `snet` |
+| Network security groups | `nsg-amo-aca-sandbox-scus-01`, `nsg-amo-db-sandbox-scus-01` | `nsg` |
+| Network security group rules | `nsgsr-<what the rule does>` | `nsgsr` |
+| PostgreSQL flexible server | `pgsql-amo-sandbox-scus-01` | `pgsql` |
+| Container Apps environment | `cae-amo-sandbox-scus-01` | `cae` |
+| Container apps | `ca-amo-api-sandbox-scus-01`, `ca-amo-worker-sandbox-scus-01` | `ca` |
+| Private DNS zone | `amo-sandbox-scus.postgres.database.azure.com` | none (the name must be the DNS domain and end in `postgres.database.azure.com`) |
+
+The private DNS zone link (`pg-link`) and the database inside the server (`amo`) have no CAF abbreviation. The Entra application's display name is not an Azure resource name and is outside the convention. A name cannot be changed after creation, so change `prefix`, `environment` or `location_short` before the first apply, not after. Learn: [Abbreviation recommendations for Azure resources](https://learn.microsoft.com/azure/cloud-adoption-framework/ready/azure-best-practices/resource-abbreviations), [Define your naming convention](https://learn.microsoft.com/azure/cloud-adoption-framework/ready/azure-best-practices/resource-naming).
+
 ## 2. Authentication model
 
 Signing in with Microsoft Entra ID is not enough. To use the appliance a person (or an application) must also be **assigned
@@ -218,9 +238,9 @@ operations recorded by the API and auditing their completion (ADR-0026). Locally
 The two subnets each have a network security group (a firewall for a subnet) with a deny-all-inbound rule at the end, so
 only the traffic below gets in (ADR-0032). Outbound traffic is left at Azure's defaults.
 
-> **Provisional, not validated: the Container Apps group (`snet-aca`).** The database group is consistent with Microsoft Learn but
+> **Provisional, not validated: the Container Apps group (`snet-amo-aca-…`).** The database group is consistent with Microsoft Learn but
 > has never been applied. The Container Apps environment is a **workload-profile** environment (owner decision, issue 82): its
-> subnet must be at least a /27 and delegated to `Microsoft.App/environments`; `snet-aca` is a /26 with that delegation. For
+> subnet must be at least a /27 and delegated to `Microsoft.App/environments`; `snet-amo-aca-…` is a /26 with that delegation. For
 > that kind of environment Microsoft says inbound traffic from the internet "routes through the public IP that exists in the
 > managed resource group rather than through your subnet", that inbound subnet rules "apply only to traffic that goes through
 > your virtual network", and that locking down inbound traffic with an NSG or firewall "isn't supported"
@@ -231,8 +251,8 @@ only the traffic below gets in (ADR-0032). Outbound traffic is left at Azure's d
 
 | Subnet | Allowed in | Everything else |
 |---|---|---|
-| Container Apps (`snet-aca`) | HTTPS (443 and the edge proxy port 31443) from `ingress_allowed_source_prefixes`; the Azure Load Balancer health probes; the subnet's own addresses | denied, including the database subnet |
-| Database (`snet-db`) | PostgreSQL (5432) from the Container Apps subnet; 5432 inside the database subnet (PostgreSQL features such as high availability need it) | denied |
+| Container Apps (`snet-amo-aca-…`) | HTTPS (443 and the edge proxy port 31443) from `ingress_allowed_source_prefixes`; the Azure Load Balancer health probes; the subnet's own addresses | denied, including the database subnet |
+| Database (`snet-amo-db-…`) | PostgreSQL (5432) from the Container Apps subnet; 5432 inside the database subnet (PostgreSQL features such as high availability need it) | denied |
 
 - **Port 80 is not blocked by this firewall.** Public traffic does not cross the subnet (see the box above), so the firewall cannot
   close port 80 for it. The API app does not accept plain http (`allow_insecure_connections = false`: the platform redirects to
@@ -246,8 +266,8 @@ only the traffic below gets in (ADR-0032). Outbound traffic is left at Azure's d
   `Internet` default). That is the control that limits the public path. Ranges must be IPv4 in their network form
   (`203.0.113.0/24` or `198.51.100.7/32`, not `203.0.113.7/24`); IPv6, `0.0.0.0/0` and `"Internet"` mixed with ranges are refused.
   Not verified against a live environment.
-- **Address plan.** `vnet_cidr` (default `10.60.0.0/22`) is split into sixteenths: `snet-aca` is the first (`10.60.0.0/26`) and
-  `snet-db` the second (`10.60.0.64/26`). The environment needs `snet-aca` to be at least a /27, so `vnet_cidr` must be an IPv4
+- **Address plan.** `vnet_cidr` (default `10.60.0.0/22`) is split into sixteenths: `snet-amo-aca-…` is the first (`10.60.0.0/26`) and
+  `snet-amo-db-…` the second (`10.60.0.64/26`). The environment needs `snet-amo-aca-…` to be at least a /27, so `vnet_cidr` must be an IPv4
   range from /8 to /23, and it must not overlap the ranges Azure reserves for these environments (169.254.0.0/16, 172.30.0.0/16,
   172.31.0.0/16, 192.0.2.0/24, 100.100.0.0/17, 100.100.128.0/19, 100.100.160.0/19, 100.100.192.0/19; Microsoft Learn, [Virtual
   network configuration](https://learn.microsoft.com/en-us/azure/container-apps/custom-virtual-networks)); Terraform checks both.
