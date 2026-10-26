@@ -120,3 +120,10 @@ clearly right follow-ups; each is reversible by reverting the workflow change.
   digest without a tag, scans that digest, tags it with `docker buildx imagetools create`, then attests the same digest. A failed
   scan leaves an untagged image under its digest (no tag, no attestation) that is deleted by hand; the alternative of building
   twice with a cache still produces two images. Not exercised: the workflow is inert until `DOCKERHUB_ENABLED` is set.
+- **Appliance image: only a tag logs in.** The first manual run of `publish-images.yml` (run 40254017571) failed at the Docker Hub
+  login with `400 access_denied`, because the connection in Docker Home trusts tag refs only and a manual run is on `main`. The
+  workflow is now two paths: `rehearse` (manual run: builds into the runner's local Docker, scans, no login, no push, `contents:
+  read` only) and `build-scan-publish` (gated by `DOCKERHUB_ENABLED` and a `refs/tags/v*` push; the only job with `id-token: write`
+  and `attestations: write`). The alternative of a single job with the login step conditioned was rejected because the job's
+  permissions would still include `id-token: write` on a path that never needs it. `tests/release/release-workflows.test.mjs`
+  pins the gate, the permissions and the absence of a login on the manual path, with mutation checks.
