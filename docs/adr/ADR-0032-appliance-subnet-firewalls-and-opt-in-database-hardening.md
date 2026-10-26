@@ -203,3 +203,7 @@ and is the evidence that closes issue 82 and the `aca` part of ticket #53.
   edges are added, and the server states `geo_redundant_backup_enabled = false`, which is the provider default.
 - Adding the groups to an already deployed subnet is a change to a live network; plan it in a maintenance window and read
   the plan first.
+
+## Addendum (2026-10-26): resource names
+
+The names used in this record (`snet-aca`, `snet-db`, `deny-all-inbound`, the `nsg-<prefix>-<environment>-<region>-aca` pair) are the names before the first sandbox apply. They now follow the Cloud Adoption Framework abbreviations and the estate's house style (`snet-amo-aca-<environment>-<region>-01`, `nsg-amo-aca-<environment>-<region>-01`, rule names starting `nsgsr-`, `pgsql-...` for the server). The behaviour decided here is unchanged. The current names are in `docs/deployment/enterprise.md` section 1 and are pinned by the `resource_names_follow_the_caf_convention` test.

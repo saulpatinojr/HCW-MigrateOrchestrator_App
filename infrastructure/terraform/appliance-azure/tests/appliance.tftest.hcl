@@ -282,12 +282,12 @@ run "aca_subnet_meets_the_workload_profile_requirements" {
 
   assert {
     condition     = tonumber(split("/", one(azurerm_subnet.aca.address_prefixes))[1]) <= 27
-    error_message = "snet-aca must be at least a /27 (Learn, Virtual network configuration, workload profile environment)."
+    error_message = "snet-amo-aca-… must be at least a /27 (Learn, Virtual network configuration, workload profile environment)."
   }
 
   assert {
     condition     = length(azurerm_subnet.aca.delegation) == 1 && one([for d in azurerm_subnet.aca.delegation : one([for s in d.service_delegation : s.name])]) == "Microsoft.App/environments"
-    error_message = "snet-aca must be delegated to Microsoft.App/environments (required for a workload-profile environment)."
+    error_message = "snet-amo-aca-… must be delegated to Microsoft.App/environments (required for a workload-profile environment)."
   }
 
   assert {
@@ -297,12 +297,12 @@ run "aca_subnet_meets_the_workload_profile_requirements" {
 
   assert {
     condition     = length(azurerm_subnet.db.delegation) == 1 && one([for d in azurerm_subnet.db.delegation : one([for s in d.service_delegation : s.name])]) == "Microsoft.DBforPostgreSQL/flexibleServers"
-    error_message = "snet-db must stay delegated to PostgreSQL flexible servers."
+    error_message = "snet-amo-db-… must stay delegated to PostgreSQL flexible servers."
   }
 
   assert {
     condition     = contains(azurerm_subnet.db.service_endpoints, "Microsoft.Storage")
-    error_message = "snet-db must declare the Microsoft.Storage service endpoint that Azure adds for a flexible server; without it Terraform plans to remove it, which can disrupt the server's connectivity."
+    error_message = "snet-amo-db-… must declare the Microsoft.Storage service endpoint that Azure adds for a flexible server; without it Terraform plans to remove it, which can disrupt the server's connectivity."
   }
 }
 
@@ -390,5 +390,114 @@ run "a_guid_in_upper_case_is_accepted" {
     app_role_assignments = {
       me = { principal_object_id = "AAAAAAAA-BBBB-4CCC-8DDD-EEEEEEEEEEEE", role = "Migration.Read" }
     }
+  }
+}
+
+# Names follow the Cloud Adoption Framework (CAF) abbreviations and this estate's house style: type-workload[-function]-environment-region-nn,
+# with resource groups as rg-function-workload-environment-region. Learn: "Abbreviation recommendations for Azure resources" (a PostgreSQL
+# flexible server is pgsql, a network security group rule is nsgsr, a container app is ca, a container apps environment is cae) and
+# "Define your naming convention".
+run "resource_names_follow_the_caf_convention" {
+  command = plan
+
+  variables {
+    environment    = "sandbox"
+    location       = "southcentralus"
+    location_short = "scus"
+  }
+
+  assert {
+    condition     = azurerm_resource_group.app.name == "rg-app-amo-sandbox-scus" && azurerm_container_app_environment.app.infrastructure_resource_group_name == "rg-caeinfra-amo-sandbox-scus"
+    error_message = "Resource groups must be rg-<function>-<workload>-<environment>-<region> (the app group and the platform-managed group of the environment)."
+  }
+
+  assert {
+    condition = alltrue([
+      azurerm_user_assigned_identity.app.name == "id-amo-sandbox-scus-01",
+      azurerm_log_analytics_workspace.app.name == "log-amo-sandbox-scus-01",
+      azurerm_application_insights.app.name == "appi-amo-sandbox-scus-01",
+      azurerm_virtual_network.app.name == "vnet-amo-sandbox-scus-01",
+      azurerm_container_app_environment.app.name == "cae-amo-sandbox-scus-01",
+    ])
+    error_message = "Identity, Log Analytics, Application Insights, virtual network and Container Apps environment names must be <abbreviation>-<workload>-<environment>-<region>-<nn> (id, log, appi, vnet, cae)."
+  }
+
+  assert {
+    condition = alltrue([
+      azurerm_subnet.aca.name == "snet-amo-aca-sandbox-scus-01",
+      azurerm_subnet.db.name == "snet-amo-db-sandbox-scus-01",
+      azurerm_network_security_group.aca.name == "nsg-amo-aca-sandbox-scus-01",
+      azurerm_network_security_group.db.name == "nsg-amo-db-sandbox-scus-01",
+    ])
+    error_message = "Subnets and network security groups must be snet-/nsg-<workload>-<function>-<environment>-<region>-<nn>."
+  }
+
+  assert {
+    condition = alltrue([for r in [
+      azurerm_network_security_rule.aca_allow_https_from_clients,
+      azurerm_network_security_rule.aca_allow_load_balancer_probes,
+      azurerm_network_security_rule.aca_allow_subnet_internal,
+      azurerm_network_security_rule.aca_deny_all_inbound,
+      azurerm_network_security_rule.db_allow_postgres_from_aca,
+      azurerm_network_security_rule.db_allow_postgres_within_subnet,
+      azurerm_network_security_rule.db_deny_all_inbound,
+    ] : startswith(r.name, "nsgsr-")])
+    error_message = "Every network security group rule name must start with the CAF abbreviation nsgsr-."
+  }
+
+  assert {
+    condition = alltrue([
+      azurerm_postgresql_flexible_server.db.name == "pgsql-amo-sandbox-scus-01",
+      azurerm_container_app.api.name == "ca-amo-api-sandbox-scus-01",
+      azurerm_container_app.worker.name == "ca-amo-worker-sandbox-scus-01",
+      endswith(azurerm_private_dns_zone.pg.name, ".postgres.database.azure.com"),
+    ])
+    error_message = "The PostgreSQL flexible server must be pgsql-... (not psql-), the container apps ca-<workload>-<function>-<environment>-<region>-<nn>, and the private DNS zone must end in postgres.database.azure.com."
+  }
+
+  assert {
+    condition = alltrue([for n in [
+      azurerm_resource_group.app.name, azurerm_user_assigned_identity.app.name, azurerm_log_analytics_workspace.app.name,
+      azurerm_application_insights.app.name, azurerm_virtual_network.app.name, azurerm_subnet.aca.name, azurerm_subnet.db.name,
+      azurerm_network_security_group.aca.name, azurerm_network_security_group.db.name, azurerm_postgresql_flexible_server.db.name,
+      azurerm_container_app_environment.app.name, azurerm_container_app.api.name, azurerm_container_app.worker.name,
+    ] : can(regex("^[a-z][a-z0-9-]*[a-z0-9]$", n)) && length(n) <= 32])
+    error_message = "Every name must be lower case letters, digits and hyphens, and within 32 characters (the Container Apps limit is the tightest)."
+  }
+}
+
+# Azure Container Apps names are 2 to 32 characters of lower case letters, digits and single hyphens (Learn, "Resource naming rules").
+# The names are built from prefix, environment and region, so a long or odd value is refused at plan time (review of the naming change).
+run "a_prefix_that_makes_a_container_app_name_too_long_is_refused" {
+  command = plan
+
+  variables {
+    prefix = "a-very-long-workload-prefix"
+  }
+
+  expect_failures = [azurerm_container_app.api, azurerm_container_app.worker]
+}
+
+run "a_prefix_that_leaves_a_double_hyphen_in_a_container_app_name_is_refused" {
+  command = plan
+
+  variables {
+    prefix = "amo-"
+  }
+
+  expect_failures = [azurerm_container_app.api, azurerm_container_app.worker]
+}
+
+run "the_longest_default_names_still_fit_the_container_app_limit" {
+  command = plan
+
+  variables {
+    environment    = "production"
+    location_short = "scus"
+  }
+
+  assert {
+    condition     = length(azurerm_container_app.worker.name) <= 32 && length(azurerm_container_app.api.name) <= 32
+    error_message = "With environment production and region scus both container app names must fit 32 characters."
   }
 }
