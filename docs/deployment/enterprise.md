@@ -326,22 +326,24 @@ Also not yet validated live: that Entra refuses to issue a token to an unassigne
 Removing a deployment you made for testing takes more steps than `terraform destroy`, for reasons found when the first sandbox was removed (2026-10-27). Do this only for a sandbox: removing the enterprise application deletes every role assignment made on it, which is why the guard below exists.
 
 1. **Work in a copy of the configuration, never in the repository.** Copy the whole `infrastructure/terraform/appliance-azure` folder, including `terraform.tfstate` and the variable file you applied with, to a new folder outside the repository (if your state is held elsewhere, the copy uses it too). Do steps 1 to 3 in the copy, always with that variable file. The sign-in service principal (`azuread_service_principal.api`) has `lifecycle { prevent_destroy = true }` (ADR-0031), so `terraform plan -destroy` stops with "Instance cannot be destroyed". In the copy, set it to `false`, make a saved plan with `terraform plan -destroy -out destroy.plan` and the same `-var-file` options you used for the apply, read it (it should list only this deployment's resources and its Entra objects), and apply that plan.
-2. **Expect the database administrator to hang.** The administrator is the managed identity's database role. Azure may refuse to drop it ("cannot be dropped because some objects depend on it": most likely the tables the API created, although PostgreSQL also refuses to drop a role that still has privileges granted to it). Terraform prints only "Still destroying..." for it; the error is in the resource group's Activity log in the Azure portal (operation "Delete PostgreSQL server administrator"). If it is still destroying after about ten minutes, look there, then delete the resource group. First check what you are about to delete. PowerShell:
+2. **Expect the database administrator to hang.** The administrator is the managed identity's database role. Azure may refuse to drop it ("cannot be dropped because some objects depend on it": most likely the tables the API created, although PostgreSQL also refuses to drop a role that still has privileges granted to it). Terraform prints only "Still destroying..." for it; the error is in the resource group's Activity log in the Azure portal (operation "Delete PostgreSQL server administrator"). If it is still destroying after about ten minutes, look there, then stop Terraform (press Ctrl+C once) and wait for the process to exit. Do not delete the resource group while Terraform is still running: the Entra objects may not have been removed yet (step 3). Then check what you are about to delete. The subscription and the group come from the group's own record in the Terraform state, so the delete cannot reach another subscription. PowerShell:
 
    ```powershell
-   $rg = (terraform state show -no-color azurerm_resource_group.app | Select-String '^\s*name\s*=\s*"(.+)"$').Matches[0].Groups[1].Value
-   az account show --query name --output tsv
-   az resource list --resource-group $rg --output table
+   $id = (terraform state show -no-color azurerm_resource_group.app | Select-String '^\s*id\s*=\s*"(.+)"$').Matches[0].Groups[1].Value
+   $sub = $id.Split('/')[2]
+   $rg = $id.Split('/')[4]
+   az resource list --subscription $sub --resource-group $rg --output table
    ```
 
    bash:
 
    ```bash
-   rg="$(terraform state show -no-color azurerm_resource_group.app | tr -d '\r' | sed -n 's/^ *name *= *"\(.*\)"$/\1/p')"
-   az account show --query name --output tsv
-   az resource list --resource-group "$rg" --output table
+   id="$(terraform state show -no-color azurerm_resource_group.app | tr -d '' | sed -n 's/^ *id *= *"\(.*\)"$//p')"
+   sub="$(echo "$id" | cut -d/ -f3)"
+   rg="$(echo "$id" | cut -d/ -f5)"
+   az resource list --subscription "$sub" --resource-group "$rg" --output table
    ```
 
-   The subscription must be the sandbox, and the list must hold only this deployment's resources. Only then run `az group delete --name $rg --yes` (PowerShell) or `az group delete --name "$rg" --yes` (bash). Deleting the Container Apps environment alone took about 21 minutes in the first sandbox removal.
-3. **Tell Terraform it is gone.** When the group no longer exists, run `terraform apply -refresh-only` in the copy, with the same variable file; `terraform state list` then prints nothing. The Entra objects (app registration, enterprise application and role assignment) were already removed by the destroy in step 1. Then delete the copy, and delete `terraform.tfstate` and `terraform.tfstate.backup` in the original folder, which still list resources that no longer exist.
+   The list must hold only this deployment's resources. Only then run `az group delete --subscription $sub --name $rg --yes` (PowerShell) or `az group delete --subscription "$sub" --name "$rg" --yes` (bash). Deleting the Container Apps environment alone took about 21 minutes in the first sandbox removal.
+3. **Tell Terraform it is gone, and finish what survives.** When the group no longer exists, run `terraform apply -refresh-only` in the copy, with the same variable file, and look at `terraform state list`. Refresh-only removes state entries for resources that no longer exist; it does not delete the Entra objects (app registration, enterprise application and role assignment) or role assignments made outside the group. If the list is not empty, run `terraform destroy` in the copy (with `prevent_destroy = false`, as in step 1) and repeat the refresh and the check until it prints nothing. In the first sandbox removal the Entra objects had already been destroyed by step 1 before the group finished deleting. Only when the list is empty, delete the copy, and delete `terraform.tfstate` and `terraform.tfstate.backup` in the original folder, which still list resources that no longer exist.
 4. **Know what Azure keeps for a while.** A deleted Log Analytics workspace is kept for 14 days and its name stays reserved: creating one with the same name, group and region in that time recovers the old one with its data (if the group was deleted together with the workspace, create the group again first). To free the name at once, recover the workspace and then delete it permanently (`az monitor log-analytics workspace delete --force`; [Delete and recover a Log Analytics workspace](https://learn.microsoft.com/azure/azure-monitor/logs/delete-workspace)). A deleted app registration and its enterprise application are kept for 30 days and can be restored by an application owner or administrator ([Restore or remove a recently deleted application](https://learn.microsoft.com/entra/identity-platform/howto-restore-app)).
