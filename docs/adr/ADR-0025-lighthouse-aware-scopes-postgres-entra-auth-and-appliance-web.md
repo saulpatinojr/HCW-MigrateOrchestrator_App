@@ -18,5 +18,4 @@
 
 ## Consequences
 Cross-tenant intent stops being self-reported in the appliance; database credentials vanish from configuration; operators
-have a UI that cannot bypass the gate because it only calls the same API. Live validation of MSAL, Lighthouse projection and
-the PostgreSQL token exchange remains pending (VALIDATION.md).
+have a UI that cannot bypass the gate because it only calls the same API. Live validation of MSAL and Lighthouse projection remains pending (VALIDATION.md). The PostgreSQL token exchange was indicated, not directly shown, by the 2026-10-27 sandbox run (`docs/deployment/enterprise.md`, section 5).

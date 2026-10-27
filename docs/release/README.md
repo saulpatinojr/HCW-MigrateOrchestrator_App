@@ -55,7 +55,7 @@ It can never create a release: only a pushed tag does.
    Run workflow, Branch: `main`, leave "attest" unticked, Run workflow. (Any branch other than `main` stops at once with a clear message.)
 3. Wait for the run to turn green (about ten minutes; three operating systems build in parallel). Open the run: the summary lists
    the sha256 of every file, and the `release-files` artifact holds the ten files.
-4. Recommended once, before the first real tag: run it again with "attest" ticked:
+4. Recommended once, before the first release you cut from a changed pipeline: run it again with "attest" ticked:
 
    ```bash
    gh workflow run release-cli.yml --repo saulpatinojr/HCW-MigrateOrchestrator_App --ref main -f attest=true
@@ -86,10 +86,10 @@ prove: the Docker login, the push, the tag and the attestation (all need a real 
 
 ### What the dry run cannot prove
 
-These happen only on a real tag, so the first real tag is also their first test. They are covered by tests against a fake `gh`
+These happen only on a real tag, so the first real tag was also their first test (`v0.4.0`, 2026-10-25: every job of [its release run](https://github.com/saulpatinojr/HCW-MigrateOrchestrator_App/actions/runs/40256029325) passed; `v0.4.1` repeated it, [run 40453199382](https://github.com/saulpatinojr/HCW-MigrateOrchestrator_App/actions/runs/40453199382)). They are covered by tests against a fake `gh`
 (`tests/release/`), not by a live run.
 
-| Not rehearsed | Why | What to look at on the first real tag |
+| Not rehearsed | Why | What to look at on a real tag |
 |---|---|---|
 | The tag run itself starting, and the tag-only jobs `release` and `post-release` | A manual run is not a tag push, and those jobs are tag-only on purpose | The run lists eight jobs, all green |
 | Creating the draft release, uploading ten files, making it public | Needs `contents: write` and a real tag; a manual run must never have that | The release page lists exactly the ten files |
@@ -147,6 +147,28 @@ These happen only on a real tag, so the first real tag is also their first test.
    git tag -a "v$version" "$sha" -m "Release v$version"
    git push origin "v$version"
    ```
+
+   If the push is refused with `GH007: Your push would publish a private email address`, nothing was published: an annotated tag
+   records your commit email, and your GitHub account blocks a private one. Delete the local tag and make it again with your GitHub
+   no-reply address. The commands below look that address up for you, so no placeholder is left to paste. PowerShell:
+
+   ```powershell
+   $noreply = "$(gh api user --jq .id)+$(gh api user --jq .login)@users.noreply.github.com"
+   git tag -d "v$version"
+   git -c "user.email=$noreply" tag -a "v$version" $sha -m "Release v$version"
+   git cat-file -p "v$version"
+   ```
+
+   bash:
+
+   ```bash
+   noreply="$(gh api user --jq '"\(.id)+\(.login)@users.noreply.github.com"')"
+   git tag -d "v$version"
+   git -c user.email="$noreply" tag -a "v$version" "$sha" -m "Release v$version"
+   git cat-file -p "v$version"
+   ```
+
+   The line that starts `tagger` must end in `@users.noreply.github.com>`. Only then run `git push origin "v$version"` again. If you have set `GIT_COMMITTER_EMAIL` in your environment, it overrides `-c user.email`: unset it for this command (bash: `unset GIT_COMMITTER_EMAIL`; PowerShell: `Remove-Item Env:GIT_COMMITTER_EMAIL`). Your no-reply address is listed at <https://github.com/settings/emails>.
 
 4. **Watch the tag run** in [Actions](https://github.com/saulpatinojr/HCW-MigrateOrchestrator_App/actions/workflows/release-cli.yml).
    When all eight jobs are green, open the [release page](https://github.com/saulpatinojr/HCW-MigrateOrchestrator_App/releases) and

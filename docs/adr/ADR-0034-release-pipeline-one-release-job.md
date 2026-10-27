@@ -93,7 +93,7 @@ checksum files and the two package tarballs the downstream edition pins by URL a
   are off; draft-then-publish is the order GitHub documents for them, so turning them on later needs no change here.
 - Open owner decisions, not made here: tightening the tag ruleset's creation rule (admins can bypass it) and turning on
   immutable releases. The downstream edition checks `releases/latest` and pins by URL and hash without verifying attestations.
-- Static and local evidence only: no workflow has run. The first real exercise is the dry run on `main`, then the tag.
+- As of 2026-10-25: static and local evidence only, no workflow had run. The dry runs and the tags `v0.4.0` and `v0.4.1` have since passed (`VALIDATION.md`, first sandbox apply section).
 
 ## Addendum 2026-10-25: follow-ups F7 and F5, and the image build ([issue 83](https://github.com/saulpatinojr/HCW-MigrateOrchestrator_App/issues/83))
 
