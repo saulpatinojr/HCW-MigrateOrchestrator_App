@@ -338,7 +338,7 @@ Removing a deployment you made for testing takes more steps than `terraform dest
    bash:
 
    ```bash
-   id="$(terraform state show -no-color azurerm_resource_group.app | tr -d '' | sed -n 's/^ *id *= *"\(.*\)"$//p')"
+   id="$(terraform state show -no-color azurerm_resource_group.app | tr -d '\r' | sed -n 's/^ *id *= *"\(.*\)"$/\1/p')"
    sub="$(echo "$id" | cut -d/ -f3)"
    rg="$(echo "$id" | cut -d/ -f5)"
    az resource list --subscription "$sub" --resource-group "$rg" --output table
