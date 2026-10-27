@@ -26,8 +26,8 @@ subnet", that "inbound NSG rules apply only to traffic that goes through your vi
 traffic via NSG or firewall on an external workload profile environment isn't supported". So the `aca` group only limits traffic
 that crosses the virtual network. What limits the public path is (a) the IP restrictions on the container app ingress, driven by
 `ingress_allowed_source_prefixes` (Learn: [Set up IP ingress restrictions](https://learn.microsoft.com/en-us/azure/container-apps/ip-restrictions)), and above all (b) the Microsoft Entra
-bearer token with an app role that the API requires on every protected request (every route except the public `/api/health` and `/api/agents`) (ADR-0031). A sandbox apply must confirm that the environment
-starts and the API answers over 443 with this group attached before the PROVISIONAL label is removed (issues 82 and 53).
+bearer token with an app role that the API requires on every protected request (every route except the public `/api/health` and `/api/agents`) (ADR-0031). A sandbox apply had to confirm that the environment
+starts and the API answers over 443 with this group attached before the PROVISIONAL label is removed (issues 82 and 53). The sandbox run of 2026-10-26 and 2026-10-27 met that first test (see Status at the end); the label stays until the owner decides otherwise.
 Each subnet gets an NSG, associated with the subnet, whose last rule is an explicit **deny all inbound at priority 4096**.
 That rule also overrides Azure's built-in "allow traffic from the virtual network" rule, so a subnet is reachable only through
 the rules below. Rules are separate `azurerm_network_security_rule` resources, and the association waits for them; the
@@ -139,9 +139,9 @@ in `main.tf`. The ticket's `CKV2_AZURE_31` (NSG on two subnets) is fixed by sect
 
 - The `aca` rules follow Learn's inbound table for a **workload-profile** environment (443 and 31443 for HTTPS clients, the Azure
   Load Balancer probe range, and the deny-all at the end). They are provisional (section 1).
-- **Not verified, and the largest risk of this change:** that the environment and the database come up under these rules, that
+- **Not verified as of 2026-10-25 (see Status at the end), and the largest risk of this change:** that the environment and the database come up under these rules, that
   Learn's list is complete, and how the NSG behaves for an external workload-profile environment at all (Learn says the public path
-  does not cross the subnet). Nothing was applied. Unverified details of the `aca` group: leaving out ports 80 and 31080, reading
+  does not cross the subnet). Nothing had been applied then. Unverified details of the `aca` group: leaving out ports 80 and 31080, reading
   the subnet-to-subnet rule as also needed inbound, and whether the deny-all at the end affects anything the platform needs. If
   the environment fails to start or the API is unreachable after the groups are attached, review these first.
 - The rule that allows the internet passes the tag in the singular `source_address_prefix`, and the ranges in the plural
@@ -184,10 +184,7 @@ environment), a second public IP for egress, and a standard load balancer. I did
 environment, NAT gateway or user-defined routes (workload profiles support them; not used), or a custom resource group name for the
 managed resources (the default is used). Region support and quotas for workload profiles were not checked.
 
-**Status (2026-10-27).** `terraform plan` is no longer stopped, and the configuration was applied once, to a sandbox subscription
-(South Central US): the environment started with both groups attached, the API answered over 443 without a token, and it reached
-the database. Signed-in traffic through the `aca` group was not tested, so that group stays provisional. The sentences above that
-say "never applied" describe the time they were written.
+**Status (2026-10-27).** `terraform plan` is no longer stopped. The configuration was applied to a sandbox subscription (South Central US), first on 2026-10-26 and again on 2026-10-27 to move to the `v0.4.1` image. Observed on 2026-10-27: the environment started with both groups attached and the API answered `GET /api/health` over 443 (and refused two protected routes without a token). Judging by its start-up order, and by Azure refusing at the teardown to drop its database role because objects depend on it, the API also reached the database (no query was run). Not tested: ports 80 and 31080, the subnet-to-subnet rule, traffic that crosses the virtual network and any signed-in call, so the `aca` group stays provisional; the label stays until the owner decides otherwise. The sandbox was deleted on 2026-10-27 after these checks, so they cannot be repeated against it. The sentences above that say it was not applied, that a sandbox apply must still confirm something, or that the environment and the database coming up are not verified, describe the time they were written (2026-10-25).
 
 ## Rollback
 

@@ -164,8 +164,9 @@ resource "azurerm_subnet" "db" {
 # the IP restrictions on the container app ingress (var.ingress_allowed_source_prefixes) and, above all, by the bearer
 # token and role check in the API (ADR-0031). The group limits traffic that does cross the virtual network.
 #
-# PROVISIONAL, NOT VALIDATED: applied once to a sandbox (2026-10-27); the environment started and the API answered over
-# 443 with this group attached, but only without a sign-in token (issue 82, issue 53). The db group below is a separate group.
+# PROVISIONAL, NOT VALIDATED: applied to a sandbox (first 2026-10-26, updated 2026-10-27); the environment started and the API
+# answered over 443 with this group attached. Not tested: ports 80 and 31080, the subnet-to-subnet rule, traffic that crosses
+# the virtual network and any signed-in call (issue 82, issue 53). The db group below is a separate group.
 resource "azurerm_network_security_group" "aca" {
   name                = "nsg-${var.prefix}-aca-${local.env_region}-01"
   location            = var.location

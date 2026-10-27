@@ -86,7 +86,7 @@ prove: the Docker login, the push, the tag and the attestation (all need a real 
 
 ### What the dry run cannot prove
 
-These happen only on a real tag, so the first real tag is also their first test. They are covered by tests against a fake `gh`
+These happen only on a real tag, so the first real tag was also their first test (`v0.4.1`, 2026-10-27: every job of [its release run](https://github.com/saulpatinojr/HCW-MigrateOrchestrator_App/actions/runs/40453199382) passed). They are covered by tests against a fake `gh`
 (`tests/release/`), not by a live run.
 
 | Not rehearsed | Why | What to look at on the first real tag |
@@ -148,11 +148,27 @@ These happen only on a real tag, so the first real tag is also their first test.
    git push origin "v$version"
    ```
 
-   If the push is refused with `GH007: Your push would publish a private email address`, the tag carries your private commit email
-   (an annotated tag records who made it) and your GitHub account blocks that. Nothing was published. Delete the local tag
-   (`git tag -d "v$version"`), then make it again with your GitHub no-reply address for this one command and push again:
-   `git -c user.name="<your name>" -c user.email="<your id>+<your login>@users.noreply.github.com" tag -a "v$version" $sha -m "Release v$version"`.
-   Your no-reply address is listed at <https://github.com/settings/emails>.
+   If the push is refused with `GH007: Your push would publish a private email address`, nothing was published: an annotated tag
+   records your commit email, and your GitHub account blocks a private one. Delete the local tag and make it again with your GitHub
+   no-reply address. The commands below look that address up for you, so no placeholder is left to paste. PowerShell:
+
+   ```powershell
+   $noreply = "$(gh api user --jq .id)+$(gh api user --jq .login)@users.noreply.github.com"
+   git tag -d "v$version"
+   git -c "user.email=$noreply" tag -a "v$version" $sha -m "Release v$version"
+   git cat-file -p "v$version"
+   ```
+
+   bash:
+
+   ```bash
+   noreply="$(gh api user --jq '"\(.id)+\(.login)@users.noreply.github.com"')"
+   git tag -d "v$version"
+   git -c user.email="$noreply" tag -a "v$version" "$sha" -m "Release v$version"
+   git cat-file -p "v$version"
+   ```
+
+   The line that starts `tagger` must end in `@users.noreply.github.com>`. Only then run `git push origin "v$version"` again. If you have set `GIT_COMMITTER_EMAIL` in your environment, it overrides `-c user.email`: unset it for this command. Your no-reply address is listed at <https://github.com/settings/emails>.
 
 4. **Watch the tag run** in [Actions](https://github.com/saulpatinojr/HCW-MigrateOrchestrator_App/actions/workflows/release-cli.yml).
    When all eight jobs are green, open the [release page](https://github.com/saulpatinojr/HCW-MigrateOrchestrator_App/releases) and

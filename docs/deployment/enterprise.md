@@ -5,14 +5,18 @@ with dependency-free credentials.
 
 ## 1. Provision
 
-> **Status: applied once, in a sandbox; not in production.** On 2026-10-27 this configuration was applied to a non-production
-> subscription (South Central US) with the `v0.4.1` appliance image. The environment and the database came up, the API and the
-> worker run that image with no restarts, the API answers `GET /api/health` over 443, protected routes answer 401 without a token,
-> and the API reached the database with its managed identity (it creates its tables before it starts listening, and it listened).
-> A signed-in call has not been tested; section 5 lists what is still unvalidated. The Container Apps environment is a
-> workload-profile environment (owner decision on [issue 82](https://github.com/saulpatinojr/HCW-MigrateOrchestrator_App/issues/82), ADR-0032). **Use release `v0.4.1` or later:** the `v0.4.0`
-> image cannot start against an Azure database (fixed in `v0.4.1`, see `CHANGELOG.md`). Do your first apply in a non-production
-> subscription and read the plan first. The subnet firewall for the Container Apps subnet stays provisional (section 2d).
+> **Status: applied to one sandbox, not to production.** This configuration was first applied to a non-production subscription
+> (South Central US) on 2026-10-26, and on 2026-10-27 its two container apps were updated to the `v0.4.1` image. Observed on
+> 2026-10-27: the environment and the database server were up, each subnet had its firewall attached, both apps ran that image
+> with a healthy revision and no restarts when checked, a fresh plan printed "No changes", `GET /api/health` answered 200 over
+> 443, and `/api/me` and `/api/scopes` answered 401 without a token. Inferred, not observed: that the API logged in to the
+> database with its managed identity (it logged that it was listening, and its start-up code creates its tables before it
+> listens; at the teardown Azure also refused to drop that identity's database role because objects depend on it; no query was
+> run). Not tested: any signed-in call; section 5 lists what is still unvalidated. The sandbox was deleted on 2026-10-27 after these checks, so they cannot be repeated against it. The
+> Container Apps environment is a workload-profile environment (owner decision on [issue 82](https://github.com/saulpatinojr/HCW-MigrateOrchestrator_App/issues/82), ADR-0032).
+> **Use release `v0.4.1` or later:** the `v0.4.0` image cannot start against an Azure database (fixed in `v0.4.1`, see
+> `CHANGELOG.md`). Do your first apply in a non-production subscription and read the plan first. The subnet firewall for the
+> Container Apps subnet stays provisional (section 2d).
 
 Sign in with `az login` first (no secrets). Both shells use the subscription you are signed in to as the hosting subscription.
 
@@ -242,8 +246,9 @@ The two subnets each have a network security group (a firewall for a subnet) wit
 only the traffic below gets in (ADR-0032). Outbound traffic is left at Azure's defaults.
 
 > **Provisional, not validated: the Container Apps group (`snet-amo-aca-…`).** The database group is consistent with Microsoft Learn and
-> was applied in the 2026-10-27 sandbox apply: the environment started with both groups attached, the API answered over 443 and
-> reached the database, but only without a sign-in token, so the Container Apps group stays provisional. The Container Apps environment is a **workload-profile** environment (owner decision, issue 82): its
+> was applied in the sandbox on 2026-10-26: the environment started with both groups attached and the API answered over 443 on
+> 2026-10-27. The Container Apps group stays provisional, because that run did not test ports 80 and 31080, the subnet-to-subnet
+> rule or traffic that crosses the virtual network, and because Learn (below) says this group does not govern the public path. The Container Apps environment is a **workload-profile** environment (owner decision, issue 82): its
 > subnet must be at least a /27 and delegated to `Microsoft.App/environments`; `snet-amo-aca-…` is a /26 with that delegation. For
 > that kind of environment Microsoft says inbound traffic from the internet "routes through the public IP that exists in the
 > managed resource group rather than through your subnet", that inbound subnet rules "apply only to traffic that goes through
@@ -251,7 +256,8 @@ only the traffic below gets in (ADR-0032). Outbound traffic is left at Azure's d
 > ([Network security groups for Container Apps](https://learn.microsoft.com/en-us/azure/container-apps/firewall-integration)).
 > So this firewall **does not restrict who reaches the API from the internet**. What does: the IP restrictions on the container app
 > ingress (`ingress_allowed_source_prefixes`, below) and, above all, the sign-in token with an app role that every protected call needs (everything except the public health and agent-list routes)
-> (section 2). Whether the firewall itself lets the environment start has not been shown: a sandbox apply must confirm it.
+> (section 2). The sandbox run of 2026-10-26 and 2026-10-27 showed that the environment starts and the API answers over 443 with this group
+> attached; it did not test ports 80 and 31080, the subnet-to-subnet rule or a signed-in call.
 
 | Subnet | Allowed in | Everything else |
 |---|---|---|
@@ -305,16 +311,21 @@ resource groups) is granted **per engagement** and removed afterwards; the base 
 Outside production mode (for example `npm run appliance:api` on a laptop) it still starts, and every protected route returns
 401 by design.
 
-## 5. Not yet validated against a real tenant
+## 5. What has and has not been validated live
 
-**Validated in the 2026-10-27 sandbox apply** (South Central US, `v0.4.1` image): the configuration applies and then plans with no
-changes; the Container Apps environment starts with both subnet groups attached; the API and the worker run the published image by
-digest with no restarts; `GET /api/health` answers 200 over 443; protected routes answer 401 `unauthenticated` without a token;
-and PostgreSQL Entra token exchange at connect time works (implemented as a `pg` password provider, ADR-0025: the API creates its
-tables before it starts listening, and it listened). The first sandbox run found that the `v0.4.0` image could not do the last
-one, because the database library discarded the token provider; `v0.4.1` fixes that.
+**Observed in the sandbox** (applied 2026-10-26, checked 2026-10-27; South Central US): the configuration applied and a fresh plan afterwards printed "No changes"; the Container Apps environment started with both subnet groups attached; the database server was up, with password login off, Entra login on and public access off; the two container apps ran the `v0.4.1` image by digest with a healthy revision and no restarts when checked; `GET /api/health` answered 200 over 443; and `/api/me` and `/api/scopes` answered 401 `unauthenticated` without a token. The first run (2026-10-26, `v0.4.0` image) found that the image could not start against an Azure database, because the database library discarded the token provider; `v0.4.1` fixes that. The sandbox was deleted on 2026-10-27 after these checks, so they cannot be repeated against it.
 
-**Not yet validated live:** JWKS fetch, Resource Graph paging, `validateMoveResources` polling, Resource Mover API shapes
-([VERIFY] 2023-08-01 request bodies). All are exercised against fakes in the test suite.
+**Indicated, not directly shown:** PostgreSQL Entra token exchange at connect time (implemented as a `pg` password provider, ADR-0025). The API creates its tables before it starts listening, its health route reports `PostgresRepository`, and it logged that it was listening, so the managed-identity login must have worked. A second signal came at the teardown: Azure refused to drop that identity's database role because objects depend on it, which fits the tables the API created. No query was run, and the server's connection metrics could not confirm it.
 
-Also not yet validated live: that Entra refuses to issue a token to an unassigned user or application once `app_role_assignment_required` is on, that the `roles` claim carries the assigned role in a real access token, and any signed-in call at all. A signed-in test first needs the sign-in registration completed: Terraform creates the API registration with no identifier URI and no `access_as_user` scope (the Terraform output printed after the apply and section 2b say what to add), so no ordinary client can request a token for it yet. The Terraform tests (`terraform test` with mocked providers) and the static tests prove what the configuration declares, not what Azure or Entra do with it. If the Container Apps environment fails to start after the groups are attached, the first rule to review is the one for the Container Apps subnet (section 2d) against the current Microsoft Learn page "Network security groups for configuring a virtual network in Azure Container Apps".
+**Not yet validated live:** any signed-in call; any database query; anything the worker does (it logs nothing by design); JWKS fetch, Resource Graph paging, `validateMoveResources` polling and Resource Mover API shapes ([VERIFY] 2023-08-01 request bodies), which are exercised against fakes in the test suite; ports 80 and 31080, the ingress IP restrictions and the subnet-to-subnet rule.
+
+Also not yet validated live: that Entra refuses to issue a token to an unassigned user or application once `app_role_assignment_required` is on, and that the `roles` claim carries the assigned role in a real access token. A signed-in test first needs the sign-in registration completed: Terraform creates the API registration with no identifier URI and no `access_as_user` scope (the Terraform output printed after the apply covers the identifier URI and the role assignments; section 2b covers the scope and the client application). Azure CLI could not get a token for it in the sandbox (AADSTS65001, consent missing), so a signed-in test needs that setup first. The Terraform tests (`terraform test` with mocked providers) and the static tests prove what the configuration declares, not what Azure or Entra do with it. If the Container Apps environment fails to start after the groups are attached, the first rule to review is the one for the Container Apps subnet (section 2d) against the current Microsoft Learn page "Network security groups for configuring a virtual network in Azure Container Apps".
+
+## 6. Removing a sandbox
+
+Removing a deployment you made for testing takes more steps than `terraform destroy`, for reasons found when the first sandbox was removed (2026-10-27). Do this only for a sandbox: removing the enterprise application deletes every role assignment made on it, which is why the guard below exists.
+
+1. **Lift the destroy guard in a throwaway copy, never in the repository.** The sign-in service principal (`azuread_service_principal.api`) has `lifecycle { prevent_destroy = true }` (ADR-0031), so `terraform plan -destroy` stops with "Instance cannot be destroyed". In a copy of the configuration that you will discard, set it to `false`, make a saved plan with `terraform plan -destroy -out destroy.plan`, read it (it should list only this deployment's resources and its Entra objects), and apply that plan.
+2. **Expect the database administrator to fail, and delete the resource group instead.** The administrator is the managed identity's database role, and that role owns the tables the API created. Azure refuses to drop it (`AadAuthPrincipalDropFailed`: the role "cannot be dropped because some objects depend on it"), and Terraform keeps waiting on it. When you see that, delete the resource group (`az group delete --name <the resource group> --yes`). Deleting the Container Apps environment alone takes more than 15 minutes.
+3. **Tell Terraform it is gone.** When the group no longer exists, run `terraform apply -refresh-only` with the same variable file; `terraform state list` then prints nothing. The Entra objects (app registration, enterprise application and role assignment) were already removed by the destroy in step 1.
+4. **Know what Azure keeps for a while.** A deleted Log Analytics workspace is kept for 14 days and its name stays reserved: creating one with the same name, group and region in that time recovers the old one ([Delete and recover a Log Analytics workspace](https://learn.microsoft.com/azure/azure-monitor/logs/delete-workspace)). A deleted app registration and its enterprise application are kept for 30 days and can be restored ([Restore or remove a recently deleted application](https://learn.microsoft.com/entra/identity-platform/howto-restore-app)).

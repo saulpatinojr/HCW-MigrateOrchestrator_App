@@ -33,10 +33,10 @@ Who can use the appliance: every call except the health and agent-list routes ne
 carries an app role** (`Migration.Read`, `Migration.Plan`, `Migration.Execute` or `Migration.Execute.Destructive`; the lowest, `Migration.Read`, is assess only). A valid token with no
 role, or an unknown one, is answered with 403; there is no default access for a signed-in user. Terraform also turns on
 "assignment required" for the Entra application as a first layer (the role check in the API is the authoritative control). See
-[`docs/deployment/enterprise.md`](docs/deployment/enterprise.md) (sections 2 and 2d) and ADR-0031 and ADR-0032. **The Terraform has been applied once, to a sandbox (2026-10-27), and never in production:** the environment and the database came up and the API answers over 443; a signed-in call is not yet tested (section 5 of that guide). The Container Apps environment is a workload-profile environment, [issue 82](https://github.com/saulpatinojr/HCW-MigrateOrchestrator_App/issues/82).
+[`docs/deployment/enterprise.md`](docs/deployment/enterprise.md) (sections 2 and 2d) and ADR-0031 and ADR-0032. **The Terraform has been applied to one sandbox subscription (first on 2026-10-26, again on 2026-10-27 to move to the `v0.4.1` image), not to production:** on 2026-10-27 the environment and the database server were up and the API answered over 443 with no restarts when checked; no signed-in call has been tested (section 5 of that guide). The sandbox was deleted on 2026-10-27 after these checks, so they cannot be repeated against it. The Container Apps environment is a workload-profile environment, [issue 82](https://github.com/saulpatinojr/HCW-MigrateOrchestrator_App/issues/82).
 
 > **Status:** reference implementation, not production. Sign-in, Resource Graph and Resource Mover are implemented against
-> REST with fakes in tests; nothing has been validated against a live tenant yet. Every limitation is recorded in
+> REST with fakes in tests; none of them has been run against a live tenant (the only live check so far is one sandbox deployment of the Terraform, which made no signed-in call). Every limitation is recorded in
 > [`VALIDATION.md`](VALIDATION.md).
 
 ## The two repositories
@@ -126,13 +126,14 @@ The GitHub Release is created by one job, as a draft, and made public only after
 
 An image exists for a `v*` tag only if the `publish-images` workflow ran (not "skipped") for that tag. It runs only when the
 repository variable `DOCKERHUB_ENABLED` is `true` when the tag is pushed; with it unset the job is skipped, not failed.
-State on 2026-10-25 (ticket #42):
+State on 2026-10-27 (ticket #42):
 
 | Tag | Appliance image on Docker Hub |
 |---|---|
 | `v0.2.0`, `v0.2.1` | None. These were pushed to GitHub Container Registry, before the move to Docker Hub on 2026-10-10 (`docs/release/docker-hub.md`) |
 | `v0.3.0`, `v0.3.1` | None. `publish-images` was skipped for both because the variable was not set (the tags exist and cannot be changed) |
-| The next `v*` tag | Yes, if `DOCKERHUB_ENABLED` is still `true` and `DOCKERHUB_CONNECTION` still holds the Docker OIDC connection ID. Both were set on 2026-10-25. This is the first Docker Hub image: the repository `hybridcloudworks/img-mo-appliance-app` exists, is public and holds no image yet |
+| `v0.4.0` | Yes: `docker.io/hybridcloudworks/img-mo-appliance-app@sha256:b93797b971a013cef83e8f7db5a0f8aa6f3fadbec2805c26674ca280b20a2cea`. **Do not deploy it to Azure:** it cannot start against an Azure database (fixed in `v0.4.1`) |
+| `v0.4.1` | Yes: `docker.io/hybridcloudworks/img-mo-appliance-app@sha256:38a8b58436fe75d195119b3e085e0251c8891df42ba80a4a7dddff769668098d`, built by the `publish-images` run for the tag; its signed build record verifies |
 
 To check a tag yourself: open the [publish-images runs](https://github.com/saulpatinojr/HCW-MigrateOrchestrator_App/actions/workflows/publish-images.yml)
 and confirm the run for that tag says "success" and ends with a line `docker.io/hybridcloudworks/img-mo-appliance-app@sha256:...`;
