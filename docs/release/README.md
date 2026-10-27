@@ -148,6 +148,12 @@ These happen only on a real tag, so the first real tag is also their first test.
    git push origin "v$version"
    ```
 
+   If the push is refused with `GH007: Your push would publish a private email address`, the tag carries your private commit email
+   (an annotated tag records who made it) and your GitHub account blocks that. Nothing was published. Delete the local tag
+   (`git tag -d "v$version"`), then make it again with your GitHub no-reply address for this one command and push again:
+   `git -c user.name="<your name>" -c user.email="<your id>+<your login>@users.noreply.github.com" tag -a "v$version" $sha -m "Release v$version"`.
+   Your no-reply address is listed at <https://github.com/settings/emails>.
+
 4. **Watch the tag run** in [Actions](https://github.com/saulpatinojr/HCW-MigrateOrchestrator_App/actions/workflows/release-cli.yml).
    When all eight jobs are green, open the [release page](https://github.com/saulpatinojr/HCW-MigrateOrchestrator_App/releases) and
    check it lists the ten files from section 1.

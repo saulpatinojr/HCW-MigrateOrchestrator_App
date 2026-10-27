@@ -5,11 +5,14 @@ with dependency-free credentials.
 
 ## 1. Provision
 
-> **Status: never applied; a sandbox apply is pending.** The Container Apps environment is a workload-profile environment (owner
-> decision on [issue 82](https://github.com/saulpatinojr/HCW-MigrateOrchestrator_App/issues/82), ADR-0032) and the configuration passes `terraform validate` and the mocked-provider tests, but
-> nothing has been created in any subscription. Do the first apply in a non-production subscription and read the plan first. The
-> subnet firewall for the Container Apps subnet is provisional until that apply shows the environment starts and the API answers
-> over 443 (section 2d).
+> **Status: applied once, in a sandbox; not in production.** On 2026-10-27 this configuration was applied to a non-production
+> subscription (South Central US) with the `v0.4.1` appliance image. The environment and the database came up, the API and the
+> worker run that image with no restarts, the API answers `GET /api/health` over 443, protected routes answer 401 without a token,
+> and the API reached the database with its managed identity (it creates its tables before it starts listening, and it listened).
+> A signed-in call has not been tested; section 5 lists what is still unvalidated. The Container Apps environment is a
+> workload-profile environment (owner decision on [issue 82](https://github.com/saulpatinojr/HCW-MigrateOrchestrator_App/issues/82), ADR-0032). **Use release `v0.4.1` or later:** the `v0.4.0`
+> image cannot start against an Azure database (fixed in `v0.4.1`, see `CHANGELOG.md`). Do your first apply in a non-production
+> subscription and read the plan first. The subnet firewall for the Container Apps subnet stays provisional (section 2d).
 
 Sign in with `az login` first (no secrets). Both shells use the subscription you are signed in to as the hosting subscription.
 
@@ -238,8 +241,9 @@ operations recorded by the API and auditing their completion (ADR-0026). Locally
 The two subnets each have a network security group (a firewall for a subnet) with a deny-all-inbound rule at the end, so
 only the traffic below gets in (ADR-0032). Outbound traffic is left at Azure's defaults.
 
-> **Provisional, not validated: the Container Apps group (`snet-amo-aca-…`).** The database group is consistent with Microsoft Learn but
-> has never been applied. The Container Apps environment is a **workload-profile** environment (owner decision, issue 82): its
+> **Provisional, not validated: the Container Apps group (`snet-amo-aca-…`).** The database group is consistent with Microsoft Learn and
+> was applied in the 2026-10-27 sandbox apply: the environment started with both groups attached, the API answered over 443 and
+> reached the database, but only without a sign-in token, so the Container Apps group stays provisional. The Container Apps environment is a **workload-profile** environment (owner decision, issue 82): its
 > subnet must be at least a /27 and delegated to `Microsoft.App/environments`; `snet-amo-aca-…` is a /26 with that delegation. For
 > that kind of environment Microsoft says inbound traffic from the internet "routes through the public IP that exists in the
 > managed resource group rather than through your subnet", that inbound subnet rules "apply only to traffic that goes through
@@ -303,7 +307,14 @@ Outside production mode (for example `npm run appliance:api` on a laptop) it sti
 
 ## 5. Not yet validated against a real tenant
 
-JWKS fetch, Resource Graph paging, `validateMoveResources` polling, Resource Mover API shapes ([VERIFY] 2023-08-01 request
-bodies), PostgreSQL Entra token exchange at connect time (implemented as a `pg` password provider, ADR-0025; untested live). All are exercised against fakes in the test suite.
+**Validated in the 2026-10-27 sandbox apply** (South Central US, `v0.4.1` image): the configuration applies and then plans with no
+changes; the Container Apps environment starts with both subnet groups attached; the API and the worker run the published image by
+digest with no restarts; `GET /api/health` answers 200 over 443; protected routes answer 401 `unauthenticated` without a token;
+and PostgreSQL Entra token exchange at connect time works (implemented as a `pg` password provider, ADR-0025: the API creates its
+tables before it starts listening, and it listened). The first sandbox run found that the `v0.4.0` image could not do the last
+one, because the database library discarded the token provider; `v0.4.1` fixes that.
 
-Also not yet validated live: that Entra refuses to issue a token to an unassigned user or application once `app_role_assignment_required` is on, that the `roles` claim carries the assigned role in a real access token, and that the subnet network security groups let the Container Apps environment and the PostgreSQL server come up and talk to each other. The Terraform tests (`terraform test` with mocked providers) and the static tests prove what the configuration declares, not what Azure or Entra do with it. If the Container Apps environment fails to start after the groups are attached, the first rule to review is the one for the Container Apps subnet (section 2d) against the current Microsoft Learn page "Network security groups for configuring a virtual network in Azure Container Apps".
+**Not yet validated live:** JWKS fetch, Resource Graph paging, `validateMoveResources` polling, Resource Mover API shapes
+([VERIFY] 2023-08-01 request bodies). All are exercised against fakes in the test suite.
+
+Also not yet validated live: that Entra refuses to issue a token to an unassigned user or application once `app_role_assignment_required` is on, that the `roles` claim carries the assigned role in a real access token, and any signed-in call at all. A signed-in test first needs the sign-in registration completed: Terraform creates the API registration with no identifier URI and no `access_as_user` scope (the Terraform output printed after the apply and section 2b say what to add), so no ordinary client can request a token for it yet. The Terraform tests (`terraform test` with mocked providers) and the static tests prove what the configuration declares, not what Azure or Entra do with it. If the Container Apps environment fails to start after the groups are attached, the first rule to review is the one for the Container Apps subnet (section 2d) against the current Microsoft Learn page "Network security groups for configuring a virtual network in Azure Container Apps".

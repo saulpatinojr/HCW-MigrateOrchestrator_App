@@ -18,8 +18,8 @@ subnets, and the Container Apps subnet accepted what the platform routed to it.
 
 ### 1. A firewall on each subnet, deny by default (`db`: done; `aca`: PROVISIONAL, not validated)
 
-**Read this first.** The `db` group is consistent with Microsoft Learn for a PostgreSQL flexible server in a delegated subnet, and has never been applied. The `aca` group is
-**provisional and not validated**: it has never been applied, and it **does not restrict who reaches the API from the internet**.
+**Read this first.** The `db` group is consistent with Microsoft Learn for a PostgreSQL flexible server in a delegated subnet, and had never been applied when this was written (see Status at the end). The `aca` group is
+**provisional and not validated**: it had not been applied when this was written, and it **does not restrict who reaches the API from the internet**.
 Microsoft Learn ([Network security groups for Container Apps](https://learn.microsoft.com/en-us/azure/container-apps/firewall-integration)) says that for an external workload-profile
 environment inbound traffic "routes through the public IP that exists in the managed resource group rather than through your
 subnet", that "inbound NSG rules apply only to traffic that goes through your virtual network", and that "locking down inbound
@@ -184,8 +184,10 @@ environment), a second public IP for egress, and a standard load balancer. I did
 environment, NAT gateway or user-defined routes (workload profiles support them; not used), or a custom resource group name for the
 managed resources (the default is used). Region support and quotas for workload profiles were not checked.
 
-**Status.** `terraform plan` is no longer stopped; the configuration has still **never been applied**. A sandbox apply is pending
-and is the evidence that closes issue 82 and the `aca` part of ticket #53.
+**Status (2026-10-27).** `terraform plan` is no longer stopped, and the configuration was applied once, to a sandbox subscription
+(South Central US): the environment started with both groups attached, the API answered over 443 without a token, and it reached
+the database. Signed-in traffic through the `aca` group was not tested, so that group stays provisional. The sentences above that
+say "never applied" describe the time they were written.
 
 ## Rollback
 
