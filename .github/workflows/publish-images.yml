@@ -124,7 +124,7 @@ jobs:
       # Cost of that order: if the scan fails, an untagged image stays in the repository under its digest; no tag points at it
       # and no attestation is made, and it can be deleted on Docker Hub (docs/release/docker-hub.md).
       - name: Log in to Docker Hub through the OIDC connection (to push the build)
-        uses: docker/login-action@dbcb813823bdd20940b903addbd779551569679f # v4.6.0
+        uses: docker/login-action@81c6f93d4bc991e510b342a00b419b3bb4efc5c6 # v4.7.0
         env:
           DOCKERHUB_OIDC_CONNECTIONID: ${{ vars.DOCKERHUB_CONNECTION }}
           DOCKERHUB_OIDC_EXPIREIN: "900"
@@ -146,7 +146,7 @@ jobs:
         with: { image-ref: "${{ env.IMAGE }}@${{ steps.build.outputs.digest }}", exit-code: "1", severity: "HIGH,CRITICAL", ignore-unfixed: true }
       # A new login after the scan: the first token (900 seconds) may have run out during a long build and scan.
       - name: Log in again to Docker Hub (to tag and attest)
-        uses: docker/login-action@dbcb813823bdd20940b903addbd779551569679f # v4.6.0
+        uses: docker/login-action@81c6f93d4bc991e510b342a00b419b3bb4efc5c6 # v4.7.0
         env:
           DOCKERHUB_OIDC_CONNECTIONID: ${{ vars.DOCKERHUB_CONNECTION }}
           DOCKERHUB_OIDC_EXPIREIN: "900"
