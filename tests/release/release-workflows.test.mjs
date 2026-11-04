@@ -386,8 +386,8 @@ function stepInputs(step) {
   }
   return Object.fromEntries(pairs.map(([k, v]) => [k, v.trim().replace(/^(["'])(.*)\1$/, "$2")]));
 }
-// `uses:` is the step's own key wherever it sits: on the `- ` line or on any line indented to the step's keys
-const checkoutSteps = (body) => Object.values(jobs(body)).flatMap(steps).filter((s) => /^(?: {6}-[ \t]+| {8})uses:[ \t]+["']?actions\/checkout@/m.test(s));
+// `uses:` is the step's own key wherever it sits (owner and repository names are case-insensitive on GitHub): on the `- ` line or on any line indented to the step's keys
+const checkoutSteps = (body) => Object.values(jobs(body)).flatMap(steps).filter((s) => /^(?: {6}-[ \t]+| {8})uses:[ \t]+["']?actions\/checkout@/im.test(s));
 
 test("no checkout in ci.yml or security.yml leaves the token on disk", () => {
   // By default actions/checkout keeps GITHUB_TOKEN in .git/config, where every later step can read it (zizmor `artipacked`).
@@ -398,7 +398,7 @@ test("no checkout in ci.yml or security.yml leaves the token on disk", () => {
     assert.ok(found.length > 0, `${name}: no checkout found`);
     // fail closed: every non-comment line naming actions/checkout must belong to a step the reader found, so a step
     // written in a shape it does not read (other indentation, flow style) fails here instead of passing unseen
-    const mentions = code(name).split("\n").filter((l) => /actions\/checkout@/.test(l)).length;
+    const mentions = code(name).split("\n").filter((l) => /actions\/checkout@/i.test(l)).length;
     assert.equal(found.length, mentions, `${name}: ${mentions} lines name actions/checkout but ${found.length} checkout steps were read`);
     for (const step of found) assert.equal(stepInputs(step)["persist-credentials"], "false", `${name}: a checkout keeps the token on disk:\n${step}`);
   }
@@ -418,5 +418,6 @@ test("no checkout in ci.yml or security.yml leaves the token on disk", () => {
   assert.deepEqual(read(`      - uses:   actions/checkout@v7\n        with: { fetch-depth: 0 }\n`), [undefined]);
   assert.deepEqual(read(`      - name: Spaced\n        uses:  "actions/checkout@v7"\n        with:\n          persist-credentials: false\n`), ["false"]);
   assert.deepEqual(read(`${uses}        with:\n          token: |\n            persist-credentials: false\n`), [undefined]);
+  assert.deepEqual(read(`      - uses: Actions/Checkout@v7\n        with: { fetch-depth: 0 }\n`), [undefined]);
   assert.deepEqual(read(`      - name: Not a checkout\n        uses: actions/setup-node@v7\n        with:\n          note: "uses: actions/checkout@v7"\n`), []);
 });
