@@ -386,7 +386,7 @@ function stepInputs(step) {
   return Object.fromEntries(pairs.map(([k, v]) => [k, v.trim().replace(/^(["'])(.*)\1$/, "$2")]));
 }
 // `uses:` is the step's own key wherever it sits: on the `- ` line or on any line indented to the step's keys
-const checkoutSteps = (body) => Object.values(jobs(body)).flatMap(steps).filter((s) => /^(?: {6}- | {8})uses: actions\/checkout@/m.test(s));
+const checkoutSteps = (body) => Object.values(jobs(body)).flatMap(steps).filter((s) => /^(?: {6}-[ \t]+| {8})uses:[ \t]+["']?actions\/checkout@/m.test(s));
 
 test("no checkout in ci.yml or security.yml leaves the token on disk", () => {
   // By default actions/checkout keeps GITHUB_TOKEN in .git/config, where every later step can read it (zizmor `artipacked`).
@@ -410,5 +410,7 @@ test("no checkout in ci.yml or security.yml leaves the token on disk", () => {
   assert.deepEqual(read(`${uses}        with:\n          persist-credentials: false # don't persist the token\n`), ["false"]);
   assert.deepEqual(read(`${uses}        with: { persist-credentials: false } # don't persist the token\n`), ["false"]);
   assert.deepEqual(read(`      - id: co\n        if: always()\n        uses: actions/checkout@v7\n        with: { fetch-depth: 0 }\n`), [undefined]);
+  assert.deepEqual(read(`      - uses:   actions/checkout@v7\n        with: { fetch-depth: 0 }\n`), [undefined]);
+  assert.deepEqual(read(`      - name: Spaced\n        uses:  "actions/checkout@v7"\n        with:\n          persist-credentials: false\n`), ["false"]);
   assert.deepEqual(read(`      - name: Not a checkout\n        uses: actions/setup-node@v7\n        with:\n          note: "uses: actions/checkout@v7"\n`), []);
 });
