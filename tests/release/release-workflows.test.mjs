@@ -349,3 +349,14 @@ test("the workflows do not call a tag permanent without the ruleset caveat (revi
   }
   assert.match(text(RELEASE), /blocked from being moved or deleted \(the "Protect release tags" ruleset; repository admins can bypass it or switch it off\)/);
 });
+
+test("no checkout in ci.yml or security.yml leaves the token on disk", () => {
+  // By default actions/checkout keeps GITHUB_TOKEN in .git/config, where every later step can read it (zizmor `artipacked`).
+  // No step of these two pushes with git (gitleaks gets its own GITHUB_TOKEN env), so every checkout turns it off.
+  // copilot-setup-steps.yml is left as it is: it prepares the Copilot coding agent's environment, which manages its git access.
+  for (const name of ["ci.yml", "security.yml"]) {
+    const checkouts = code(name).split("\n").map((l, i, all) => [l, all[i + 1] ?? ""]).filter(([l]) => /uses: actions\/checkout@/.test(l));
+    assert.ok(checkouts.length > 0, `${name}: no checkout found`);
+    for (const [, next] of checkouts) assert.match(next, /persist-credentials: false/, `${name}: a checkout keeps the token on disk`);
+  }
+});
