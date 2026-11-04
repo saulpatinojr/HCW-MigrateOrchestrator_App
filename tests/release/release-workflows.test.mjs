@@ -377,10 +377,11 @@ function stepInputs(step) {
     pairs = [...inline.slice(1, -1).matchAll(/([A-Za-z0-9_-]+):\s*("[^"]*"|'[^']*'|[^,]*)/g)].map((m) => [m[1], m[2]]);
   } else {
     pairs = [];
+    // an input is a key at exactly the inputs' indentation; deeper lines belong to a multi-line value, never an input
     for (const l of lines.slice(at + 1)) {
       if (!/^ {10}/.test(l)) break;
-      const m = dropComment(l).match(/^([A-Za-z0-9_-]+):\s*(.*)$/);
-      if (m) pairs.push([m[1], m[2]]);
+      const m = l.match(/^ {10}([A-Za-z0-9_-]+):(?:\s+(.*))?$/);
+      if (m) pairs.push([m[1], dropComment(m[2] ?? "")]);
     }
   }
   return Object.fromEntries(pairs.map(([k, v]) => [k, v.trim().replace(/^(["'])(.*)\1$/, "$2")]));
@@ -395,6 +396,10 @@ test("no checkout in ci.yml or security.yml leaves the token on disk", () => {
   for (const name of ["ci.yml", "security.yml"]) {
     const found = checkoutSteps(text(name));
     assert.ok(found.length > 0, `${name}: no checkout found`);
+    // fail closed: every non-comment line naming actions/checkout must belong to a step the reader found, so a step
+    // written in a shape it does not read (other indentation, flow style) fails here instead of passing unseen
+    const mentions = code(name).split("\n").filter((l) => /actions\/checkout@/.test(l)).length;
+    assert.equal(found.length, mentions, `${name}: ${mentions} lines name actions/checkout but ${found.length} checkout steps were read`);
     for (const step of found) assert.equal(stepInputs(step)["persist-credentials"], "false", `${name}: a checkout keeps the token on disk:\n${step}`);
   }
   // the reader itself: both forms are read, a comment is not an input, and only the exact value false passes
@@ -412,5 +417,6 @@ test("no checkout in ci.yml or security.yml leaves the token on disk", () => {
   assert.deepEqual(read(`      - id: co\n        if: always()\n        uses: actions/checkout@v7\n        with: { fetch-depth: 0 }\n`), [undefined]);
   assert.deepEqual(read(`      - uses:   actions/checkout@v7\n        with: { fetch-depth: 0 }\n`), [undefined]);
   assert.deepEqual(read(`      - name: Spaced\n        uses:  "actions/checkout@v7"\n        with:\n          persist-credentials: false\n`), ["false"]);
+  assert.deepEqual(read(`${uses}        with:\n          token: |\n            persist-credentials: false\n`), [undefined]);
   assert.deepEqual(read(`      - name: Not a checkout\n        uses: actions/setup-node@v7\n        with:\n          note: "uses: actions/checkout@v7"\n`), []);
 });
