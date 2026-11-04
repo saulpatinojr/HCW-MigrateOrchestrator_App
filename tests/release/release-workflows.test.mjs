@@ -349,3 +349,75 @@ test("the workflows do not call a tag permanent without the ruleset caveat (revi
   }
   assert.match(text(RELEASE), /blocked from being moved or deleted \(the "Protect release tags" ruleset; repository admins can bypass it or switch it off\)/);
 });
+
+/**
+ * The `with:` inputs of one step, from either form GitHub accepts: inline (`with: { a: 1, b: "x,y" }`) or a block of
+ * `key: value` lines indented under it. Trailing comments are dropped, so text inside a comment is never an input.
+ */
+function stepInputs(step) {
+  // a # starts a comment when it is outside quotes and at the start or after whitespace; quotes inside a comment are text
+  const dropComment = (s) => {
+    let quote = "";
+    for (let i = 0; i < s.length; i++) {
+      const ch = s[i];
+      if (quote) {
+        if (ch === quote) quote = "";
+      } else if (ch === '"' || ch === "'") quote = ch;
+      else if (ch === "#" && (i === 0 || /\s/.test(s[i - 1]))) return s.slice(0, i).trim();
+    }
+    return s.trim();
+  };
+  const lines = step.split("\n");
+  const at = lines.findIndex((l) => /^ {8}with:/.test(l));
+  if (at < 0) return {};
+  const inline = dropComment(lines[at].replace(/^ {8}with:/, ""));
+  let pairs;
+  if (inline) {
+    assert.ok(inline.startsWith("{") && inline.endsWith("}"), `unreadable with: ${inline}`);
+    pairs = [...inline.slice(1, -1).matchAll(/([A-Za-z0-9_-]+):\s*("[^"]*"|'[^']*'|[^,]*)/g)].map((m) => [m[1], m[2]]);
+  } else {
+    pairs = [];
+    // an input is a key at exactly the inputs' indentation; deeper lines belong to a multi-line value, never an input
+    for (const l of lines.slice(at + 1)) {
+      if (!/^ {10}/.test(l)) break;
+      const m = l.match(/^ {10}([A-Za-z0-9_-]+):(?:\s+(.*))?$/);
+      if (m) pairs.push([m[1], dropComment(m[2] ?? "")]);
+    }
+  }
+  return Object.fromEntries(pairs.map(([k, v]) => [k, v.trim().replace(/^(["'])(.*)\1$/, "$2")]));
+}
+// `uses:` is the step's own key wherever it sits (owner and repository names are case-insensitive on GitHub): on the `- ` line or on any line indented to the step's keys
+const checkoutSteps = (body) => Object.values(jobs(body)).flatMap(steps).filter((s) => /^(?: {6}-[ \t]+| {8})uses:[ \t]+["']?actions\/checkout@/im.test(s));
+
+test("no checkout in ci.yml or security.yml leaves the token on disk", () => {
+  // By default actions/checkout keeps GITHUB_TOKEN in .git/config, where every later step can read it (zizmor `artipacked`).
+  // No step of these two pushes with git (gitleaks gets its own GITHUB_TOKEN env), so every checkout turns it off.
+  // copilot-setup-steps.yml is left as it is: it prepares the Copilot coding agent's environment, which manages its git access.
+  for (const name of ["ci.yml", "security.yml"]) {
+    const found = checkoutSteps(text(name));
+    assert.ok(found.length > 0, `${name}: no checkout found`);
+    // fail closed: every non-comment line naming actions/checkout must belong to a step the reader found, so a step
+    // written in a shape it does not read (other indentation, flow style) fails here instead of passing unseen
+    const mentions = code(name).split("\n").filter((l) => /actions\/checkout@/i.test(l)).length;
+    assert.equal(found.length, mentions, `${name}: ${mentions} lines name actions/checkout but ${found.length} checkout steps were read`);
+    for (const step of found) assert.equal(stepInputs(step)["persist-credentials"], "false", `${name}: a checkout keeps the token on disk:\n${step}`);
+  }
+  // the reader itself: both forms are read, a comment is not an input, and only the exact value false passes
+  const job = (step) => `on: push\njobs:\n  j:\n    runs-on: ubuntu-latest\n    steps:\n${step}`;
+  const read = (step) => checkoutSteps(job(step)).map((s) => stepInputs(s)["persist-credentials"]);
+  const uses = "      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1\n";
+  assert.deepEqual(read(`${uses}        with: { persist-credentials: false, fetch-depth: 0 }\n`), ["false"]);
+  assert.deepEqual(read(`${uses}        with:\n          fetch-depth: 0\n          persist-credentials: false # off\n`), ["false"]);
+  assert.deepEqual(read(`      - name: Check out\n        uses: actions/checkout@v7\n        with:\n          persist-credentials: "false"\n`), ["false"]);
+  assert.deepEqual(read(`${uses}        with: { fetch-depth: 0 } # persist-credentials: false\n`), [undefined]);
+  assert.deepEqual(read(`${uses}      - name: prepare # persist-credentials: false\n        run: true\n`), [undefined]);
+  assert.deepEqual(read(`${uses}        with: { persist-credentials: falsey }\n`), ["falsey"]);
+  assert.deepEqual(read(`${uses}        with:\n          persist-credentials: false # don't persist the token\n`), ["false"]);
+  assert.deepEqual(read(`${uses}        with: { persist-credentials: false } # don't persist the token\n`), ["false"]);
+  assert.deepEqual(read(`      - id: co\n        if: always()\n        uses: actions/checkout@v7\n        with: { fetch-depth: 0 }\n`), [undefined]);
+  assert.deepEqual(read(`      - uses:   actions/checkout@v7\n        with: { fetch-depth: 0 }\n`), [undefined]);
+  assert.deepEqual(read(`      - name: Spaced\n        uses:  "actions/checkout@v7"\n        with:\n          persist-credentials: false\n`), ["false"]);
+  assert.deepEqual(read(`${uses}        with:\n          token: |\n            persist-credentials: false\n`), [undefined]);
+  assert.deepEqual(read(`      - uses: Actions/Checkout@v7\n        with: { fetch-depth: 0 }\n`), [undefined]);
+  assert.deepEqual(read(`      - name: Not a checkout\n        uses: actions/setup-node@v7\n        with:\n          note: "uses: actions/checkout@v7"\n`), []);
+});
