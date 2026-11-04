@@ -355,7 +355,18 @@ test("the workflows do not call a tag permanent without the ruleset caveat (revi
  * `key: value` lines indented under it. Trailing comments are dropped, so text inside a comment is never an input.
  */
 function stepInputs(step) {
-  const dropComment = (s) => s.replace(/\s+#[^"']*$/, "").trim();
+  // a # starts a comment when it is outside quotes and at the start or after whitespace; quotes inside a comment are text
+  const dropComment = (s) => {
+    let quote = "";
+    for (let i = 0; i < s.length; i++) {
+      const ch = s[i];
+      if (quote) {
+        if (ch === quote) quote = "";
+      } else if (ch === '"' || ch === "'") quote = ch;
+      else if (ch === "#" && (i === 0 || /\s/.test(s[i - 1]))) return s.slice(0, i).trim();
+    }
+    return s.trim();
+  };
   const lines = step.split("\n");
   const at = lines.findIndex((l) => /^ {8}with:/.test(l));
   if (at < 0) return {};
@@ -374,7 +385,8 @@ function stepInputs(step) {
   }
   return Object.fromEntries(pairs.map(([k, v]) => [k, v.trim().replace(/^(["'])(.*)\1$/, "$2")]));
 }
-const checkoutSteps = (body) => Object.values(jobs(body)).flatMap(steps).filter((s) => /^ {6}- (?:name: .*\n {8})?uses: actions\/checkout@/m.test(s));
+// `uses:` is the step's own key wherever it sits: on the `- ` line or on any line indented to the step's keys
+const checkoutSteps = (body) => Object.values(jobs(body)).flatMap(steps).filter((s) => /^(?: {6}- | {8})uses: actions\/checkout@/m.test(s));
 
 test("no checkout in ci.yml or security.yml leaves the token on disk", () => {
   // By default actions/checkout keeps GITHUB_TOKEN in .git/config, where every later step can read it (zizmor `artipacked`).
@@ -395,4 +407,8 @@ test("no checkout in ci.yml or security.yml leaves the token on disk", () => {
   assert.deepEqual(read(`${uses}        with: { fetch-depth: 0 } # persist-credentials: false\n`), [undefined]);
   assert.deepEqual(read(`${uses}      - name: prepare # persist-credentials: false\n        run: true\n`), [undefined]);
   assert.deepEqual(read(`${uses}        with: { persist-credentials: falsey }\n`), ["falsey"]);
+  assert.deepEqual(read(`${uses}        with:\n          persist-credentials: false # don't persist the token\n`), ["false"]);
+  assert.deepEqual(read(`${uses}        with: { persist-credentials: false } # don't persist the token\n`), ["false"]);
+  assert.deepEqual(read(`      - id: co\n        if: always()\n        uses: actions/checkout@v7\n        with: { fetch-depth: 0 }\n`), [undefined]);
+  assert.deepEqual(read(`      - name: Not a checkout\n        uses: actions/setup-node@v7\n        with:\n          note: "uses: actions/checkout@v7"\n`), []);
 });
