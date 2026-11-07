@@ -5,8 +5,9 @@ import { readFileSync, readdirSync } from "node:fs";
 // No `${{ }}` expression inside a `run:` script of any workflow. GitHub pastes such an expression into the script text
 // before the shell runs it, so a value that contains shell syntax becomes code (zizmor's template-injection audit). The
 // value goes into the step's or the job's `env:` and the script reads it as a quoted shell variable instead. Static check
-// of the files (no YAML library; the workflows share one style): a `run:` line, and for `run: |` or `run: >` every line
-// indented deeper than the key.
+// of the files (no YAML library; the workflows share one style): a `run:` line, and for a block scalar (`run: |` or `run: >`, with
+// optional chomping and indentation indicators in either order, such as `|2-` or `>-2`) every line indented deeper
+// than the key.
 
 const DIR = ".github/workflows";
 
@@ -19,7 +20,7 @@ function runScripts(source) {
     if (!m) continue;
     const keyIndent = m[1].length + (m[2] ? 2 : 0);
     const body = [{ line: i + 1, text: m[3] }];
-    if (/^[|>][-+]?\s*(#.*)?$/.test(m[3])) {
+    if (/^[|>](?:[1-9][-+]?|[-+][1-9]?)?\s*(#.*)?$/.test(m[3])) {
       for (let j = i + 1; j < lines.length; j++) {
         const l = lines[j];
         if (l.trim() !== "" && l.length - l.trimStart().length <= keyIndent) break;
@@ -72,9 +73,13 @@ test("the check finds an expression in a one-line run, a block run and a list-it
     "        with: { ref: \"${{ github.ref }}\" }",
     "      - run: >-",
     "          echo fine",
+    "      - run: |2-",
+    "          echo ${{ github.head_ref }}",
+    "      - run: >+1",
+    "         echo ${{ github.head_ref }}",
   ].join("\n");
   assert.deepEqual(
     offending(sample).map(({ line }) => line),
-    [4, 10],
+    [4, 10, 16, 18],
   );
 });
