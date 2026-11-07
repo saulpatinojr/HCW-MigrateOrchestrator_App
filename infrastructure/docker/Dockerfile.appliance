@@ -1,8 +1,11 @@
 # syntax=docker/dockerfile:1.7
 # Both base images are pinned by digest (tag@sha256:...); Dependabot (docker ecosystem) proposes updates.
+# Base: node:26-trixie-slim (Debian 13), the multi-arch index digest read from Docker Hub on 2026-11-07, the same digest the
+# downstream lab image pins (HCW-MigrateOrchestrator_AddOn Dockerfile.lab, 0.3.3). Moved from node:26-bookworm-slim (Debian 12),
+# whose apt 2.6.1 carries CVE-2026-109518. Change both FROM lines together; tests/security/base-image-pins.test.mjs pins the shape.
 # Azure Migration Orchestrator — appliance API + worker. Managed identity / WIF only; no client secrets accepted at startup.
 # Single-repository build (ADR-0028): the engine, rules and appliance all live here.
-FROM node:26-bookworm-slim@sha256:28147155d47dc31abe0a46e0d12b59b2fb3d0a2dcc5dc65fce76a074180b16fe AS build
+FROM node:26-trixie-slim@sha256:5adad64f9a1fca2d51972caa65983634c8a774eb300d72b20f7f2a0f60368072 AS build
 WORKDIR /src
 COPY package.json package-lock.json tsconfig.base.json tsconfig.build.json ./
 COPY packages ./packages
@@ -10,11 +13,23 @@ COPY apps ./apps
 # tsc -b --force: stale *.tsbuildinfo in a build context must never suppress emission.
 RUN npm ci --no-audit --no-fund && npx tsc -b tsconfig.build.json --force && npm prune --omit=dev
 
-FROM node:26-bookworm-slim@sha256:28147155d47dc31abe0a46e0d12b59b2fb3d0a2dcc5dc65fce76a074180b16fe
+FROM node:26-trixie-slim@sha256:5adad64f9a1fca2d51972caa65983634c8a774eb300d72b20f7f2a0f60368072
 ENV NODE_ENV=production PORT=8081 AMO_RULES_DIR=/app/rules AMO_CREDENTIAL_KIND=managed-identity
 WORKDIR /app
-# Pull the latest Debian security fixes for the base image (Trivy gates publication on fixed HIGH/CRITICAL CVEs).
-RUN apt-get update && apt-get -y --no-install-recommends upgrade && apt-get clean && rm -rf /var/lib/apt/lists/*
+# Debian's security updates on top of the digest-pinned base (Trivy gates publication on fixed HIGH/CRITICAL CVEs). A security
+# upload reaches the mirrors days before the official Node image is rebuilt with it; this step closes that window.
+# `Acquire::Retries=0`: the apt doing this upgrade is still the base's, and CVE-2026-109518 needs a download retry to slip an
+# unverified package in, so retries stay off (a mirror hiccup fails the build instead).
+# `--error-on=any`: the update fails if any index (the security one above all) cannot be fetched, instead of succeeding with a
+# warning and leaving the base unupgraded. PUBLISH_CACHE_BUST is a per-run value publish-images.yml passes (run id and attempt);
+# naming it in the command gives this layer a new cache key on every publish run, so a rebuild never reuses an older upgrade
+# result. Unset on a local or CI build, where the layer caches as usual.
+ARG PUBLISH_CACHE_BUST=
+RUN printf 'upgrade run: %s\n' "${PUBLISH_CACHE_BUST}" \
+    && apt-get -o Acquire::Retries=0 update --error-on=any \
+    && apt-get -o Acquire::Retries=0 upgrade -y --no-install-recommends \
+    && apt-get clean \
+    && rm -rf /var/lib/apt/lists/*
 COPY --from=build /src/node_modules ./node_modules
 COPY --from=build /src/packages ./packages
 COPY --from=build /src/apps/appliance-api ./apps/appliance-api

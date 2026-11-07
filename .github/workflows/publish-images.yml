@@ -4,6 +4,9 @@
 # that digest -> tag it. A failing scan gives the image no tag and no attestation. Deployments reference the digest this run
 # prints, never a tag.
 #
+# Both builds pass PUBLISH_CACHE_BUST (this run's id and attempt) to the Dockerfile's security-upgrade layer, so a rehearsal or a
+# publish run never reuses an older `apt-get upgrade` result from the builder cache (the downstream lab image does the same).
+#
 # Two paths, two jobs, and only one of them can reach Docker Hub:
 #   - A v* tag push runs build-scan-publish: the Docker OIDC login, the push, the tag, the attestation. It is the ONLY job with
 #     id-token: write and attestations: write, and its `if` is the push gate: DOCKERHUB_ENABLED and a refs/tags/v* ref.
@@ -76,6 +79,7 @@ jobs:
           tags: ${{ env.IMAGE }}:rehearsal
           provenance: false
           sbom: false
+          build-args: PUBLISH_CACHE_BUST=${{ github.run_id }}-${{ github.run_attempt }}
       - name: Scan the local image (HIGH/CRITICAL, fixed only)
         uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25 # v0.36.0
         with: { image-ref: "${{ env.IMAGE }}:rehearsal", exit-code: "1", severity: "HIGH,CRITICAL", ignore-unfixed: true }
@@ -141,6 +145,7 @@ jobs:
           labels: ${{ steps.meta.outputs.labels }}
           provenance: true
           sbom: true
+          build-args: PUBLISH_CACHE_BUST=${{ github.run_id }}-${{ github.run_attempt }}
       - name: Scan that digest before it gets a tag (HIGH/CRITICAL, fixed only)
         uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25 # v0.36.0
         with: { image-ref: "${{ env.IMAGE }}@${{ steps.build.outputs.digest }}", exit-code: "1", severity: "HIGH,CRITICAL", ignore-unfixed: true }
