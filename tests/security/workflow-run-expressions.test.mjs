@@ -5,9 +5,9 @@ import { readFileSync, readdirSync } from "node:fs";
 // No `${{ }}` expression inside a `run:` script of any workflow. GitHub pastes such an expression into the script text
 // before the shell runs it, so a value that contains shell syntax becomes code (zizmor's template-injection audit). The
 // value goes into the step's or the job's `env:` and the script reads it as a quoted shell variable instead. Static check
-// of the files (no YAML library; the workflows share one style): a `run:` line, and for a block scalar (`run: |` or `run: >`, with
-// optional chomping and indentation indicators in either order, such as `|2-` or `>-2`) every line indented deeper
-// than the key.
+// of the files (no YAML library; the workflows share one style, and a step written as a flow mapping is refused
+// below): a `run:` line, and for a block scalar (`run: |` or `run: >`, with optional chomping and indentation
+// indicators in either order, such as `|2-` or `>-2`) every line indented deeper than the key.
 
 const DIR = ".github/workflows";
 
@@ -37,6 +37,14 @@ const offending = (source) =>
     .flat()
     .filter(({ text }) => text.includes("${{"));
 
+/** Lines that write a `run:` inside a flow mapping (`- { run: ... }`), which the line-based check above cannot read. */
+const flowStyleRuns = (source) =>
+  source
+    .replace(/\r\n/g, "\n")
+    .split("\n")
+    .map((text, i) => ({ line: i + 1, text }))
+    .filter(({ text }) => /[{,]\s*["']?run["']?\s*:/.test(text.replace(/#.*$/, "")));
+
 const workflows = readdirSync(DIR).filter((f) => /\.ya?ml$/.test(f));
 
 test("no workflow pastes a ${{ }} expression into a run script", () => {
@@ -49,6 +57,29 @@ test("no workflow pastes a ${{ }} expression into a run script", () => {
       `${file}: move each expression into env: and read it as a quoted shell variable`,
     );
   }
+});
+
+test("no workflow writes a step's run in flow style, which the check above cannot read", () => {
+  for (const file of workflows) {
+    assert.deepEqual(
+      flowStyleRuns(readFileSync(`${DIR}/${file}`, "utf8")).map(({ line, text }) => `${file}:${line}: ${text.trim()}`),
+      [],
+      `${file}: write each step as a block mapping (one key per line) so the run-expression check can read it`,
+    );
+  }
+});
+
+test("the flow-style refusal finds run inside braces and ignores block keys", () => {
+  const sample = [
+    "      - { run: 'echo \"${{ github.ref }}\"' }",
+    "      - { name: x, run: echo hi }",
+    "      - name: block",
+    "        run: echo fine # { run: in a comment }",
+  ].join("\n");
+  assert.deepEqual(
+    flowStyleRuns(sample).map(({ line }) => line),
+    [1, 2],
+  );
 });
 
 test("scanners.yml: the OSV summary step reads the outcome from env", () => {
