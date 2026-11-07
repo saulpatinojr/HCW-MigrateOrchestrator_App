@@ -37,11 +37,14 @@ jobs:
             ./
       - name: Say what happened in the run summary
         if: always()
+        # The outcome reaches the script as an environment variable, never as an expression pasted into its text (template injection).
+        env:
+          OSV_OUTCOME: ${{ steps.osv.outcome }}
         run: |
-          if [ "${{ steps.osv.outcome }}" = "success" ]; then
+          if [ "$OSV_OUTCOME" = "success" ]; then
             echo "OSV-Scanner found no known-vulnerable dependencies in the lockfiles." >> "$GITHUB_STEP_SUMMARY"
           else
-            echo "OSV-Scanner reported findings or could not finish (step outcome: ${{ steps.osv.outcome }}). Report only: see the Security tab, code scanning, category osv-scanner." >> "$GITHUB_STEP_SUMMARY"
+            echo "OSV-Scanner reported findings or could not finish (step outcome: ${OSV_OUTCOME}). Report only: see the Security tab, code scanning, category osv-scanner." >> "$GITHUB_STEP_SUMMARY"
           fi
       - name: Upload the findings to the Security tab
         if: always() && hashFiles('osv-results.sarif') != ''
