@@ -16,9 +16,9 @@ function runScripts(source) {
   const lines = source.replace(/\r\n/g, "\n").split("\n");
   const found = [];
   for (let i = 0; i < lines.length; i++) {
-    const m = /^(\s*)(- )?run:\s*(.*)$/.exec(lines[i]);
+    const m = /^(\s*)(-\s+)?run:\s*(.*)$/.exec(lines[i]);
     if (!m) continue;
-    const keyIndent = m[1].length + (m[2] ? 2 : 0);
+    const keyIndent = m[1].length + (m[2] ? m[2].length : 0);
     const body = [{ line: i + 1, text: m[3] }];
     if (/^[|>](?:[1-9][-+]?|[-+][1-9]?)?\s*(#.*)?$/.test(m[3])) {
       for (let j = i + 1; j < lines.length; j++) {
@@ -77,9 +77,12 @@ test("the check finds an expression in a one-line run, a block run and a list-it
     "          echo ${{ github.head_ref }}",
     "      - run: >+1",
     "         echo ${{ github.head_ref }}",
+    "      -   run: echo ${{ github.ref }}",
+    "      -   run: |",
+    "            echo ${{ github.head_ref }}",
   ].join("\n");
   assert.deepEqual(
     offending(sample).map(({ line }) => line),
-    [4, 10, 16, 18],
+    [4, 10, 16, 18, 19, 21],
   );
 });
