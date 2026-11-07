@@ -33,3 +33,11 @@ runtime dependency rule of ADR-0002 stands. The Coder workspace image is unaffec
 - Future runtime bumps follow the same rule: one coordinated change across the surfaces in the table, verified by `npm test`,
   the clean-consumer gate, local image builds with a vulnerability scan, and a release tag that exercises the publish
   workflows — never a lone Dockerfile bump.
+
+## Note (2026-11-07): the Debian release under Node 26 moves to 13 "trixie"
+
+The Node floor is unchanged (26); only the Debian release the images and the devcontainer sit on moves. `Dockerfile.lab`
+(downstream, AddOn 0.3.3, 2026-11-05) and `Dockerfile.appliance` (here, 2026-11-07) now build on `node:26-trixie-slim`,
+pinned by digest, and the devcontainer uses `mcr.microsoft.com/devcontainers/typescript-node:26-trixie`. Reason: Debian 12's
+apt 2.6.1 carries CVE-2026-109518, which the website's Docker Scout check refused on the lab image; Debian 13 is the current
+stable release. The table above records the decision as it was taken on 2026-10-04.

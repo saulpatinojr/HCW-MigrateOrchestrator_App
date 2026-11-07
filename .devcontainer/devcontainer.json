@@ -1,6 +1,6 @@
 {
   "name": "azure-migration-orchestrator",
-  "image": "mcr.microsoft.com/devcontainers/typescript-node:26-bookworm",
+  "image": "mcr.microsoft.com/devcontainers/typescript-node:26-trixie",
   "features": {
     "ghcr.io/devcontainers/features/terraform:1": {},
     "ghcr.io/devcontainers/features/powershell:1": {},
