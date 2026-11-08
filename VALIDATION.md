@@ -187,6 +187,11 @@ The Terraform in `infrastructure/terraform/appliance-azure` was applied to one n
 - **Executed (Linux sandbox, Node 26.13.0):** `npm ci`; `npm test` — 362 passed, 0 failed, including the new runner-label test in `tests/release/release-workflows.test.mjs` (also run against `main`'s `ci.yml`, where it failed on `runs-on: ubuntu-latest`, as it should); `npm run rules:validate` — 35 rules, snapshot 1.0.35. A grep over `.github/` finds `ubuntu-latest` only in the kept `release-cli.yml` `sea` matrix.
 - **Not executed:** actionlint and zizmor (downloading them is refused here, and this repository's CI does not run actionlint); no workflow has run on `ubuntu-26.04` yet, so the pull request's own CI run is the first proof for `ci.yml`, `security.yml`, `scanners.yml` and `iac-validate.yml`, and the release, publish, rules-refresh, repository-admin and Copilot setup workflows are first proved on their next manual or scheduled run.
 
+## No expressions inside `run:` scripts (2026-11-07)
+
+- **Executed (Linux sandbox, Node 26.13.0):** `npm ci` (0 vulnerabilities); `npm test` — 364 passed, 0 failed, including the new `tests/security/workflow-run-expressions.test.mjs` (3 tests). That test was also run with the `main` version of `scanners.yml` and, separately, of `iac-validate.yml` in place, and failed on each, naming the offending lines (`scanners.yml:41` and `:44`; `iac-validate.yml:22`, `:23`, `:24`, `:26`). `npm run rules:validate` — 35 rules, snapshot 1.0.35.
+- **Not executed:** actionlint and zizmor (downloading the linters is refused in this sandbox), so the claim that zizmor no longer reports template injection in these two files rests on the change itself and the test, not on a zizmor run; `security.yml`'s workflow-file CodeQL analysis and the `scanners` and `iac-validate` runs on the pull request are the first live proof. The test reads the workflows line by line (no YAML parser), which fits their one shared style but is not a YAML-aware check.
+
 ## Not implemented
 
 Execution beyond Resource Mover; Bicep/ARM mainTemplate for Marketplace; PDF/HTML reports; rate limiting and concurrency bounds (delivered downstream in `_Addon/apps/lab-api`, ADR-0030); persistence of enterprise assessments; cost/capacity live checks (agent defined, returns unknown without authenticated APIs).
