@@ -421,3 +421,16 @@ test("no checkout in ci.yml or security.yml leaves the token on disk", () => {
   assert.deepEqual(read(`      - uses: Actions/Checkout@v7\n        with: { fetch-depth: 0 }\n`), [undefined]);
   assert.deepEqual(read(`      - name: Not a checkout\n        uses: actions/setup-node@v7\n        with:\n          note: "uses: actions/checkout@v7"\n`), []);
 });
+
+test("every job runs on the pinned ubuntu-26.04 image, except the cross-OS binary matrix of release-cli", () => {
+  // A pinned label changes only when someone edits it here; ubuntu-latest moves when GitHub moves it. The `sea` matrix of
+  // release-cli keeps ubuntu-latest beside macos-latest and windows-latest, the labels ADR-0034's binary names assume.
+  for (const name of ALL) {
+    for (const line of code(name).split("\n").filter((l) => /^\s*runs-on:/.test(l))) {
+      const label = line.split("runs-on:")[1].trim();
+      if (name === RELEASE && label === "${{ matrix.os }}") continue;
+      assert.equal(label, "ubuntu-26.04", `${name}: ${line.trim()}`);
+    }
+  }
+  assert.match(text(RELEASE), /os: \[ubuntu-latest, macos-latest, windows-latest\]/);
+});

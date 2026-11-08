@@ -7,7 +7,7 @@ permissions:
   contents: read
 jobs:
   build-test:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-26.04
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with: { persist-credentials: false }
@@ -26,7 +26,7 @@ jobs:
 
   packed-consumer:
     # The packages the web-front edition and the website install: pack, install from tarballs into an empty project, run, type-check.
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-26.04
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with: { persist-credentials: false }
@@ -37,7 +37,7 @@ jobs:
 
   generated-terraform:
     # Proves the generated bundle (not just the repo's own IaC) passes terraform validate.
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-26.04
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with: { persist-credentials: false }
@@ -59,7 +59,7 @@ jobs:
   appliance-image:
     # Builds the appliance image without pushing it, lints the Dockerfile, scans the image and starts it once, so a broken
     # or vulnerable image shows up in the pull request and not at release time. The release workflow repeats the scan.
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-26.04
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with: { persist-credentials: false }

@@ -48,7 +48,7 @@ concurrency:
   cancel-in-progress: false
 jobs:
   check:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-26.04
     outputs:
       version: ${{ steps.guard.outputs.version }}
     steps:
@@ -104,7 +104,7 @@ jobs:
 
   packages:
     needs: check
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-26.04
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with: { persist-credentials: false }
@@ -141,7 +141,7 @@ jobs:
 
   inventory:
     needs: [check, sea, packages]
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-26.04
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with: { persist-credentials: false }
@@ -165,7 +165,7 @@ jobs:
   attest:
     needs: [check, inventory]
     if: github.event_name == 'push' || inputs.attest
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-26.04
     permissions:
       contents: read
       id-token: write # to get the signing certificate for the attestations
@@ -213,7 +213,7 @@ jobs:
   verify-attestations:
     needs: [check, attest]
     if: github.event_name == 'push' || inputs.attest
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-26.04
     permissions:
       contents: read
       attestations: read # gh attestation verify
@@ -238,7 +238,7 @@ jobs:
   release:
     needs: [check, inventory, attest, verify-attestations]
     if: github.event_name == 'push' && startsWith(github.ref, 'refs/tags/v')
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-26.04
     permissions:
       contents: write # to create and publish the release: this job is the only one that has it
       attestations: read # to verify them
@@ -266,7 +266,7 @@ jobs:
   post-release:
     needs: [check, release]
     if: github.event_name == 'push' && startsWith(github.ref, 'refs/tags/v')
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-26.04
     permissions:
       contents: read
       attestations: read

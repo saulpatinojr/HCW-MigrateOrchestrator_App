@@ -15,7 +15,7 @@ permissions:
 jobs:
   osv-scanner:
     # Scorecard cannot judge pull requests, so only this job runs on them.
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-26.04
     timeout-minutes: 15
     permissions:
       contents: read
@@ -56,7 +56,7 @@ jobs:
 
   scorecard:
     if: github.event_name != 'pull_request'
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-26.04
     timeout-minutes: 15
     permissions:
       contents: read
