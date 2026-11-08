@@ -35,7 +35,7 @@ jobs:
   # both start from the same tag, and the image can be pushed even if the release run fails (and the reverse).
   check:
     if: vars.DOCKERHUB_ENABLED == 'true'
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-26.04
     steps:
       - name: A manual run is only allowed on main
         if: github.event_name != 'push' && github.ref != 'refs/heads/main'
@@ -59,7 +59,7 @@ jobs:
   rehearse:
     needs: check
     if: vars.DOCKERHUB_ENABLED == 'true' && github.event_name == 'workflow_dispatch'
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-26.04
     permissions:
       contents: read # the checkout, and nothing else
     steps:
@@ -95,7 +95,7 @@ jobs:
   build-scan-publish:
     needs: check
     if: vars.DOCKERHUB_ENABLED == 'true' && github.event_name == 'push' && startsWith(github.ref, 'refs/tags/v')
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-26.04
     permissions:
       contents: read
       id-token: write # the Docker token exchange, and Sigstore's signing certificate

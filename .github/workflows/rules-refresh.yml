@@ -15,7 +15,7 @@ permissions:
   contents: read
 jobs:
   diff:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-26.04
     environment: admin-ops
     steps:
       # persist-credentials: false — create-pull-request pushes with its own token; with the checkout's persisted
