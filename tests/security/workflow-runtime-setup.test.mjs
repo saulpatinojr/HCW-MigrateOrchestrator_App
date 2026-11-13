@@ -81,14 +81,29 @@ const INDIRECT_RUNTIME = {
 // (`env FOO=1 node`, `sudo node`, `if node ...; then`).
 const ASSIGNMENT = String.raw`[A-Za-z_][A-Za-z0-9_]*=(?:"(?:[^"\\]|\\.)*"|'[^']*'|[^\s"'])*\s+`;
 // Words that run the next word, each with the options it may take first: the letters of the options that take an
-// argument (`sudo -u nobody`, `nice -n 10`), and any other `-x`/`--long` flag. `command` only with `-p`, because
-// `command -v node` looks node up and runs nothing.
-const WRAPPER_OPTIONS = { env: "uCS", sudo: "ugCDhprtU", xargs: "InPLdaEs", exec: "a", time: "of", nice: "n" };
+// argument (`sudo -u nobody`, `nice -n 10`), any other `-x`/`--long` flag, and the `--` that ends the options
+// (`env -- node`). `timeout` also takes its duration (`timeout 60 node`). `command` only with `-p` or `--`, because
+// `command -v node` looks node up and runs nothing. Ported from the website's copy (HCW-HybridCloudWorks#1707).
+const WRAPPER_OPTIONS = {
+  env: "uCS",
+  sudo: "ugCDhprtU",
+  xargs: "InPLdaEs",
+  exec: "a",
+  time: "of",
+  nice: "n",
+  nohup: "",
+  stdbuf: "ioe",
+  timeout: "sk",
+};
+const optionsOf = (takes) =>
+  String.raw`(?:\s+(?:${takes ? String.raw`-[A-Za-z]*[${takes}]\s*[^\s-]\S*|` : ""}--?\w[\w-]*(?:=\S+)?|--(?=\s)))*`;
 const WRAPPERS = [
-  ...Object.entries(WRAPPER_OPTIONS).map(
-    ([word, takes]) => String.raw`${word}(?:\s+(?:-[A-Za-z]*[${takes}]\s*[^\s-]\S*|--?\w[\w-]*(?:=\S+)?))*\s+`,
+  ...Object.entries(WRAPPER_OPTIONS).map(([word, takes]) =>
+    word === "timeout"
+      ? String.raw`timeout${optionsOf(takes)}\s+\d+(?:\.\d+)?[smhd]?\s+`
+      : String.raw`${word}${optionsOf(takes)}\s+`,
   ),
-  String.raw`command(?:\s+-p)*\s+`,
+  String.raw`command(?:\s+(?:-p|--(?=\s)))*\s+`,
   String.raw`(?:if|then|else|elif|do|while|until|!)\s+`,
 ].join("|");
 // A `case` pattern that ends at the start of a line (`check)`, `a|b)`), after which a command may follow.
@@ -614,6 +629,12 @@ test("runsRuntime finds node and python in command position", () => {
     "env -i npm ci",
     "nice -n 10 node x.js",
     "xargs -n 1 node",
+    "env -- node script.mjs",
+    "command -- node scripts/x.mjs",
+    "command -p -- npm ci",
+    "sudo -u nobody -- node x.js",
+    "timeout 60 node x.js",
+    "nohup node x.js",
     "a|b) node x.js ;;",
     "sudo node x",
     "xargs node x",
@@ -650,6 +671,9 @@ test("runsRuntime finds node and python in command position", () => {
     "sudo -u nobody python3 check.py",
     "sudo -u runner python3 check.py",
     "time -p python3 check.py",
+    "sudo -- python3 check.py",
+    "timeout -k 5 1m python3 x.py",
+    "stdbuf -oL python3 x.py",
     "check) python3 scripts/check.py ;;",
     "docker run --rm img bash -c 'x' && python3 y.py",
   ];
