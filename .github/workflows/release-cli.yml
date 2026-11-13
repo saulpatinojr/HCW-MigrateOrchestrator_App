@@ -83,7 +83,8 @@ jobs:
       - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
         with: { node-version: 26, package-manager-cache: false }
       - run: npm ci && npm run build
-      - run: bash scripts/build-sea.sh
+      - name: Build the single-file binary
+        run: bash scripts/build-sea.sh
         shell: bash
       - name: Smoke test (the one binary; checksum files are skipped)
         shell: bash

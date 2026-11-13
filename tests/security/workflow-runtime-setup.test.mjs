@@ -73,7 +73,7 @@ const RUNNER_DEFAULT_ALLOWED = {};
 const INDIRECT_RUNTIME = {
   "iac-validate.yml > terraform > checkov > python":
     "pipx is a Python program, and `pipx run` installs checkov into a virtual environment of the Python it is given",
-  "release-cli.yml > sea > step 4 > node": "`bash scripts/build-sea.sh` runs `node` and `npx esbuild`, and copies that node into the binary",
+  "release-cli.yml > sea > Build the single-file binary > node": "`bash scripts/build-sea.sh` runs `node` and `npx esbuild`, and copies that node into the binary",
 };
 
 // Where a command may start: the line's start or an opening or joining character, then any `NAME=value` assignments
