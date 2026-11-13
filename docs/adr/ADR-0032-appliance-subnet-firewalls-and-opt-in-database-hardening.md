@@ -119,7 +119,7 @@ in `main.tf`. The ticket's `CKV2_AZURE_31` (NSG on two subnets) is fixed by sect
   skipped by a `#checkov:skip=` comment inside `azurerm_postgresql_flexible_server.db` in `main.tf`, with the reason written beside it
   (sections 3 and 4). The run now reports 0 failed, 2 skipped, and the workflow step fails the job on any new finding, so the
   skip comments are the stored baseline: a new finding fails, and removing a skip makes the old one fail again. The earlier prose
-  baseline below stays as the Trivy record. The checkov step installs the pinned version with `pipx` on the runner; its own dependencies are not pinned.
+  baseline below stays as the Trivy record. The checkov step installs the pinned version with `pipx` on the runner; its own dependencies are not pinned. Since 2026-11-13 it runs on Python 3.15, set up by `actions/setup-python` and handed to `pipx run --python`, not on the runner's own Python (HCW-HybridCloudWorks#1707).
 - **Geo-redundant backup is validated against region pairs (added 2026-10-25).** `postgres_geo_redundant_backup_enabled = true` is refused at plan time when
   `location` is one of the regions that Learn's [region pairs page](https://learn.microsoft.com/azure/reliability/regions-paired) shows
   without a pair (Chile Central, Mexico Central, Austria East, Belgium Central, Denmark East, Italy North, Poland Central, Spain

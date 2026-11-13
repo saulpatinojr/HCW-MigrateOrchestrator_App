@@ -1,11 +1,12 @@
 # syntax=docker/dockerfile:1.7
 # Both base images are pinned by digest (tag@sha256:...); Dependabot (docker ecosystem) proposes updates.
-# Base: node:26-trixie-slim (Debian 13), the multi-arch index digest read from Docker Hub on 2026-11-07, the same digest the
-# downstream lab image pins (HCW-MigrateOrchestrator_AddOn Dockerfile.lab, 0.3.3). Moved from node:26-bookworm-slim (Debian 12),
-# whose apt 2.6.1 carries CVE-2026-109518. Change both FROM lines together; tests/security/base-image-pins.test.mjs pins the shape.
+# Base: node:26-trixie-slim (Debian 13), the multi-arch index digest read from Docker Hub on 2026-11-13: Node 26.13.1 (NODE_VERSION
+# in the linux/amd64 image config), Node's 2026-11-11 security release; the 26.13.1-trixie-slim tag resolves to the same digest.
+# Moved from node:26-bookworm-slim (Debian 12), whose apt 2.6.1 carries CVE-2026-109518. Change both FROM lines together;
+# tests/security/base-image-pins.test.mjs pins the shape.
 # Azure Migration Orchestrator — appliance API + worker. Managed identity / WIF only; no client secrets accepted at startup.
 # Single-repository build (ADR-0028): the engine, rules and appliance all live here.
-FROM node:26-trixie-slim@sha256:5adad64f9a1fca2d51972caa65983634c8a774eb300d72b20f7f2a0f60368072 AS build
+FROM node:26-trixie-slim@sha256:e6bedef217677b276c591795e169840edd9096dbf13f29df8ef8d1856b8820bc AS build
 WORKDIR /src
 COPY package.json package-lock.json tsconfig.base.json tsconfig.build.json ./
 COPY packages ./packages
@@ -13,7 +14,7 @@ COPY apps ./apps
 # tsc -b --force: stale *.tsbuildinfo in a build context must never suppress emission.
 RUN npm ci --no-audit --no-fund && npx tsc -b tsconfig.build.json --force && npm prune --omit=dev
 
-FROM node:26-trixie-slim@sha256:5adad64f9a1fca2d51972caa65983634c8a774eb300d72b20f7f2a0f60368072
+FROM node:26-trixie-slim@sha256:e6bedef217677b276c591795e169840edd9096dbf13f29df8ef8d1856b8820bc
 ENV NODE_ENV=production PORT=8081 AMO_RULES_DIR=/app/rules AMO_CREDENTIAL_KIND=managed-identity
 WORKDIR /app
 # Debian's security updates on top of the digest-pinned base (Trivy gates publication on fixed HIGH/CRITICAL CVEs). A security
