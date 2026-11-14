@@ -46,6 +46,10 @@ try {
   const uiPkg = JSON.parse(readFileSync(join(proj, "node_modules/@hybridcloudworks/migration-ui/package.json"), "utf8"));
   if (EXPECT_VERSION) for (const pkg of [corePkg, uiPkg]) if (pkg.version !== EXPECT_VERSION) throw new Error(`${pkg.name} installed as ${pkg.version}, expected ${EXPECT_VERSION}`);
   for (const bad of ["./azure-auth", "./azure-arm", "./azure-execution"]) if (bad in corePkg.exports) throw new Error(`published core must not export ${bad}`);
+  for (const name of ["migration-core", "migration-ui"]) {
+    const licence = join(proj, "node_modules/@hybridcloudworks", name, "LICENSE");
+    if (!existsSync(licence) || !readFileSync(licence, "utf8").startsWith("MIT License")) throw new Error(`@hybridcloudworks/${name} does not carry the MIT licence text (LICENSE)`);
+  }
 
   // 2. runtime: assess the sample through the installed package, rules found inside node_modules without configuration
   writeFileSync(join(proj, "consumer.mjs"), `

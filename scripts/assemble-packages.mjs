@@ -5,6 +5,8 @@
  *   dist-packages/migration-ui    — @hybridcloudworks/migration-ui: the React explorer components (types reference migration-core)
  * The Azure clients (azure-auth, azure-arm, azure-execution) are deliberately NOT published: the web-front edition must be
  * technically unable to reach Azure (ADR-0008). Run after `tsc -b`. `--version X.Y.Z` overrides the root package version.
+ * Each package gets a copy of the root LICENSE (MIT asks for its notice to travel with every copy); npm packs a root
+ * LICENSE whatever `files` says, and it is listed there too so the intent is visible.
  */
 import { cpSync, existsSync, mkdirSync, readdirSync, readFileSync, rmSync, statSync, writeFileSync } from "node:fs";
 import { dirname, join, posix, relative, sep } from "node:path";
@@ -20,6 +22,7 @@ const CORE_NAME = "@hybridcloudworks/migration-core";
 const UI_NAME = "@hybridcloudworks/migration-ui";
 const REPO = "https://github.com/saulpatinojr/HCW-MigrateOrchestrator_App";
 const OUT = join(ROOT, "dist-packages");
+const LICENSE = join(ROOT, "LICENSE");
 
 const isShipped = (f) => !/\.test\.(js|d\.ts)$/.test(f) && !f.endsWith(".map") && !f.endsWith(".tsbuildinfo");
 const walk = (dir) => readdirSync(dir, { withFileTypes: true }).flatMap((e) => (e.isDirectory() ? walk(join(dir, e.name)) : [join(dir, e.name)]));
@@ -66,7 +69,7 @@ writeFileSync(join(coreDir, "package.json"), JSON.stringify({
   license: "MIT", type: "module", sideEffects: false, engines: { node: ">=26" },
   repository: { type: "git", url: `${REPO}.git` }, homepage: REPO, bugs: `${REPO}/issues`,
   keywords: ["azure", "migration", "resource-mover", "azure-migrate", "assessment", "terraform"],
-  files: ["dist", "rules", "README.md"], exports: exportsMap, dependencies: {}
+  files: ["dist", "rules", "README.md", "LICENSE"], exports: exportsMap, dependencies: {}
 }, null, 2) + "\n");
 writeFileSync(join(coreDir, "README.md"), `# ${CORE_NAME}
 
@@ -84,6 +87,8 @@ This package contains no Azure SDK and no Azure client: the \`./azure-discovery\
 Every assessment output is labelled, hashed and traceable to rule versions; generated Terraform is illustrative scaffolding, not production-approved. License: MIT.
 `);
 
+cpSync(LICENSE, join(coreDir, "LICENSE"));
+
 // ---- migration-ui ----
 const uiDir = join(OUT, "migration-ui");
 copyDist("ui", join(uiDir, "dist"));
@@ -96,7 +101,7 @@ writeFileSync(join(uiDir, "package.json"), JSON.stringify({
   license: "MIT", type: "module", sideEffects: false, engines: { node: ">=26" },
   repository: { type: "git", url: `${REPO}.git`, directory: "packages/ui" }, homepage: REPO, bugs: `${REPO}/issues`,
   keywords: ["azure", "migration", "react", "explorer"],
-  files: ["dist", "README.md"],
+  files: ["dist", "README.md", "LICENSE"],
   exports: { ".": { types: "./dist/index.d.ts", default: "./dist/index.js" }, "./package.json": "./package.json" },
   dependencies: { [CORE_NAME]: VERSION, ...external },
   peerDependencies: uiSrcPkg.peerDependencies
@@ -117,6 +122,8 @@ Styling uses Tailwind utility classes; add the package to your Tailwind source s
 
 The explorer never asks for credentials and never talks to Azure: it calls the lab API, which processes the uploaded CSV in memory only. License: MIT.
 `);
+
+cpSync(LICENSE, join(uiDir, "LICENSE"));
 
 const n = walk(OUT).length;
 console.log(`assembled ${CORE_NAME}@${VERSION} (${CORE.length} subpaths) and ${UI_NAME}@${VERSION} → ${relative(ROOT, OUT)} (${n} files)`);

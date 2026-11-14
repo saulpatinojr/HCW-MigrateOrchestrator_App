@@ -1,5 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
+import { spawnSync } from "node:child_process";
 import { existsSync, readdirSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 
@@ -41,5 +42,22 @@ test("migration-ui depends on the exact core version, keeps React as a peer and 
   assert.deepEqual(Object.keys(pkg.peerDependencies).sort(), ["react", "react-dom"]);
   for (const f of walk(join(OUT, "migration-ui/dist")).filter((f) => f.endsWith(".js"))) {
     assert.ok(!readFileSync(f, "utf8").includes("@hybridcloudworks/migration-core"), `${f} imports the core at runtime; the UI must only use its types`);
+  }
+});
+
+test("both packages carry the root MIT licence text, and npm pack puts it in the tarball", () => {
+  // Up to 0.4.1 the tarballs said "license": "MIT" but held no LICENSE file; the licence asks for its notice in every copy.
+  const root = readFileSync("LICENSE");
+  for (const name of ["migration-core", "migration-ui"]) {
+    const dir = join(OUT, name);
+    assert.ok(existsSync(join(dir, "LICENSE")), `${name} has no LICENSE`);
+    assert.deepEqual(readFileSync(join(dir, "LICENSE")), root, `${name}/LICENSE differs from the root LICENSE`);
+    const pkg = JSON.parse(readFileSync(join(dir, "package.json"), "utf8"));
+    assert.equal(pkg.license, "MIT");
+    assert.ok(pkg.files.includes("LICENSE"), `${name} package.json files does not list LICENSE`);
+    const packed = spawnSync("npm", ["pack", "--dry-run", "--json", "--ignore-scripts"], { cwd: dir, encoding: "utf8", shell: process.platform === "win32" });
+    assert.equal(packed.status, 0, packed.stderr);
+    const files = JSON.parse(packed.stdout)[0].files.map((f) => f.path);
+    assert.ok(files.includes("LICENSE"), `npm pack leaves LICENSE out of ${name}`);
   }
 });
