@@ -18,8 +18,8 @@
 | hcw-sample-vm-billing-01 | Microsoft.Compute/virtualMachines | native-move | recreate | reconstruct | reconstruct | replicate | azure-resource-mover | medium (0.74) | azure.compute.virtualmachines |
 | hcw-sample-vm-billing-01_OsDisk | Microsoft.Compute/disks | orchestrated-migration | recreate | reconstruct | not-applicable | replicate | azure-resource-mover | medium (0.74) | azure.compute.disks |
 | hcw-sample-avset-billing | Microsoft.Compute/availabilitySets | native-move | recreate | reconstruct | reconstruct | replicate | azure-resource-mover | medium (0.74) | azure.compute.availabilitysets |
-| hcwsamplestbillingprod | Microsoft.Storage/storageAccounts | recreate-and-migrate | recreate | reconstruct | reconstruct | sync-and-cutover | azure-storage-mover | medium (0.74) | org.hcw.storage.storageaccounts.region |
-| hcw-sample-kv-billing | Microsoft.KeyVault/vaults | recreate-and-migrate | recreate | reconstruct | reconstruct | backup-restore | backup-and-restore | medium (0.74) | azure.keyvault.vaults |
+| hcwsamplestbilling | Microsoft.Storage/storageAccounts | recreate-and-migrate | recreate | reconstruct | reconstruct | sync-and-cutover | azure-storage-mover | medium (0.74) | org.hcw.storage.storageaccounts.region |
+| hcw-sample-kv-bill | Microsoft.KeyVault/vaults | recreate-and-migrate | recreate | reconstruct | reconstruct | backup-restore | backup-and-restore | medium (0.74) | azure.keyvault.vaults |
 | hcw-sample-sql-billing-prod-eus | Microsoft.Sql/servers | recreate-and-migrate | recreate | reconstruct | reconstruct | replicate | failover-group | medium (0.74) | azure.sql.servers |
 | hcw-sample-billingdb | Microsoft.Sql/servers/databases | recreate-and-migrate | recreate | reconstruct | not-applicable | replicate | geo-replication | medium (0.74) | azure.sql.servers.databases |
 | hcw-sample-psql-billing-prod-eus | Microsoft.DBforPostgreSQL/flexibleServers | recreate-and-migrate | recreate | reconstruct | reconstruct | replicate | native-database-replication | medium (0.74) | azure.dbforpostgresql.flexibleservers |
@@ -499,7 +499,7 @@
 - Network topology, private endpoints, encryption/CMK, managed identities, RBAC, locks, policy, data size, backup/replication state — require authenticated inspection
 - Data volume, change rate and consistency requirements (needed to size the sync window)
 
-### hcwsamplestbillingprod
+### hcwsamplestbilling
 
 - Type: `Microsoft.Storage/storageAccounts` · Region: eastus · RG: hcw-sample-rg-billing-prod-eus · Application group: billing
 - Disposition: **recreate-and-migrate** via **azure-storage-mover** (alternatives: azcopy, object-replication, azure-data-factory, data-box)
@@ -536,9 +536,9 @@
 - After cutover: re-establish backup and DR protection in the destination (Azure Backup / ASR / native redundancy). This is DR, not migration.
 
 **Evidence**
-- [observed-from-csv] name = hcwsamplestbillingprod
+- [observed-from-csv] name = hcwsamplestbilling
 - [observed-from-csv] type = microsoft.storage/storageaccounts
-- [observed-from-csv] resourceId = /subscriptions/00000000-0000-0000-0000-000000000001/resourceGroups/hcw-sample-rg-billing-prod-eus/providers/Microsoft.Storage/storageAccounts/hcwsamplestbillingprod
+- [observed-from-csv] resourceId = /subscriptions/00000000-0000-0000-0000-000000000001/resourceGroups/hcw-sample-rg-billing-prod-eus/providers/Microsoft.Storage/storageAccounts/hcwsamplestbilling
 - [observed-from-csv] resourceGroup = hcw-sample-rg-billing-prod-eus
 - [observed-from-csv] subscriptionId = 00000000-0000-0000-0000-000000000001
 - [observed-from-csv] location = eastus
@@ -559,7 +559,7 @@
 - Network topology, private endpoints, encryption/CMK, managed identities, RBAC, locks, policy, data size, backup/replication state — require authenticated inspection
 - Data volume, change rate and consistency requirements (needed to size the sync window)
 
-### hcw-sample-kv-billing
+### hcw-sample-kv-bill
 
 - Type: `Microsoft.KeyVault/vaults` · Region: eastus · RG: hcw-sample-rg-billing-prod-eus · Application group: billing
 - Disposition: **recreate-and-migrate** via **backup-and-restore** (alternatives: manual-reconstruction, terraform-redeploy)
@@ -589,9 +589,9 @@
 - After cutover: re-establish backup and DR protection in the destination (Azure Backup / ASR / native redundancy). This is DR, not migration.
 
 **Evidence**
-- [observed-from-csv] name = hcw-sample-kv-billing
+- [observed-from-csv] name = hcw-sample-kv-bill
 - [observed-from-csv] type = microsoft.keyvault/vaults
-- [observed-from-csv] resourceId = /subscriptions/00000000-0000-0000-0000-000000000001/resourceGroups/hcw-sample-rg-billing-prod-eus/providers/Microsoft.KeyVault/vaults/hcw-sample-kv-billing
+- [observed-from-csv] resourceId = /subscriptions/00000000-0000-0000-0000-000000000001/resourceGroups/hcw-sample-rg-billing-prod-eus/providers/Microsoft.KeyVault/vaults/hcw-sample-kv-bill
 - [observed-from-csv] resourceGroup = hcw-sample-rg-billing-prod-eus
 - [observed-from-csv] subscriptionId = 00000000-0000-0000-0000-000000000001
 - [observed-from-csv] location = eastus
@@ -898,7 +898,7 @@
 **Dependencies**
 - parent → hcw-sample-asp-billing-prod-eus [inferred] — an app belongs to an App Service plan (inferred from type and shared resource group; confirm with authenticated discovery)
 - soft → hcw-sample-appi-billing-prod [inferred] — Application Insights connection string in app settings (inferred from type and shared resource group; confirm with authenticated discovery)
-- identity → hcw-sample-kv-billing [inferred] — app settings commonly use Key Vault references (inferred from type and shared resource group; confirm with authenticated discovery)
+- identity → hcw-sample-kv-bill [inferred] — app settings commonly use Key Vault references (inferred from type and shared resource group; confirm with authenticated discovery)
 - identity → hcw-sample-id-billing-app [inferred] — user-assigned identity may be bound to the app (inferred from type and shared resource group; confirm with authenticated discovery)
 
 **Prerequisites**
@@ -959,9 +959,9 @@
 
 **Dependencies**
 - parent → hcw-sample-asp-billing-prod-eus [inferred] — an app belongs to an App Service plan (inferred from type and shared resource group; confirm with authenticated discovery)
-- soft → hcwsamplestbillingprod [inferred] — Function Apps require a storage account (kind contains functionapp) (inferred from type and shared resource group; confirm with authenticated discovery)
+- soft → hcwsamplestbilling [inferred] — Function Apps require a storage account (kind contains functionapp) (inferred from type and shared resource group; confirm with authenticated discovery)
 - soft → hcw-sample-appi-billing-prod [inferred] — Application Insights connection string in app settings (inferred from type and shared resource group; confirm with authenticated discovery)
-- identity → hcw-sample-kv-billing [inferred] — app settings commonly use Key Vault references (inferred from type and shared resource group; confirm with authenticated discovery)
+- identity → hcw-sample-kv-bill [inferred] — app settings commonly use Key Vault references (inferred from type and shared resource group; confirm with authenticated discovery)
 - identity → hcw-sample-id-billing-app [inferred] — user-assigned identity may be bound to the app (inferred from type and shared resource group; confirm with authenticated discovery)
 
 **Prerequisites**
@@ -1379,7 +1379,7 @@ _Everything else binds to these._
 
 - Entry: Destination landing zone scope approved; Address space and naming approved
 - Exit: VNets/subnets/NSGs reachable; Key Vaults and identities exist; Log Analytics receiving data
-- Resources (8): hcw-sample-log-prod-eus, hcw-sample-kv-billing, hcw-sample-id-billing-app, hcw-sample-pip-lb-billing, hcw-sample-vnet-billing-prod-eus, hcw-sample-nsg-app, hcw-sample-rg-billing-prod-eus, hcw-sample-snet-app
+- Resources (8): hcw-sample-log-prod-eus, hcw-sample-kv-bill, hcw-sample-id-billing-app, hcw-sample-pip-lb-billing, hcw-sample-vnet-billing-prod-eus, hcw-sample-nsg-app, hcw-sample-rg-billing-prod-eus, hcw-sample-snet-app
 
 ### Wave 2: Data platforms: storage, databases, registries
 
@@ -1387,7 +1387,7 @@ _Long-running copies start early; applications cut over last._
 
 - Entry: Wave 1 complete; Private connectivity in place; Data copy tooling authorised
 - Exit: Initial copy complete; Reconciliation plan agreed
-- Resources (6): hcw-sample-sql-billing-prod-eus, hcw-sample-billingdb, hcw-sample-cosmos-billing-prod, hcwsamplestbillingprod, hcw-sample-psql-billing-prod-eus, hcwsampleacrbilling
+- Resources (6): hcw-sample-sql-billing-prod-eus, hcw-sample-billingdb, hcw-sample-cosmos-billing-prod, hcwsamplestbilling, hcw-sample-psql-billing-prod-eus, hcwsampleacrbilling
 
 ### Wave 3: Edge and platform: load balancers, gateways, private endpoints, plans
 

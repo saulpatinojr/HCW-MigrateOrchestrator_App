@@ -15,7 +15,7 @@
 
 - Entry: Destination landing zone scope approved; Address space and naming approved
 - [ ] hcw-sample-log-prod-eus: terraform plan/apply the generated module → reconstruct configuration → rebind identities
-- [ ] hcw-sample-kv-billing: backup source → restore to destination → verify inventory
+- [ ] hcw-sample-kv-bill: backup source → restore to destination → verify inventory
 - [ ] hcw-sample-id-billing-app: terraform plan/apply the generated module → reconstruct configuration → rebind identities
 - [ ] hcw-sample-pip-lb-billing: add to Resource Mover move collection → prepare → initiate move → commit after validation
 - [ ] hcw-sample-vnet-billing-prod-eus: add to Resource Mover move collection → prepare → initiate move → commit after validation
@@ -30,7 +30,7 @@
 - [ ] hcw-sample-sql-billing-prod-eus: create geo-secondary / failover group → wait for seeding → planned failover at cutover
 - [ ] hcw-sample-billingdb: create geo-secondary / failover group → wait for seeding → planned failover at cutover
 - [ ] hcw-sample-cosmos-billing-prod: follow service-native relocation (e.g. Cosmos DB add region → change write region → remove source)
-- [ ] hcwsamplestbillingprod: define Storage Mover project/job → initial copy → incremental → cutover
+- [ ] hcwsamplestbilling: define Storage Mover project/job → initial copy → incremental → cutover
 - [ ] hcw-sample-psql-billing-prod-eus: create cross-region replica → monitor lag → promote at cutover
 - [ ] hcwsampleacrbilling: create registry → az acr import per repository/tag → verify manifest digests
 - Exit: Initial copy complete; Reconciliation plan agreed
