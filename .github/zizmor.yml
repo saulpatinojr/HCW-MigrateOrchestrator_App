@@ -2,17 +2,28 @@
 # (HCW-HybridCloudWorks#1707, following #1575).
 #
 # self-repository: two workflows run this repository's own action with
-# `uses: ./.github/actions/self-merging-pr`. zizmor asks for GitHub's newer
+# `uses: ./.github/actions/self-merging-pr`, and that action is handed the
+# App key (secrets.APP_PRIVATE_KEY). zizmor asks for GitHub's newer
 # `uses: $/...` form, which reads the action from the commit that is running
 # rather than from the checked-out folder. That is the better form, but
 # actionlint 1.7.12, the release this CI pins (the same one every HCW
-# repository pins), does not understand `$/` and fails the actionlint step on
-# it. The `./` form is safe in both: the action is read from this
-# repository's own checkout, made earlier in the same job, and nothing is
-# cloned into that folder in between. Ignored for those two lines only, so a
-# new `./` reference anywhere, or an edit that moves one of these, is flagged
-# again (update the line number here once it is checked). Switch to `$/` and
-# drop these entries when actionlint is moved to a release that accepts it.
+# repository pins), does not understand `$/` and fails the actionlint step
+# on it, so both lines are ignored for now. The planned fix is the `$/` form,
+# once actionlint accepts it and it has been tested here.
+#
+# - rehearse-self-merging-pr.yml: between the checkout and that line the job
+#   runs one step, a `printf` that writes .github/rehearsal.txt.
+# - rules-refresh.yml: between the checkout and that line the job runs
+#   `npm ci && npm run build` (dependency install scripts run: .npmrc does not
+#   set ignore-scripts) and `node scripts/refresh-rules-from-learn.mjs`. Any
+#   of them could rewrite the action's files before it runs with the key.
+#   That risk exists on main today and is accepted for now; the mitigation is
+#   that npm ci installs only what package-lock.json names, each package
+#   checked against its integrity hash.
+#
+# Each ignore names a line, and zizmor matches it against the whole step, so
+# the finding comes back if the step moves up, but a move of one line down
+# can stay ignored: check the numbers here whenever these workflows change.
 rules:
   self-repository:
     ignore:

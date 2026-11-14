@@ -30,12 +30,12 @@ jobs:
       # release whose SHA-256 is written here; move a version and its digest
       # together. Each linter runs even when the one before it failed, so one
       # run shows every finding.
-      # zizmor is a Python program. Its environment below is made from Python
-      # 3.15, the program's floor, not from the runner's own older Python
-      # (saulpatinojr/HCW-HybridCloudWorks#1707). This repository has no
-      # .python-version, so the line is written here. No cache: the install
-      # is one wheel checked by its hash. Runs after an earlier failure too,
-      # like the install step it serves.
+      # zizmor is installed from PyPI with pip, so the install step needs
+      # Python 3.15: its environment is made from that, not from the
+      # runner's own older Python (saulpatinojr/HCW-HybridCloudWorks#1707).
+      # This repository has no .python-version, so the line is written here.
+      # No cache: the install is one wheel checked by its hash. Runs after an
+      # earlier failure too, like the install step it serves.
       - uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0 # v7.1.0
         if: ${{ !cancelled() }}
         with: { python-version: "3.15" }
@@ -82,7 +82,8 @@ jobs:
           zizmor --version
           args=(--offline --format=github)
           if [ -f .github/zizmor.yml ]; then args+=(--config .github/zizmor.yml); fi
-          zizmor "${args[@]}" .github/workflows
+          # .github/actions too: the composite action there is handed the App key.
+          zizmor "${args[@]}" .github/workflows .github/actions
 
       - name: hadolint
         if: ${{ !cancelled() && steps.lint-tools.outcome == 'success' }}

@@ -389,11 +389,12 @@ function stepInputs(step) {
 // `uses:` is the step's own key wherever it sits (owner and repository names are case-insensitive on GitHub): on the `- ` line or on any line indented to the step's keys
 const checkoutSteps = (body) => Object.values(jobs(body)).flatMap(steps).filter((s) => /^(?: {6}-[ \t]+| {8})uses:[ \t]+["']?actions\/checkout@/im.test(s));
 
-test("no checkout in ci.yml or security.yml leaves the token on disk", () => {
+test("no checkout in ci.yml, security.yml or copilot-setup-steps.yml leaves the token on disk", () => {
   // By default actions/checkout keeps GITHUB_TOKEN in .git/config, where every later step can read it (zizmor `artipacked`).
-  // No step of these two pushes with git (gitleaks gets its own GITHUB_TOKEN env), so every checkout turns it off.
-  // copilot-setup-steps.yml is left as it is: it prepares the Copilot coding agent's environment, which manages its git access.
-  for (const name of ["ci.yml", "security.yml"]) {
+  // No step of these three pushes with git (gitleaks gets its own GITHUB_TOKEN env), so every checkout turns it off.
+  // copilot-setup-steps.yml prepares the Copilot coding agent's environment; the agent manages its own git access and
+  // does not use the token this read-only checkout would leave behind, so it turns it off too, as the AddOn's copy does.
+  for (const name of ["ci.yml", "security.yml", "copilot-setup-steps.yml"]) {
     const found = checkoutSteps(text(name));
     assert.ok(found.length > 0, `${name}: no checkout found`);
     // fail closed: every non-comment line naming actions/checkout must belong to a step the reader found, so a step
