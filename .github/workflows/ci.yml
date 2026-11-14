@@ -11,25 +11,15 @@ jobs:
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with: { persist-credentials: false }
-      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
-        with: { node-version: 26, cache: npm }
-      - run: npm ci
-      - run: npm test
-      - run: npm run rules:validate
-      - name: Build appliance web (Vite + Tailwind)
-        run: npm run web:build
-        env: { VITE_ENTRA_TENANT_ID: ci, VITE_ENTRA_SPA_CLIENT_ID: ci, VITE_API_SCOPE: ci }
-      - name: Package repository ZIP (artifact)
-        run: bash scripts/package-repository.sh
-      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
-        with: { name: hcw-azmigrateorchestrator-app, path: hcw-azmigrateorchestrator-app.zip, retention-days: 7 }
-
       # Workflow and Dockerfile linters (HCW-HybridCloudWorks#1575): the
       # same three tools, versions and digests as the website's CI. CodeRabbit
       # used to run them and was removed on 2026-11-06. Each tool is a pinned
       # release whose SHA-256 is written here; move a version and its digest
       # together. Each linter runs even when the one before it failed, so one
       # run shows every finding.
+      # They run first, straight after the checkout: no repository code (npm
+      # install scripts, tests, the build) has run yet, so nothing in this pull
+      # request can rewrite .github on disk before it is read.
       # zizmor is installed from PyPI with pip, so the install step needs
       # Python 3.15: its environment is made from that, not from the
       # runner's own older Python (saulpatinojr/HCW-HybridCloudWorks#1707).
@@ -101,6 +91,19 @@ jobs:
           fi
           printf 'linting %s\n' "${files[@]}"
           hadolint --failure-threshold warning --format tty "${files[@]}"
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with: { node-version: 26, cache: npm }
+      - run: npm ci
+      - run: npm test
+      - run: npm run rules:validate
+      - name: Build appliance web (Vite + Tailwind)
+        run: npm run web:build
+        env: { VITE_ENTRA_TENANT_ID: ci, VITE_ENTRA_SPA_CLIENT_ID: ci, VITE_API_SCOPE: ci }
+      - name: Package repository ZIP (artifact)
+        run: bash scripts/package-repository.sh
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with: { name: hcw-azmigrateorchestrator-app, path: hcw-azmigrateorchestrator-app.zip, retention-days: 7 }
+
 
   packed-consumer:
     # The packages the web-front edition and the website install: pack, install from tarballs into an empty project, run, type-check.

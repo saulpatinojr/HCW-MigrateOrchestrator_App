@@ -13,13 +13,13 @@
 #
 # - rehearse-self-merging-pr.yml: between the checkout and that line the job
 #   runs one step, a `printf` that writes .github/rehearsal.txt.
-# - rules-refresh.yml: between the checkout and that line the job runs
-#   `npm ci && npm run build` (dependency install scripts run: .npmrc does not
-#   set ignore-scripts) and `node scripts/refresh-rules-from-learn.mjs`. Any
-#   of them could rewrite the action's files before it runs with the key.
-#   That risk exists on main today and is accepted for now; the mitigation is
-#   that npm ci installs only what package-lock.json names, each package
-#   checked against its integrity hash.
+# - rules-refresh.yml: the action runs in the `pull-request` job, which runs
+#   only a fresh checkout and a download of the report files (data, into
+#   rules/reports/) before it. npm ci, the build and the refresh script run
+#   in the separate `diff` job, which has no environment and no secrets, so
+#   nothing that could rewrite the action's files runs where the key is.
+#   (Until HCW-HybridCloudWorks#1707's linter change they ran in the same
+#   job, before the action; that was the reachable risk this split removes.)
 #
 # Each ignore names a line, and zizmor matches it against the whole step, so
 # the finding comes back if the step moves up, but a move of one line down
@@ -28,4 +28,4 @@ rules:
   self-repository:
     ignore:
       - rehearse-self-merging-pr.yml:47
-      - rules-refresh.yml:29
+      - rules-refresh.yml:50
