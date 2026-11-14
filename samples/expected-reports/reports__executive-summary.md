@@ -6,7 +6,7 @@
 
 - Assessment ID: `<assessment-id>`
 - Generated: 2026-10-03T12:00:00.000Z
-- Input hash (sha256): `9f4e78ae637413285a614daf358585b878045f726ce5b729fd02a5d29e4845aa`
+- Input hash (sha256): `0874d1826f607b4b9caa139d2ac8f53e0916a098f6896b8b136e308e31b1b50c`
 - Rules: 1.0.35 (checksum `<rules-checksum>`)
 - Operation assessed: **region-relocation** → westus3
 - Authenticated against Azure: **no**

@@ -64,7 +64,7 @@ test("portal export without a Resource ID column derives ids from the RESOURCE L
   const csv = [
     "NAME,TYPE,RESOURCE GROUP,LOCATION,SUBSCRIPTION,RESOURCE LINK",
     `"hcw-sample-vnet","Virtual network","rg-hcw-sample","Central US","sub-hcw-sample","https://portal.azure.com#resource/subscriptions/${sub}/resourceGroups/rg-hcw-sample/providers/Microsoft.Network/virtualNetworks/hcw-sample-vnet"`,
-    `"hcw sample ag","Action group","rg-hcw-sample","Global","sub-hcw-sample","https://portal.azure.com/#@contoso.example/resource/subscriptions/${sub}/resourceGroups/rg-hcw-sample/providers/microsoft.insights/actiongroups/hcw%20sample%20ag"`,
+    `"hcw sample ag","Action group","rg-hcw-sample","Global","sub-hcw-sample","https://portal.azure.com/#@hcw-sample.example/resource/subscriptions/${sub}/resourceGroups/rg-hcw-sample/providers/microsoft.insights/actiongroups/hcw%20sample%20ag"`,
     `"hcw-sample-odd","Storage account","rg-hcw-sample","Central US","sub-hcw-sample","https://portal.azure.com/#home"`,
   ].join("\n");
   const r = ingestResourcesCsv(csv);
@@ -87,7 +87,7 @@ test("portal export without a Resource ID column derives ids from the RESOURCE L
 test("resourceIdFromPortalLink reads both portal link shapes and rejects anything else", () => {
   const id = "/subscriptions/00000000-0000-0000-0000-000000000001/resourceGroups/rg-hcw-sample/providers/Microsoft.Web/sites/hcw-sample-app";
   assert.equal(resourceIdFromPortalLink(`https://portal.azure.com#resource${id}`), id);
-  assert.equal(resourceIdFromPortalLink(`https://portal.azure.com/#@contoso.example/resource${id}/`), id);
+  assert.equal(resourceIdFromPortalLink(`https://portal.azure.com/#@hcw-sample.example/resource${id}/`), id);
   assert.equal(resourceIdFromPortalLink(id), id);
   assert.equal(resourceIdFromPortalLink("https://portal.azure.com/#blade/HubsExtension/BrowseAll"), null);
   assert.equal(resourceIdFromPortalLink(`https://portal.azure.com/#blade/x/subscriptions/${id.slice(15)}`), null, "only a portal resource link counts");

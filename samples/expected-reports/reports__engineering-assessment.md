@@ -8,45 +8,45 @@
 
 | Resource | Type | Disposition | Infra | Config | Identity | Data | Tool | Confidence | Rule |
 |---|---|---|---|---|---|---|---|---|---|
-| rg-contoso-billing-prod-eus | Microsoft.Resources/resourceGroups | recreate-only | recreate | reconstruct | not-applicable | not-applicable | terraform-redeploy | medium (0.74) | azure.resources.resourcegroups |
-| vnet-billing-prod-eus | Microsoft.Network/virtualNetworks | native-move | recreate | reconstruct | reconstruct | replicate | azure-resource-mover | medium (0.74) | azure.network.virtualnetworks |
-| snet-app | Microsoft.Network/virtualNetworks/subnets | native-move | recreate | reconstruct | not-applicable | not-applicable | azure-resource-mover | medium (0.74) | azure.network.virtualnetworks.subnets |
-| nsg-app | Microsoft.Network/networkSecurityGroups | native-move | recreate | reconstruct | reconstruct | replicate | azure-resource-mover | medium (0.74) | azure.network.networksecuritygroups |
-| pip-lb-billing | Microsoft.Network/publicIPAddresses | recreate-and-migrate | recreate | reconstruct | not-applicable | not-applicable | azure-resource-mover | medium (0.7) | azure.network.publicipaddresses |
-| lb-billing-prod | Microsoft.Network/loadBalancers | native-move | recreate | reconstruct | reconstruct | replicate | azure-resource-mover | medium (0.65) | azure.network.loadbalancers |
-| nic-vm-billing-01 | Microsoft.Network/networkInterfaces | native-move | recreate | reconstruct | reconstruct | replicate | azure-resource-mover | medium (0.74) | azure.network.networkinterfaces |
-| vm-billing-01 | Microsoft.Compute/virtualMachines | native-move | recreate | reconstruct | reconstruct | replicate | azure-resource-mover | medium (0.74) | azure.compute.virtualmachines |
-| vm-billing-01_OsDisk | Microsoft.Compute/disks | orchestrated-migration | recreate | reconstruct | not-applicable | replicate | azure-resource-mover | medium (0.74) | azure.compute.disks |
-| avset-billing | Microsoft.Compute/availabilitySets | native-move | recreate | reconstruct | reconstruct | replicate | azure-resource-mover | medium (0.74) | azure.compute.availabilitysets |
-| stcontosobillingprod | Microsoft.Storage/storageAccounts | recreate-and-migrate | recreate | reconstruct | reconstruct | sync-and-cutover | azure-storage-mover | medium (0.74) | org.hcw.storage.storageaccounts.region |
-| kv-billing-prod-eus | Microsoft.KeyVault/vaults | recreate-and-migrate | recreate | reconstruct | reconstruct | backup-restore | backup-and-restore | medium (0.74) | azure.keyvault.vaults |
-| sql-billing-prod-eus | Microsoft.Sql/servers | recreate-and-migrate | recreate | reconstruct | reconstruct | replicate | failover-group | medium (0.74) | azure.sql.servers |
-| billingdb | Microsoft.Sql/servers/databases | recreate-and-migrate | recreate | reconstruct | not-applicable | replicate | geo-replication | medium (0.74) | azure.sql.servers.databases |
-| psql-billing-prod-eus | Microsoft.DBforPostgreSQL/flexibleServers | recreate-and-migrate | recreate | reconstruct | reconstruct | replicate | native-database-replication | medium (0.74) | azure.dbforpostgresql.flexibleservers |
-| cosmos-billing-prod | Microsoft.DocumentDB/databaseAccounts | orchestrated-migration | move-with-resource | reconstruct | not-applicable | replicate | service-specific-migration | medium (0.7) | azure.documentdb.databaseaccounts |
-| crcontosobilling | Microsoft.ContainerRegistry/registries | recreate-and-migrate | recreate | reconstruct | reconstruct | export-import | container-image-copy | medium (0.74) | azure.containerregistry.registries |
-| asp-billing-prod-eus | Microsoft.Web/serverFarms | recreate-only | recreate | reconstruct | reconstruct | not-applicable | terraform-redeploy | medium (0.74) | azure.web.serverfarms |
-| app-billing-web-prod | Microsoft.Web/sites | recreate-and-migrate | recreate | reconstruct | reconstruct | export-import | application-deployment | medium (0.74) | azure.web.sites |
-| func-billing-jobs-prod | Microsoft.Web/sites | recreate-and-migrate | recreate | reconstruct | reconstruct | export-import | application-deployment | medium (0.74) | azure.web.sites |
-| appi-billing-prod | Microsoft.Insights/components | recreate-and-migrate | recreate | reconstruct | not-applicable | retain-in-source | terraform-redeploy | medium (0.74) | azure.insights.components |
-| log-contoso-prod-eus | Microsoft.OperationalInsights/workspaces | recreate-and-migrate | recreate | reconstruct | not-applicable | retain-in-source | terraform-redeploy | medium (0.74) | azure.operationalinsights.workspaces |
-| rsv-contoso-prod-eus | Microsoft.RecoveryServices/vaults | recreate-only | recreate | reconstruct | reconstruct | retain-in-source | terraform-redeploy | medium (0.74) | azure.recoveryservices.vaults |
-| pe-sql-billing | Microsoft.Network/privateEndpoints | recreate-only | recreate | reconstruct | reconstruct | not-applicable | terraform-redeploy | medium (0.74) | azure.network.privateendpoints |
+| hcw-sample-rg-billing-prod-eus | Microsoft.Resources/resourceGroups | recreate-only | recreate | reconstruct | not-applicable | not-applicable | terraform-redeploy | medium (0.74) | azure.resources.resourcegroups |
+| hcw-sample-vnet-billing-prod-eus | Microsoft.Network/virtualNetworks | native-move | recreate | reconstruct | reconstruct | replicate | azure-resource-mover | medium (0.74) | azure.network.virtualnetworks |
+| hcw-sample-snet-app | Microsoft.Network/virtualNetworks/subnets | native-move | recreate | reconstruct | not-applicable | not-applicable | azure-resource-mover | medium (0.74) | azure.network.virtualnetworks.subnets |
+| hcw-sample-nsg-app | Microsoft.Network/networkSecurityGroups | native-move | recreate | reconstruct | reconstruct | replicate | azure-resource-mover | medium (0.74) | azure.network.networksecuritygroups |
+| hcw-sample-pip-lb-billing | Microsoft.Network/publicIPAddresses | recreate-and-migrate | recreate | reconstruct | not-applicable | not-applicable | azure-resource-mover | medium (0.7) | azure.network.publicipaddresses |
+| hcw-sample-lb-billing-prod | Microsoft.Network/loadBalancers | native-move | recreate | reconstruct | reconstruct | replicate | azure-resource-mover | medium (0.65) | azure.network.loadbalancers |
+| hcw-sample-nic-vm-billing-01 | Microsoft.Network/networkInterfaces | native-move | recreate | reconstruct | reconstruct | replicate | azure-resource-mover | medium (0.74) | azure.network.networkinterfaces |
+| hcw-sample-vm-billing-01 | Microsoft.Compute/virtualMachines | native-move | recreate | reconstruct | reconstruct | replicate | azure-resource-mover | medium (0.74) | azure.compute.virtualmachines |
+| hcw-sample-vm-billing-01_OsDisk | Microsoft.Compute/disks | orchestrated-migration | recreate | reconstruct | not-applicable | replicate | azure-resource-mover | medium (0.74) | azure.compute.disks |
+| hcw-sample-avset-billing | Microsoft.Compute/availabilitySets | native-move | recreate | reconstruct | reconstruct | replicate | azure-resource-mover | medium (0.74) | azure.compute.availabilitysets |
+| hcwsamplestbillingprod | Microsoft.Storage/storageAccounts | recreate-and-migrate | recreate | reconstruct | reconstruct | sync-and-cutover | azure-storage-mover | medium (0.74) | org.hcw.storage.storageaccounts.region |
+| hcw-sample-kv-billing | Microsoft.KeyVault/vaults | recreate-and-migrate | recreate | reconstruct | reconstruct | backup-restore | backup-and-restore | medium (0.74) | azure.keyvault.vaults |
+| hcw-sample-sql-billing-prod-eus | Microsoft.Sql/servers | recreate-and-migrate | recreate | reconstruct | reconstruct | replicate | failover-group | medium (0.74) | azure.sql.servers |
+| hcw-sample-billingdb | Microsoft.Sql/servers/databases | recreate-and-migrate | recreate | reconstruct | not-applicable | replicate | geo-replication | medium (0.74) | azure.sql.servers.databases |
+| hcw-sample-psql-billing-prod-eus | Microsoft.DBforPostgreSQL/flexibleServers | recreate-and-migrate | recreate | reconstruct | reconstruct | replicate | native-database-replication | medium (0.74) | azure.dbforpostgresql.flexibleservers |
+| hcw-sample-cosmos-billing-prod | Microsoft.DocumentDB/databaseAccounts | orchestrated-migration | move-with-resource | reconstruct | not-applicable | replicate | service-specific-migration | medium (0.7) | azure.documentdb.databaseaccounts |
+| hcwsampleacrbilling | Microsoft.ContainerRegistry/registries | recreate-and-migrate | recreate | reconstruct | reconstruct | export-import | container-image-copy | medium (0.74) | azure.containerregistry.registries |
+| hcw-sample-asp-billing-prod-eus | Microsoft.Web/serverFarms | recreate-only | recreate | reconstruct | reconstruct | not-applicable | terraform-redeploy | medium (0.74) | azure.web.serverfarms |
+| hcw-sample-app-billing-web-prod | Microsoft.Web/sites | recreate-and-migrate | recreate | reconstruct | reconstruct | export-import | application-deployment | medium (0.74) | azure.web.sites |
+| hcw-sample-func-billing-jobs-prod | Microsoft.Web/sites | recreate-and-migrate | recreate | reconstruct | reconstruct | export-import | application-deployment | medium (0.74) | azure.web.sites |
+| hcw-sample-appi-billing-prod | Microsoft.Insights/components | recreate-and-migrate | recreate | reconstruct | not-applicable | retain-in-source | terraform-redeploy | medium (0.74) | azure.insights.components |
+| hcw-sample-log-prod-eus | Microsoft.OperationalInsights/workspaces | recreate-and-migrate | recreate | reconstruct | not-applicable | retain-in-source | terraform-redeploy | medium (0.74) | azure.operationalinsights.workspaces |
+| hcw-sample-rsv-prod-eus | Microsoft.RecoveryServices/vaults | recreate-only | recreate | reconstruct | reconstruct | retain-in-source | terraform-redeploy | medium (0.74) | azure.recoveryservices.vaults |
+| hcw-sample-pe-sql-billing | Microsoft.Network/privateEndpoints | recreate-only | recreate | reconstruct | reconstruct | not-applicable | terraform-redeploy | medium (0.74) | azure.network.privateendpoints |
 | privatelink.database.windows.net | Microsoft.Network/privateDnsZones | retain | not-applicable | not-applicable | not-applicable | not-applicable | none | medium (0.74) | azure.network.privatednszones |
-| id-billing-app | Microsoft.ManagedIdentity/userAssignedIdentities | recreate-only | recreate | reconstruct | reconstruct | not-applicable | terraform-redeploy | medium (0.74) | azure.managedidentity.userassignedidentities |
-| ag-platform-oncall | Microsoft.Insights/actionGroups | retain | not-applicable | not-applicable | not-applicable | not-applicable | none | medium (0.74) | azure.insights.actiongroups |
-| alert-vm-cpu | Microsoft.Insights/metricAlerts | recreate-only | recreate | reconstruct | reconstruct | not-applicable | terraform-redeploy | medium (0.74) | azure.insights.metricalerts |
-| quantum-research-01 | Microsoft.Quantum/Workspaces | unknown-requires-validation | unknown | unknown | unknown | unknown | none | low (0.2) | — |
+| hcw-sample-id-billing-app | Microsoft.ManagedIdentity/userAssignedIdentities | recreate-only | recreate | reconstruct | reconstruct | not-applicable | terraform-redeploy | medium (0.74) | azure.managedidentity.userassignedidentities |
+| hcw-sample-ag-platform-oncall | Microsoft.Insights/actionGroups | retain | not-applicable | not-applicable | not-applicable | not-applicable | none | medium (0.74) | azure.insights.actiongroups |
+| hcw-sample-alert-vm-cpu | Microsoft.Insights/metricAlerts | recreate-only | recreate | reconstruct | reconstruct | not-applicable | terraform-redeploy | medium (0.74) | azure.insights.metricalerts |
+| hcw-sample-quantum-research-01 | Microsoft.Quantum/Workspaces | unknown-requires-validation | unknown | unknown | unknown | unknown | none | low (0.2) | — |
 
 ## Per-resource detail
 
-### rg-contoso-billing-prod-eus
+### hcw-sample-rg-billing-prod-eus
 
-- Type: `Microsoft.Resources/resourceGroups` · Region: eastus · RG: rg-contoso-billing-prod-eus · Application group: billing
+- Type: `Microsoft.Resources/resourceGroups` · Region: eastus · RG: hcw-sample-rg-billing-prod-eus · Application group: billing
 - Disposition: **recreate-only** via **terraform-redeploy** (alternatives: none)
 - Paths — infrastructure: recreate; configuration: reconstruct; identity: not-applicable; data: not-applicable
 - Support — RG move: unsupported; subscription move: unsupported; region: unsupported; target region/SKU availability: unknown/unknown
-- Expected downtime: none; RTO/RPO compatibility: unknown/unknown; sequence: 25
+- Expected downtime: none; RTO/RPO compatibility: unknown/unknown; sequence: 24
 - Confidence: medium (0.74) — rule confidence 0.95; capped at 0.74: inventory-only evidence cannot yield high confidence
 - Rule: azure.resources.resourcegroups v1.0.0 · reason codes: RULE_MATCH, REGION_MOVE_UNSUPPORTED_ALTERNATIVE_SELECTED · human approval: required
 
@@ -54,13 +54,13 @@
 - After cutover: re-establish backup and DR protection in the destination (Azure Backup / ASR / native redundancy). This is DR, not migration.
 
 **Evidence**
-- [observed-from-csv] name = rg-contoso-billing-prod-eus
+- [observed-from-csv] name = hcw-sample-rg-billing-prod-eus
 - [observed-from-csv] type = Microsoft.Resources/resourceGroups
-- [observed-from-csv] resourceId = /subscriptions/<assessment-id>/resourceGroups/rg-contoso-billing-prod-eus
-- [observed-from-csv] resourceGroup = rg-contoso-billing-prod-eus
-- [observed-from-csv] subscriptionId = <assessment-id>
+- [observed-from-csv] resourceId = /subscriptions/00000000-0000-0000-0000-000000000001/resourceGroups/hcw-sample-rg-billing-prod-eus
+- [observed-from-csv] resourceGroup = hcw-sample-rg-billing-prod-eus
+- [observed-from-csv] subscriptionId = 00000000-0000-0000-0000-000000000001
 - [observed-from-csv] location = eastus
-- [observed-from-csv] subscriptionName = Contoso-Prod
+- [observed-from-csv] subscriptionName = hcw-sample-prod
 - [observed-from-csv] tags = {"application":"billing","environment":"prod","owner":"platform-team"}
 - [requires-authenticated-validation] Analysis is based on an exported inventory only; configuration-dependent conclusions must be validated against the live environment.
 - [general-rule] Move resources to a new resource group or subscription (https://learn.microsoft.com/azure/azure-resource-manager/management/move-resource-group-and-subscription, 2026-10-03)
@@ -75,18 +75,18 @@
 - Kind (e.g. functionapp vs app, StorageV2 vs BlobStorage)
 - Network topology, private endpoints, encryption/CMK, managed identities, RBAC, locks, policy, data size, backup/replication state — require authenticated inspection
 
-### vnet-billing-prod-eus
+### hcw-sample-vnet-billing-prod-eus
 
-- Type: `Microsoft.Network/virtualNetworks` · Region: eastus · RG: rg-contoso-billing-prod-eus · Application group: billing
+- Type: `Microsoft.Network/virtualNetworks` · Region: eastus · RG: hcw-sample-rg-billing-prod-eus · Application group: billing
 - Disposition: **native-move** via **azure-resource-mover** (alternatives: terraform-redeploy)
 - Paths — infrastructure: recreate; configuration: reconstruct; identity: reconstruct; data: replicate
 - Support — RG move: supported; subscription move: supported; region: supported; target region/SKU availability: unknown/unknown
-- Expected downtime: minutes; RTO/RPO compatibility: unknown/unknown; sequence: 17
+- Expected downtime: minutes; RTO/RPO compatibility: unknown/unknown; sequence: 16
 - Confidence: medium (0.74) — rule confidence 0.85; capped at 0.74: inventory-only evidence cannot yield high confidence
 - Rule: azure.network.virtualnetworks v1.0.0 · reason codes: RULE_MATCH, REGION_MOVE_SUPPORTED · human approval: required
 
 **Dependencies**
-- child → snet-app [discovered]
+- child → hcw-sample-snet-app [discovered]
 
 **Prerequisites**
 - All VNet peerings must be removed before a move and re-established afterwards
@@ -105,13 +105,13 @@
 - After cutover: re-establish backup and DR protection in the destination (Azure Backup / ASR / native redundancy). This is DR, not migration.
 
 **Evidence**
-- [observed-from-csv] name = vnet-billing-prod-eus
+- [observed-from-csv] name = hcw-sample-vnet-billing-prod-eus
 - [observed-from-csv] type = microsoft.network/virtualnetworks
-- [observed-from-csv] resourceId = /subscriptions/<assessment-id>/resourceGroups/rg-contoso-billing-prod-eus/providers/Microsoft.Network/virtualNetworks/vnet-billing-prod-eus
-- [observed-from-csv] resourceGroup = rg-contoso-billing-prod-eus
-- [observed-from-csv] subscriptionId = <assessment-id>
+- [observed-from-csv] resourceId = /subscriptions/00000000-0000-0000-0000-000000000001/resourceGroups/hcw-sample-rg-billing-prod-eus/providers/Microsoft.Network/virtualNetworks/hcw-sample-vnet-billing-prod-eus
+- [observed-from-csv] resourceGroup = hcw-sample-rg-billing-prod-eus
+- [observed-from-csv] subscriptionId = 00000000-0000-0000-0000-000000000001
 - [observed-from-csv] location = eastus
-- [observed-from-csv] subscriptionName = Contoso-Prod
+- [observed-from-csv] subscriptionName = hcw-sample-prod
 - [observed-from-csv] tags = {"application":"billing","environment":"prod"}
 - [requires-authenticated-validation] Analysis is based on an exported inventory only; configuration-dependent conclusions must be validated against the live environment.
 - [general-rule] Move operation support for resources (https://learn.microsoft.com/azure/azure-resource-manager/management/move-support-resources, 2026-10-03)
@@ -128,30 +128,30 @@
 - Network topology, private endpoints, encryption/CMK, managed identities, RBAC, locks, policy, data size, backup/replication state — require authenticated inspection
 - Data volume, change rate and consistency requirements (needed to size the sync window)
 
-### snet-app
+### hcw-sample-snet-app
 
-- Type: `Microsoft.Network/virtualNetworks/subnets` · Region: eastus · RG: rg-contoso-billing-prod-eus · Application group: billing
+- Type: `Microsoft.Network/virtualNetworks/subnets` · Region: eastus · RG: hcw-sample-rg-billing-prod-eus · Application group: billing
 - Disposition: **native-move** via **azure-resource-mover** (alternatives: terraform-redeploy)
 - Paths — infrastructure: recreate; configuration: reconstruct; identity: not-applicable; data: not-applicable
 - Support — RG move: supported; subscription move: supported; region: supported; target region/SKU availability: unknown/unknown
-- Expected downtime: none; RTO/RPO compatibility: unknown/unknown; sequence: 29
+- Expected downtime: none; RTO/RPO compatibility: unknown/unknown; sequence: 28
 - Confidence: medium (0.74) — rule confidence 0.8; capped at 0.74: inventory-only evidence cannot yield high confidence
 - Rule: azure.network.virtualnetworks.subnets v1.0.0 · reason codes: RULE_MATCH, REGION_MOVE_SUPPORTED · human approval: required
 
 **Dependencies**
-- parent → vnet-billing-prod-eus [discovered] — parent present in inventory
+- parent → hcw-sample-vnet-billing-prod-eus [discovered] — parent present in inventory
 
 **Secondary actions**
 - After cutover: re-establish backup and DR protection in the destination (Azure Backup / ASR / native redundancy). This is DR, not migration.
 
 **Evidence**
-- [observed-from-csv] name = snet-app
+- [observed-from-csv] name = hcw-sample-snet-app
 - [observed-from-csv] type = microsoft.network/virtualnetworks/subnets
-- [observed-from-csv] resourceId = /subscriptions/<assessment-id>/resourceGroups/rg-contoso-billing-prod-eus/providers/Microsoft.Network/virtualNetworks/vnet-billing-prod-eus/subnets/snet-app
-- [observed-from-csv] resourceGroup = rg-contoso-billing-prod-eus
-- [observed-from-csv] subscriptionId = <assessment-id>
+- [observed-from-csv] resourceId = /subscriptions/00000000-0000-0000-0000-000000000001/resourceGroups/hcw-sample-rg-billing-prod-eus/providers/Microsoft.Network/virtualNetworks/hcw-sample-vnet-billing-prod-eus/subnets/hcw-sample-snet-app
+- [observed-from-csv] resourceGroup = hcw-sample-rg-billing-prod-eus
+- [observed-from-csv] subscriptionId = 00000000-0000-0000-0000-000000000001
 - [observed-from-csv] location = eastus
-- [observed-from-csv] subscriptionName = Contoso-Prod
+- [observed-from-csv] subscriptionName = hcw-sample-prod
 - [observed-from-csv] tags = {"application":"billing"}
 - [requires-authenticated-validation] Analysis is based on an exported inventory only; configuration-dependent conclusions must be validated against the live environment.
 - [general-rule] Move operation support for resources (https://learn.microsoft.com/azure/azure-resource-manager/management/move-support-resources, 2026-10-03)
@@ -167,13 +167,13 @@
 - Kind (e.g. functionapp vs app, StorageV2 vs BlobStorage)
 - Network topology, private endpoints, encryption/CMK, managed identities, RBAC, locks, policy, data size, backup/replication state — require authenticated inspection
 
-### nsg-app
+### hcw-sample-nsg-app
 
-- Type: `Microsoft.Network/networkSecurityGroups` · Region: eastus · RG: rg-contoso-billing-prod-eus · Application group: billing
+- Type: `Microsoft.Network/networkSecurityGroups` · Region: eastus · RG: hcw-sample-rg-billing-prod-eus · Application group: billing
 - Disposition: **native-move** via **azure-resource-mover** (alternatives: terraform-redeploy)
 - Paths — infrastructure: recreate; configuration: reconstruct; identity: reconstruct; data: replicate
 - Support — RG move: supported; subscription move: supported; region: supported; target region/SKU availability: unknown/unknown
-- Expected downtime: minutes; RTO/RPO compatibility: unknown/unknown; sequence: 19
+- Expected downtime: minutes; RTO/RPO compatibility: unknown/unknown; sequence: 18
 - Confidence: medium (0.74) — rule confidence 0.8; capped at 0.74: inventory-only evidence cannot yield high confidence
 - Rule: azure.network.networksecuritygroups v1.0.0 · reason codes: RULE_MATCH, REGION_MOVE_SUPPORTED · human approval: required
 
@@ -187,13 +187,13 @@
 - After cutover: re-establish backup and DR protection in the destination (Azure Backup / ASR / native redundancy). This is DR, not migration.
 
 **Evidence**
-- [observed-from-csv] name = nsg-app
+- [observed-from-csv] name = hcw-sample-nsg-app
 - [observed-from-csv] type = microsoft.network/networksecuritygroups
-- [observed-from-csv] resourceId = /subscriptions/<assessment-id>/resourceGroups/rg-contoso-billing-prod-eus/providers/Microsoft.Network/networkSecurityGroups/nsg-app
-- [observed-from-csv] resourceGroup = rg-contoso-billing-prod-eus
-- [observed-from-csv] subscriptionId = <assessment-id>
+- [observed-from-csv] resourceId = /subscriptions/00000000-0000-0000-0000-000000000001/resourceGroups/hcw-sample-rg-billing-prod-eus/providers/Microsoft.Network/networkSecurityGroups/hcw-sample-nsg-app
+- [observed-from-csv] resourceGroup = hcw-sample-rg-billing-prod-eus
+- [observed-from-csv] subscriptionId = 00000000-0000-0000-0000-000000000001
 - [observed-from-csv] location = eastus
-- [observed-from-csv] subscriptionName = Contoso-Prod
+- [observed-from-csv] subscriptionName = hcw-sample-prod
 - [observed-from-csv] tags = {"application":"billing"}
 - [requires-authenticated-validation] Analysis is based on an exported inventory only; configuration-dependent conclusions must be validated against the live environment.
 - [general-rule] Move operation support for resources (https://learn.microsoft.com/azure/azure-resource-manager/management/move-support-resources, 2026-10-03)
@@ -209,13 +209,13 @@
 - Network topology, private endpoints, encryption/CMK, managed identities, RBAC, locks, policy, data size, backup/replication state — require authenticated inspection
 - Data volume, change rate and consistency requirements (needed to size the sync window)
 
-### pip-lb-billing
+### hcw-sample-pip-lb-billing
 
-- Type: `Microsoft.Network/publicIPAddresses` · Region: eastus · RG: rg-contoso-billing-prod-eus · Application group: billing
+- Type: `Microsoft.Network/publicIPAddresses` · Region: eastus · RG: hcw-sample-rg-billing-prod-eus · Application group: billing
 - Disposition: **recreate-and-migrate** via **azure-resource-mover** (alternatives: terraform-redeploy)
 - Paths — infrastructure: recreate; configuration: reconstruct; identity: not-applicable; data: not-applicable
 - Support — RG move: supported; subscription move: supported; region: conditional; target region/SKU availability: unknown/unknown
-- Expected downtime: minutes; RTO/RPO compatibility: unknown/unknown; sequence: 16
+- Expected downtime: minutes; RTO/RPO compatibility: unknown/unknown; sequence: 15
 - Confidence: medium (0.7) — rule confidence 0.8; conditional support (-0.1)
 - Rule: azure.network.publicipaddresses v1.0.0 · reason codes: RULE_MATCH, REGION_MOVE_CONDITIONAL · human approval: required
 
@@ -233,13 +233,13 @@
 - After cutover: re-establish backup and DR protection in the destination (Azure Backup / ASR / native redundancy). This is DR, not migration.
 
 **Evidence**
-- [observed-from-csv] name = pip-lb-billing
+- [observed-from-csv] name = hcw-sample-pip-lb-billing
 - [observed-from-csv] type = microsoft.network/publicipaddresses
-- [observed-from-csv] resourceId = /subscriptions/<assessment-id>/resourceGroups/rg-contoso-billing-prod-eus/providers/Microsoft.Network/publicIPAddresses/pip-lb-billing
-- [observed-from-csv] resourceGroup = rg-contoso-billing-prod-eus
-- [observed-from-csv] subscriptionId = <assessment-id>
+- [observed-from-csv] resourceId = /subscriptions/00000000-0000-0000-0000-000000000001/resourceGroups/hcw-sample-rg-billing-prod-eus/providers/Microsoft.Network/publicIPAddresses/hcw-sample-pip-lb-billing
+- [observed-from-csv] resourceGroup = hcw-sample-rg-billing-prod-eus
+- [observed-from-csv] subscriptionId = 00000000-0000-0000-0000-000000000001
 - [observed-from-csv] location = eastus
-- [observed-from-csv] subscriptionName = Contoso-Prod
+- [observed-from-csv] subscriptionName = hcw-sample-prod
 - [observed-from-csv] sku = Standard
 - [observed-from-csv] tags = {"application":"billing"}
 - [requires-authenticated-validation] Analysis is based on an exported inventory only; configuration-dependent conclusions must be validated against the live environment.
@@ -255,19 +255,19 @@
 - Kind (e.g. functionapp vs app, StorageV2 vs BlobStorage)
 - Network topology, private endpoints, encryption/CMK, managed identities, RBAC, locks, policy, data size, backup/replication state — require authenticated inspection
 
-### lb-billing-prod
+### hcw-sample-lb-billing-prod
 
-- Type: `Microsoft.Network/loadBalancers` · Region: eastus · RG: rg-contoso-billing-prod-eus · Application group: billing
+- Type: `Microsoft.Network/loadBalancers` · Region: eastus · RG: hcw-sample-rg-billing-prod-eus · Application group: billing
 - Disposition: **native-move** via **azure-resource-mover** (alternatives: terraform-redeploy)
 - Paths — infrastructure: recreate; configuration: reconstruct; identity: reconstruct; data: replicate
 - Support — RG move: supported; subscription move: supported; region: conditional; target region/SKU availability: unknown/unknown
-- Expected downtime: minutes; RTO/RPO compatibility: unknown/unknown; sequence: 18
+- Expected downtime: minutes; RTO/RPO compatibility: unknown/unknown; sequence: 17
 - Confidence: medium (0.65) — rule confidence 0.75; conditional support (-0.1)
 - Rule: azure.network.loadbalancers v1.0.0 · reason codes: RULE_MATCH, REGION_MOVE_CONDITIONAL · human approval: required
 
 **Dependencies**
-- network → pip-lb-billing [inferred] — frontend IP configuration (inferred from type and shared resource group; confirm with authenticated discovery)
-- network → vnet-billing-prod-eus [inferred] — internal frontend in a subnet (inferred from type and shared resource group; confirm with authenticated discovery)
+- network → hcw-sample-pip-lb-billing [inferred] — frontend IP configuration (inferred from type and shared resource group; confirm with authenticated discovery)
+- network → hcw-sample-vnet-billing-prod-eus [inferred] — internal frontend in a subnet (inferred from type and shared resource group; confirm with authenticated discovery)
 
 **Risks**
 - Constraint: Basic SKU load balancers are retired; plan an upgrade to Standard as part of the migration
@@ -279,13 +279,13 @@
 - After cutover: re-establish backup and DR protection in the destination (Azure Backup / ASR / native redundancy). This is DR, not migration.
 
 **Evidence**
-- [observed-from-csv] name = lb-billing-prod
+- [observed-from-csv] name = hcw-sample-lb-billing-prod
 - [observed-from-csv] type = microsoft.network/loadbalancers
-- [observed-from-csv] resourceId = /subscriptions/<assessment-id>/resourceGroups/rg-contoso-billing-prod-eus/providers/Microsoft.Network/loadBalancers/lb-billing-prod
-- [observed-from-csv] resourceGroup = rg-contoso-billing-prod-eus
-- [observed-from-csv] subscriptionId = <assessment-id>
+- [observed-from-csv] resourceId = /subscriptions/00000000-0000-0000-0000-000000000001/resourceGroups/hcw-sample-rg-billing-prod-eus/providers/Microsoft.Network/loadBalancers/hcw-sample-lb-billing-prod
+- [observed-from-csv] resourceGroup = hcw-sample-rg-billing-prod-eus
+- [observed-from-csv] subscriptionId = 00000000-0000-0000-0000-000000000001
 - [observed-from-csv] location = eastus
-- [observed-from-csv] subscriptionName = Contoso-Prod
+- [observed-from-csv] subscriptionName = hcw-sample-prod
 - [observed-from-csv] sku = Standard
 - [observed-from-csv] tags = {"application":"billing"}
 - [requires-authenticated-validation] Analysis is based on an exported inventory only; configuration-dependent conclusions must be validated against the live environment.
@@ -301,20 +301,20 @@
 - Network topology, private endpoints, encryption/CMK, managed identities, RBAC, locks, policy, data size, backup/replication state — require authenticated inspection
 - Data volume, change rate and consistency requirements (needed to size the sync window)
 
-### nic-vm-billing-01
+### hcw-sample-nic-vm-billing-01
 
-- Type: `Microsoft.Network/networkInterfaces` · Region: eastus · RG: rg-contoso-billing-prod-eus · Application group: billing
+- Type: `Microsoft.Network/networkInterfaces` · Region: eastus · RG: hcw-sample-rg-billing-prod-eus · Application group: billing
 - Disposition: **native-move** via **azure-resource-mover** (alternatives: terraform-redeploy)
 - Paths — infrastructure: recreate; configuration: reconstruct; identity: reconstruct; data: replicate
 - Support — RG move: supported; subscription move: supported; region: supported; target region/SKU availability: unknown/unknown
-- Expected downtime: minutes; RTO/RPO compatibility: unknown/unknown; sequence: 20
+- Expected downtime: minutes; RTO/RPO compatibility: unknown/unknown; sequence: 19
 - Confidence: medium (0.74) — rule confidence 0.8; capped at 0.74: inventory-only evidence cannot yield high confidence
 - Rule: azure.network.networkinterfaces v1.0.0 · reason codes: RULE_MATCH, REGION_MOVE_SUPPORTED · human approval: required
 
 **Dependencies**
-- network → vnet-billing-prod-eus [inferred] — NIC lives in a subnet of the VNet (inferred from type and shared resource group; confirm with authenticated discovery)
-- network → nsg-app [inferred] — NSG may be associated to the NIC or subnet (inferred from type and shared resource group; confirm with authenticated discovery)
-- network → pip-lb-billing [inferred] — public IP may be bound to the NIC (inferred from type and shared resource group; confirm with authenticated discovery)
+- network → hcw-sample-vnet-billing-prod-eus [inferred] — NIC lives in a subnet of the VNet (inferred from type and shared resource group; confirm with authenticated discovery)
+- network → hcw-sample-nsg-app [inferred] — NSG may be associated to the NIC or subnet (inferred from type and shared resource group; confirm with authenticated discovery)
+- network → hcw-sample-pip-lb-billing [inferred] — public IP may be bound to the NIC (inferred from type and shared resource group; confirm with authenticated discovery)
 
 **Risks**
 - Constraint: Private IP addresses are re-allocated at the destination unless statically configured in the target subnet range
@@ -325,13 +325,13 @@
 - After cutover: re-establish backup and DR protection in the destination (Azure Backup / ASR / native redundancy). This is DR, not migration.
 
 **Evidence**
-- [observed-from-csv] name = nic-vm-billing-01
+- [observed-from-csv] name = hcw-sample-nic-vm-billing-01
 - [observed-from-csv] type = microsoft.network/networkinterfaces
-- [observed-from-csv] resourceId = /subscriptions/<assessment-id>/resourceGroups/rg-contoso-billing-prod-eus/providers/Microsoft.Network/networkInterfaces/nic-vm-billing-01
-- [observed-from-csv] resourceGroup = rg-contoso-billing-prod-eus
-- [observed-from-csv] subscriptionId = <assessment-id>
+- [observed-from-csv] resourceId = /subscriptions/00000000-0000-0000-0000-000000000001/resourceGroups/hcw-sample-rg-billing-prod-eus/providers/Microsoft.Network/networkInterfaces/hcw-sample-nic-vm-billing-01
+- [observed-from-csv] resourceGroup = hcw-sample-rg-billing-prod-eus
+- [observed-from-csv] subscriptionId = 00000000-0000-0000-0000-000000000001
 - [observed-from-csv] location = eastus
-- [observed-from-csv] subscriptionName = Contoso-Prod
+- [observed-from-csv] subscriptionName = hcw-sample-prod
 - [observed-from-csv] tags = {"application":"billing"}
 - [requires-authenticated-validation] Analysis is based on an exported inventory only; configuration-dependent conclusions must be validated against the live environment.
 - [general-rule] Move operation support for resources (https://learn.microsoft.com/azure/azure-resource-manager/management/move-support-resources, 2026-10-03)
@@ -347,20 +347,20 @@
 - Network topology, private endpoints, encryption/CMK, managed identities, RBAC, locks, policy, data size, backup/replication state — require authenticated inspection
 - Data volume, change rate and consistency requirements (needed to size the sync window)
 
-### vm-billing-01
+### hcw-sample-vm-billing-01
 
-- Type: `Microsoft.Compute/virtualMachines` · Region: eastus · RG: rg-contoso-billing-prod-eus · Application group: billing
+- Type: `Microsoft.Compute/virtualMachines` · Region: eastus · RG: hcw-sample-rg-billing-prod-eus · Application group: billing
 - Disposition: **native-move** via **azure-resource-mover** (alternatives: azure-migrate, backup-and-restore, terraform-redeploy)
 - Paths — infrastructure: recreate; configuration: reconstruct; identity: reconstruct; data: replicate
 - Support — RG move: supported; subscription move: supported; region: supported; target region/SKU availability: unknown/unknown
-- Expected downtime: minutes; RTO/RPO compatibility: unknown/unknown; sequence: 27
+- Expected downtime: minutes; RTO/RPO compatibility: unknown/unknown; sequence: 26
 - Confidence: medium (0.74) — rule confidence 0.85; capped at 0.74: inventory-only evidence cannot yield high confidence
 - Rule: azure.compute.virtualmachines v1.0.0 · reason codes: RULE_MATCH, REGION_MOVE_SUPPORTED · human approval: required
 
 **Dependencies**
-- hard → nic-vm-billing-01 [inferred] — VMs attach NICs; the NIC must exist in the destination VNet first (inferred from type and shared resource group; confirm with authenticated discovery)
-- hard → vm-billing-01_osdisk [inferred] — OS/data disks move with the VM (inferred from type and shared resource group; confirm with authenticated discovery)
-- soft → avset-billing [inferred] — availability set membership is set at VM creation (inferred from type and shared resource group; confirm with authenticated discovery)
+- hard → hcw-sample-nic-vm-billing-01 [inferred] — VMs attach NICs; the NIC must exist in the destination VNet first (inferred from type and shared resource group; confirm with authenticated discovery)
+- hard → hcw-sample-vm-billing-01_osdisk [inferred] — OS/data disks move with the VM (inferred from type and shared resource group; confirm with authenticated discovery)
+- soft → hcw-sample-avset-billing [inferred] — availability set membership is set at VM creation (inferred from type and shared resource group; confirm with authenticated discovery)
 
 **Prerequisites**
 - Dependent NICs, disks, VNet, NSG and public IPs move together or already exist at the destination
@@ -390,13 +390,13 @@
 - After cutover: re-establish backup and DR protection in the destination (Azure Backup / ASR / native redundancy). This is DR, not migration.
 
 **Evidence**
-- [observed-from-csv] name = vm-billing-01
+- [observed-from-csv] name = hcw-sample-vm-billing-01
 - [observed-from-csv] type = microsoft.compute/virtualmachines
-- [observed-from-csv] resourceId = /subscriptions/<assessment-id>/resourceGroups/rg-contoso-billing-prod-eus/providers/Microsoft.Compute/virtualMachines/vm-billing-01
-- [observed-from-csv] resourceGroup = rg-contoso-billing-prod-eus
-- [observed-from-csv] subscriptionId = <assessment-id>
+- [observed-from-csv] resourceId = /subscriptions/00000000-0000-0000-0000-000000000001/resourceGroups/hcw-sample-rg-billing-prod-eus/providers/Microsoft.Compute/virtualMachines/hcw-sample-vm-billing-01
+- [observed-from-csv] resourceGroup = hcw-sample-rg-billing-prod-eus
+- [observed-from-csv] subscriptionId = 00000000-0000-0000-0000-000000000001
 - [observed-from-csv] location = eastus
-- [observed-from-csv] subscriptionName = Contoso-Prod
+- [observed-from-csv] subscriptionName = hcw-sample-prod
 - [observed-from-csv] sku = Standard_D4s_v5
 - [observed-from-csv] tags = {"application":"billing","environment":"prod"}
 - [requires-authenticated-validation] Analysis is based on an exported inventory only; configuration-dependent conclusions must be validated against the live environment.
@@ -415,13 +415,13 @@
 - Network topology, private endpoints, encryption/CMK, managed identities, RBAC, locks, policy, data size, backup/replication state — require authenticated inspection
 - Data volume, change rate and consistency requirements (needed to size the sync window)
 
-### vm-billing-01_OsDisk
+### hcw-sample-vm-billing-01_OsDisk
 
-- Type: `Microsoft.Compute/disks` · Region: eastus · RG: rg-contoso-billing-prod-eus · Application group: billing
+- Type: `Microsoft.Compute/disks` · Region: eastus · RG: hcw-sample-rg-billing-prod-eus · Application group: billing
 - Disposition: **orchestrated-migration** via **azure-resource-mover** (alternatives: backup-and-restore, export-and-import)
 - Paths — infrastructure: recreate; configuration: reconstruct; identity: not-applicable; data: replicate
 - Support — RG move: supported; subscription move: supported; region: supported; target region/SKU availability: unknown/unknown
-- Expected downtime: minutes; RTO/RPO compatibility: unknown/unknown; sequence: 26
+- Expected downtime: minutes; RTO/RPO compatibility: unknown/unknown; sequence: 25
 - Confidence: medium (0.74) — rule confidence 0.8; capped at 0.74: inventory-only evidence cannot yield high confidence
 - Rule: azure.compute.disks v1.0.0 · reason codes: RULE_MATCH, REGION_MOVE_SUPPORTED · human approval: required
 
@@ -439,13 +439,13 @@
 - After cutover: re-establish backup and DR protection in the destination (Azure Backup / ASR / native redundancy). This is DR, not migration.
 
 **Evidence**
-- [observed-from-csv] name = vm-billing-01_OsDisk
+- [observed-from-csv] name = hcw-sample-vm-billing-01_OsDisk
 - [observed-from-csv] type = microsoft.compute/disks
-- [observed-from-csv] resourceId = /subscriptions/<assessment-id>/resourceGroups/rg-contoso-billing-prod-eus/providers/Microsoft.Compute/disks/vm-billing-01_OsDisk
-- [observed-from-csv] resourceGroup = rg-contoso-billing-prod-eus
-- [observed-from-csv] subscriptionId = <assessment-id>
+- [observed-from-csv] resourceId = /subscriptions/00000000-0000-0000-0000-000000000001/resourceGroups/hcw-sample-rg-billing-prod-eus/providers/Microsoft.Compute/disks/hcw-sample-vm-billing-01_OsDisk
+- [observed-from-csv] resourceGroup = hcw-sample-rg-billing-prod-eus
+- [observed-from-csv] subscriptionId = 00000000-0000-0000-0000-000000000001
 - [observed-from-csv] location = eastus
-- [observed-from-csv] subscriptionName = Contoso-Prod
+- [observed-from-csv] subscriptionName = hcw-sample-prod
 - [observed-from-csv] sku = Premium_LRS
 - [observed-from-csv] tags = {"application":"billing"}
 - [requires-authenticated-validation] Analysis is based on an exported inventory only; configuration-dependent conclusions must be validated against the live environment.
@@ -461,9 +461,9 @@
 - Network topology, private endpoints, encryption/CMK, managed identities, RBAC, locks, policy, data size, backup/replication state — require authenticated inspection
 - Data volume, change rate and consistency requirements (needed to size the sync window)
 
-### avset-billing
+### hcw-sample-avset-billing
 
-- Type: `Microsoft.Compute/availabilitySets` · Region: eastus · RG: rg-contoso-billing-prod-eus · Application group: billing
+- Type: `Microsoft.Compute/availabilitySets` · Region: eastus · RG: hcw-sample-rg-billing-prod-eus · Application group: billing
 - Disposition: **native-move** via **azure-resource-mover** (alternatives: terraform-redeploy)
 - Paths — infrastructure: recreate; configuration: reconstruct; identity: reconstruct; data: replicate
 - Support — RG move: supported; subscription move: supported; region: supported; target region/SKU availability: unknown/unknown
@@ -477,13 +477,13 @@
 - After cutover: re-establish backup and DR protection in the destination (Azure Backup / ASR / native redundancy). This is DR, not migration.
 
 **Evidence**
-- [observed-from-csv] name = avset-billing
+- [observed-from-csv] name = hcw-sample-avset-billing
 - [observed-from-csv] type = microsoft.compute/availabilitysets
-- [observed-from-csv] resourceId = /subscriptions/<assessment-id>/resourceGroups/rg-contoso-billing-prod-eus/providers/Microsoft.Compute/availabilitySets/avset-billing
-- [observed-from-csv] resourceGroup = rg-contoso-billing-prod-eus
-- [observed-from-csv] subscriptionId = <assessment-id>
+- [observed-from-csv] resourceId = /subscriptions/00000000-0000-0000-0000-000000000001/resourceGroups/hcw-sample-rg-billing-prod-eus/providers/Microsoft.Compute/availabilitySets/hcw-sample-avset-billing
+- [observed-from-csv] resourceGroup = hcw-sample-rg-billing-prod-eus
+- [observed-from-csv] subscriptionId = 00000000-0000-0000-0000-000000000001
 - [observed-from-csv] location = eastus
-- [observed-from-csv] subscriptionName = Contoso-Prod
+- [observed-from-csv] subscriptionName = hcw-sample-prod
 - [observed-from-csv] sku = Aligned
 - [observed-from-csv] tags = {"application":"billing"}
 - [requires-authenticated-validation] Analysis is based on an exported inventory only; configuration-dependent conclusions must be validated against the live environment.
@@ -499,13 +499,13 @@
 - Network topology, private endpoints, encryption/CMK, managed identities, RBAC, locks, policy, data size, backup/replication state — require authenticated inspection
 - Data volume, change rate and consistency requirements (needed to size the sync window)
 
-### stcontosobillingprod
+### hcwsamplestbillingprod
 
-- Type: `Microsoft.Storage/storageAccounts` · Region: eastus · RG: rg-contoso-billing-prod-eus · Application group: billing
+- Type: `Microsoft.Storage/storageAccounts` · Region: eastus · RG: hcw-sample-rg-billing-prod-eus · Application group: billing
 - Disposition: **recreate-and-migrate** via **azure-storage-mover** (alternatives: azcopy, object-replication, azure-data-factory, data-box)
 - Paths — infrastructure: recreate; configuration: reconstruct; identity: reconstruct; data: sync-and-cutover
 - Support — RG move: supported; subscription move: supported; region: unsupported; target region/SKU availability: unknown/unknown
-- Expected downtime: hours; RTO/RPO compatibility: unknown/unknown; sequence: 14
+- Expected downtime: hours; RTO/RPO compatibility: unknown/unknown; sequence: 13
 - Confidence: medium (0.74) — rule confidence 0.85; capped at 0.74: inventory-only evidence cannot yield high confidence
 - Rule: org.hcw.storage.storageaccounts.region v1.0.0 · reason codes: RULE_MATCH, REGION_MOVE_UNSUPPORTED_ALTERNATIVE_SELECTED · human approval: required
 
@@ -536,13 +536,13 @@
 - After cutover: re-establish backup and DR protection in the destination (Azure Backup / ASR / native redundancy). This is DR, not migration.
 
 **Evidence**
-- [observed-from-csv] name = stcontosobillingprod
+- [observed-from-csv] name = hcwsamplestbillingprod
 - [observed-from-csv] type = microsoft.storage/storageaccounts
-- [observed-from-csv] resourceId = /subscriptions/<assessment-id>/resourceGroups/rg-contoso-billing-prod-eus/providers/Microsoft.Storage/storageAccounts/stcontosobillingprod
-- [observed-from-csv] resourceGroup = rg-contoso-billing-prod-eus
-- [observed-from-csv] subscriptionId = <assessment-id>
+- [observed-from-csv] resourceId = /subscriptions/00000000-0000-0000-0000-000000000001/resourceGroups/hcw-sample-rg-billing-prod-eus/providers/Microsoft.Storage/storageAccounts/hcwsamplestbillingprod
+- [observed-from-csv] resourceGroup = hcw-sample-rg-billing-prod-eus
+- [observed-from-csv] subscriptionId = 00000000-0000-0000-0000-000000000001
 - [observed-from-csv] location = eastus
-- [observed-from-csv] subscriptionName = Contoso-Prod
+- [observed-from-csv] subscriptionName = hcw-sample-prod
 - [observed-from-csv] kind = StorageV2
 - [observed-from-csv] sku = Standard_GRS
 - [observed-from-csv] tags = {"application":"billing","environment":"prod"}
@@ -559,9 +559,9 @@
 - Network topology, private endpoints, encryption/CMK, managed identities, RBAC, locks, policy, data size, backup/replication state — require authenticated inspection
 - Data volume, change rate and consistency requirements (needed to size the sync window)
 
-### kv-billing-prod-eus
+### hcw-sample-kv-billing
 
-- Type: `Microsoft.KeyVault/vaults` · Region: eastus · RG: rg-contoso-billing-prod-eus · Application group: billing
+- Type: `Microsoft.KeyVault/vaults` · Region: eastus · RG: hcw-sample-rg-billing-prod-eus · Application group: billing
 - Disposition: **recreate-and-migrate** via **backup-and-restore** (alternatives: manual-reconstruction, terraform-redeploy)
 - Paths — infrastructure: recreate; configuration: reconstruct; identity: reconstruct; data: backup-restore
 - Support — RG move: supported; subscription move: supported; region: unsupported; target region/SKU availability: unknown/unknown
@@ -589,13 +589,13 @@
 - After cutover: re-establish backup and DR protection in the destination (Azure Backup / ASR / native redundancy). This is DR, not migration.
 
 **Evidence**
-- [observed-from-csv] name = kv-billing-prod-eus
+- [observed-from-csv] name = hcw-sample-kv-billing
 - [observed-from-csv] type = microsoft.keyvault/vaults
-- [observed-from-csv] resourceId = /subscriptions/<assessment-id>/resourceGroups/rg-contoso-billing-prod-eus/providers/Microsoft.KeyVault/vaults/kv-billing-prod-eus
-- [observed-from-csv] resourceGroup = rg-contoso-billing-prod-eus
-- [observed-from-csv] subscriptionId = <assessment-id>
+- [observed-from-csv] resourceId = /subscriptions/00000000-0000-0000-0000-000000000001/resourceGroups/hcw-sample-rg-billing-prod-eus/providers/Microsoft.KeyVault/vaults/hcw-sample-kv-billing
+- [observed-from-csv] resourceGroup = hcw-sample-rg-billing-prod-eus
+- [observed-from-csv] subscriptionId = 00000000-0000-0000-0000-000000000001
 - [observed-from-csv] location = eastus
-- [observed-from-csv] subscriptionName = Contoso-Prod
+- [observed-from-csv] subscriptionName = hcw-sample-prod
 - [observed-from-csv] sku = standard
 - [observed-from-csv] tags = {"application":"billing"}
 - [requires-authenticated-validation] Analysis is based on an exported inventory only; configuration-dependent conclusions must be validated against the live environment.
@@ -612,9 +612,9 @@
 - Network topology, private endpoints, encryption/CMK, managed identities, RBAC, locks, policy, data size, backup/replication state — require authenticated inspection
 - Data volume, change rate and consistency requirements (needed to size the sync window)
 
-### sql-billing-prod-eus
+### hcw-sample-sql-billing-prod-eus
 
-- Type: `Microsoft.Sql/servers` · Region: eastus · RG: rg-contoso-billing-prod-eus · Application group: billing
+- Type: `Microsoft.Sql/servers` · Region: eastus · RG: hcw-sample-rg-billing-prod-eus · Application group: billing
 - Disposition: **recreate-and-migrate** via **failover-group** (alternatives: geo-replication, export-and-import, azure-database-migration-service, backup-and-restore)
 - Paths — infrastructure: recreate; configuration: reconstruct; identity: reconstruct; data: replicate
 - Support — RG move: supported; subscription move: supported; region: unsupported; target region/SKU availability: unknown/unknown
@@ -623,7 +623,7 @@
 - Rule: azure.sql.servers v1.0.0 · reason codes: RULE_MATCH, REGION_MOVE_UNSUPPORTED_ALTERNATIVE_SELECTED · human approval: required
 
 **Dependencies**
-- child → billingdb [discovered]
+- child → hcw-sample-billingdb [discovered]
 
 **Risks**
 - Constraint: Logical server name is globally unique (DNS); firewall rules, auditing, Entra admin and TDE keys are server-level configuration
@@ -634,13 +634,13 @@
 - After cutover: re-establish backup and DR protection in the destination (Azure Backup / ASR / native redundancy). This is DR, not migration.
 
 **Evidence**
-- [observed-from-csv] name = sql-billing-prod-eus
+- [observed-from-csv] name = hcw-sample-sql-billing-prod-eus
 - [observed-from-csv] type = microsoft.sql/servers
-- [observed-from-csv] resourceId = /subscriptions/<assessment-id>/resourceGroups/rg-contoso-billing-prod-eus/providers/Microsoft.Sql/servers/sql-billing-prod-eus
-- [observed-from-csv] resourceGroup = rg-contoso-billing-prod-eus
-- [observed-from-csv] subscriptionId = <assessment-id>
+- [observed-from-csv] resourceId = /subscriptions/00000000-0000-0000-0000-000000000001/resourceGroups/hcw-sample-rg-billing-prod-eus/providers/Microsoft.Sql/servers/hcw-sample-sql-billing-prod-eus
+- [observed-from-csv] resourceGroup = hcw-sample-rg-billing-prod-eus
+- [observed-from-csv] subscriptionId = 00000000-0000-0000-0000-000000000001
 - [observed-from-csv] location = eastus
-- [observed-from-csv] subscriptionName = Contoso-Prod
+- [observed-from-csv] subscriptionName = hcw-sample-prod
 - [observed-from-csv] tags = {"application":"billing"}
 - [requires-authenticated-validation] Analysis is based on an exported inventory only; configuration-dependent conclusions must be validated against the live environment.
 - [general-rule] Move operation support for resources (https://learn.microsoft.com/azure/azure-resource-manager/management/move-support-resources, 2026-10-03)
@@ -657,9 +657,9 @@
 - Network topology, private endpoints, encryption/CMK, managed identities, RBAC, locks, policy, data size, backup/replication state — require authenticated inspection
 - Data volume, change rate and consistency requirements (needed to size the sync window)
 
-### billingdb
+### hcw-sample-billingdb
 
-- Type: `Microsoft.Sql/servers/databases` · Region: eastus · RG: rg-contoso-billing-prod-eus · Application group: billing
+- Type: `Microsoft.Sql/servers/databases` · Region: eastus · RG: hcw-sample-rg-billing-prod-eus · Application group: billing
 - Disposition: **recreate-and-migrate** via **geo-replication** (alternatives: failover-group, export-and-import, azure-database-migration-service, backup-and-restore)
 - Paths — infrastructure: recreate; configuration: reconstruct; identity: not-applicable; data: replicate
 - Support — RG move: supported; subscription move: supported; region: unsupported; target region/SKU availability: unknown/unknown
@@ -668,7 +668,7 @@
 - Rule: azure.sql.servers.databases v1.0.0 · reason codes: RULE_MATCH, REGION_MOVE_UNSUPPORTED_ALTERNATIVE_SELECTED · human approval: required
 
 **Dependencies**
-- parent → sql-billing-prod-eus [discovered] — parent present in inventory
+- parent → hcw-sample-sql-billing-prod-eus [discovered] — parent present in inventory
 
 **Risks**
 - Constraint: Databases move with the logical server; a cross-region move creates a geo-secondary then promotes it (near-zero data loss) or uses BACPAC export/import for offline moves
@@ -687,13 +687,13 @@
 - After cutover: re-establish backup and DR protection in the destination (Azure Backup / ASR / native redundancy). This is DR, not migration.
 
 **Evidence**
-- [observed-from-csv] name = billingdb
+- [observed-from-csv] name = hcw-sample-billingdb
 - [observed-from-csv] type = microsoft.sql/servers/databases
-- [observed-from-csv] resourceId = /subscriptions/<assessment-id>/resourceGroups/rg-contoso-billing-prod-eus/providers/Microsoft.Sql/servers/sql-billing-prod-eus/databases/billingdb
-- [observed-from-csv] resourceGroup = rg-contoso-billing-prod-eus
-- [observed-from-csv] subscriptionId = <assessment-id>
+- [observed-from-csv] resourceId = /subscriptions/00000000-0000-0000-0000-000000000001/resourceGroups/hcw-sample-rg-billing-prod-eus/providers/Microsoft.Sql/servers/hcw-sample-sql-billing-prod-eus/databases/hcw-sample-billingdb
+- [observed-from-csv] resourceGroup = hcw-sample-rg-billing-prod-eus
+- [observed-from-csv] subscriptionId = 00000000-0000-0000-0000-000000000001
 - [observed-from-csv] location = eastus
-- [observed-from-csv] subscriptionName = Contoso-Prod
+- [observed-from-csv] subscriptionName = hcw-sample-prod
 - [observed-from-csv] sku = GP_Gen5_4
 - [observed-from-csv] tags = {"application":"billing"}
 - [requires-authenticated-validation] Analysis is based on an exported inventory only; configuration-dependent conclusions must be validated against the live environment.
@@ -710,13 +710,13 @@
 - Network topology, private endpoints, encryption/CMK, managed identities, RBAC, locks, policy, data size, backup/replication state — require authenticated inspection
 - Data volume, change rate and consistency requirements (needed to size the sync window)
 
-### psql-billing-prod-eus
+### hcw-sample-psql-billing-prod-eus
 
-- Type: `Microsoft.DBforPostgreSQL/flexibleServers` · Region: eastus · RG: rg-contoso-billing-prod-eus · Application group: billing
+- Type: `Microsoft.DBforPostgreSQL/flexibleServers` · Region: eastus · RG: hcw-sample-rg-billing-prod-eus · Application group: billing
 - Disposition: **recreate-and-migrate** via **native-database-replication** (alternatives: backup-and-restore, azure-database-migration-service, export-and-import)
 - Paths — infrastructure: recreate; configuration: reconstruct; identity: reconstruct; data: replicate
 - Support — RG move: supported; subscription move: supported; region: unsupported; target region/SKU availability: unknown/unknown
-- Expected downtime: minutes; RTO/RPO compatibility: unknown/unknown; sequence: 23
+- Expected downtime: minutes; RTO/RPO compatibility: unknown/unknown; sequence: 22
 - Confidence: medium (0.74) — rule confidence 0.75; capped at 0.74: inventory-only evidence cannot yield high confidence
 - Rule: azure.dbforpostgresql.flexibleservers v1.0.0 · reason codes: RULE_MATCH, REGION_MOVE_UNSUPPORTED_ALTERNATIVE_SELECTED · human approval: required
 
@@ -730,13 +730,13 @@
 - After cutover: re-establish backup and DR protection in the destination (Azure Backup / ASR / native redundancy). This is DR, not migration.
 
 **Evidence**
-- [observed-from-csv] name = psql-billing-prod-eus
+- [observed-from-csv] name = hcw-sample-psql-billing-prod-eus
 - [observed-from-csv] type = microsoft.dbforpostgresql/flexibleservers
-- [observed-from-csv] resourceId = /subscriptions/<assessment-id>/resourceGroups/rg-contoso-billing-prod-eus/providers/Microsoft.DBforPostgreSQL/flexibleServers/psql-billing-prod-eus
-- [observed-from-csv] resourceGroup = rg-contoso-billing-prod-eus
-- [observed-from-csv] subscriptionId = <assessment-id>
+- [observed-from-csv] resourceId = /subscriptions/00000000-0000-0000-0000-000000000001/resourceGroups/hcw-sample-rg-billing-prod-eus/providers/Microsoft.DBforPostgreSQL/flexibleServers/hcw-sample-psql-billing-prod-eus
+- [observed-from-csv] resourceGroup = hcw-sample-rg-billing-prod-eus
+- [observed-from-csv] subscriptionId = 00000000-0000-0000-0000-000000000001
 - [observed-from-csv] location = eastus
-- [observed-from-csv] subscriptionName = Contoso-Prod
+- [observed-from-csv] subscriptionName = hcw-sample-prod
 - [observed-from-csv] sku = Standard_D2ds_v4
 - [observed-from-csv] tags = {"application":"billing"}
 - [requires-authenticated-validation] Analysis is based on an exported inventory only; configuration-dependent conclusions must be validated against the live environment.
@@ -752,9 +752,9 @@
 - Network topology, private endpoints, encryption/CMK, managed identities, RBAC, locks, policy, data size, backup/replication state — require authenticated inspection
 - Data volume, change rate and consistency requirements (needed to size the sync window)
 
-### cosmos-billing-prod
+### hcw-sample-cosmos-billing-prod
 
-- Type: `Microsoft.DocumentDB/databaseAccounts` · Region: eastus · RG: rg-contoso-billing-prod-eus · Application group: billing
+- Type: `Microsoft.DocumentDB/databaseAccounts` · Region: eastus · RG: hcw-sample-rg-billing-prod-eus · Application group: billing
 - Disposition: **orchestrated-migration** via **service-specific-migration** (alternatives: azure-data-factory, export-and-import)
 - Paths — infrastructure: move-with-resource; configuration: reconstruct; identity: not-applicable; data: replicate
 - Support — RG move: supported; subscription move: supported; region: conditional; target region/SKU availability: unknown/unknown
@@ -775,13 +775,13 @@
 - After cutover: re-establish backup and DR protection in the destination (Azure Backup / ASR / native redundancy). This is DR, not migration.
 
 **Evidence**
-- [observed-from-csv] name = cosmos-billing-prod
+- [observed-from-csv] name = hcw-sample-cosmos-billing-prod
 - [observed-from-csv] type = microsoft.documentdb/databaseaccounts
-- [observed-from-csv] resourceId = /subscriptions/<assessment-id>/resourceGroups/rg-contoso-billing-prod-eus/providers/Microsoft.DocumentDB/databaseAccounts/cosmos-billing-prod
-- [observed-from-csv] resourceGroup = rg-contoso-billing-prod-eus
-- [observed-from-csv] subscriptionId = <assessment-id>
+- [observed-from-csv] resourceId = /subscriptions/00000000-0000-0000-0000-000000000001/resourceGroups/hcw-sample-rg-billing-prod-eus/providers/Microsoft.DocumentDB/databaseAccounts/hcw-sample-cosmos-billing-prod
+- [observed-from-csv] resourceGroup = hcw-sample-rg-billing-prod-eus
+- [observed-from-csv] subscriptionId = 00000000-0000-0000-0000-000000000001
 - [observed-from-csv] location = eastus
-- [observed-from-csv] subscriptionName = Contoso-Prod
+- [observed-from-csv] subscriptionName = hcw-sample-prod
 - [observed-from-csv] kind = GlobalDocumentDB
 - [observed-from-csv] tags = {"application":"billing"}
 - [requires-authenticated-validation] Analysis is based on an exported inventory only; configuration-dependent conclusions must be validated against the live environment.
@@ -798,13 +798,13 @@
 - Network topology, private endpoints, encryption/CMK, managed identities, RBAC, locks, policy, data size, backup/replication state — require authenticated inspection
 - Data volume, change rate and consistency requirements (needed to size the sync window)
 
-### crcontosobilling
+### hcwsampleacrbilling
 
-- Type: `Microsoft.ContainerRegistry/registries` · Region: eastus · RG: rg-contoso-billing-prod-eus · Application group: billing
+- Type: `Microsoft.ContainerRegistry/registries` · Region: eastus · RG: hcw-sample-rg-billing-prod-eus · Application group: billing
 - Disposition: **recreate-and-migrate** via **container-image-copy** (alternatives: terraform-redeploy, service-specific-migration)
 - Paths — infrastructure: recreate; configuration: reconstruct; identity: reconstruct; data: export-import
 - Support — RG move: supported; subscription move: supported; region: unsupported; target region/SKU availability: unknown/unknown
-- Expected downtime: none; RTO/RPO compatibility: unknown/unknown; sequence: 13
+- Expected downtime: none; RTO/RPO compatibility: unknown/unknown; sequence: 29
 - Confidence: medium (0.74) — rule confidence 0.8; capped at 0.74: inventory-only evidence cannot yield high confidence
 - Rule: azure.containerregistry.registries v1.0.0 · reason codes: RULE_MATCH, REGION_MOVE_UNSUPPORTED_ALTERNATIVE_SELECTED · human approval: required
 
@@ -818,13 +818,13 @@
 - After cutover: re-establish backup and DR protection in the destination (Azure Backup / ASR / native redundancy). This is DR, not migration.
 
 **Evidence**
-- [observed-from-csv] name = crcontosobilling
+- [observed-from-csv] name = hcwsampleacrbilling
 - [observed-from-csv] type = microsoft.containerregistry/registries
-- [observed-from-csv] resourceId = /subscriptions/<assessment-id>/resourceGroups/rg-contoso-billing-prod-eus/providers/Microsoft.ContainerRegistry/registries/crcontosobilling
-- [observed-from-csv] resourceGroup = rg-contoso-billing-prod-eus
-- [observed-from-csv] subscriptionId = <assessment-id>
+- [observed-from-csv] resourceId = /subscriptions/00000000-0000-0000-0000-000000000001/resourceGroups/hcw-sample-rg-billing-prod-eus/providers/Microsoft.ContainerRegistry/registries/hcwsampleacrbilling
+- [observed-from-csv] resourceGroup = hcw-sample-rg-billing-prod-eus
+- [observed-from-csv] subscriptionId = 00000000-0000-0000-0000-000000000001
 - [observed-from-csv] location = eastus
-- [observed-from-csv] subscriptionName = Contoso-Prod
+- [observed-from-csv] subscriptionName = hcw-sample-prod
 - [observed-from-csv] sku = Premium
 - [observed-from-csv] tags = {"application":"billing"}
 - [requires-authenticated-validation] Analysis is based on an exported inventory only; configuration-dependent conclusions must be validated against the live environment.
@@ -841,9 +841,9 @@
 - Network topology, private endpoints, encryption/CMK, managed identities, RBAC, locks, policy, data size, backup/replication state — require authenticated inspection
 - Data volume, change rate and consistency requirements (needed to size the sync window)
 
-### asp-billing-prod-eus
+### hcw-sample-asp-billing-prod-eus
 
-- Type: `Microsoft.Web/serverFarms` · Region: eastus · RG: rg-contoso-billing-prod-eus · Application group: billing
+- Type: `Microsoft.Web/serverFarms` · Region: eastus · RG: hcw-sample-rg-billing-prod-eus · Application group: billing
 - Disposition: **recreate-only** via **terraform-redeploy** (alternatives: application-deployment)
 - Paths — infrastructure: recreate; configuration: reconstruct; identity: reconstruct; data: not-applicable
 - Support — RG move: conditional; subscription move: conditional; region: unsupported; target region/SKU availability: unknown/unknown
@@ -863,13 +863,13 @@
 - After cutover: re-establish backup and DR protection in the destination (Azure Backup / ASR / native redundancy). This is DR, not migration.
 
 **Evidence**
-- [observed-from-csv] name = asp-billing-prod-eus
+- [observed-from-csv] name = hcw-sample-asp-billing-prod-eus
 - [observed-from-csv] type = microsoft.web/serverfarms
-- [observed-from-csv] resourceId = /subscriptions/<assessment-id>/resourceGroups/rg-contoso-billing-prod-eus/providers/Microsoft.Web/serverFarms/asp-billing-prod-eus
-- [observed-from-csv] resourceGroup = rg-contoso-billing-prod-eus
-- [observed-from-csv] subscriptionId = <assessment-id>
+- [observed-from-csv] resourceId = /subscriptions/00000000-0000-0000-0000-000000000001/resourceGroups/hcw-sample-rg-billing-prod-eus/providers/Microsoft.Web/serverFarms/hcw-sample-asp-billing-prod-eus
+- [observed-from-csv] resourceGroup = hcw-sample-rg-billing-prod-eus
+- [observed-from-csv] subscriptionId = 00000000-0000-0000-0000-000000000001
 - [observed-from-csv] location = eastus
-- [observed-from-csv] subscriptionName = Contoso-Prod
+- [observed-from-csv] subscriptionName = hcw-sample-prod
 - [observed-from-csv] kind = linux
 - [observed-from-csv] sku = P1v3
 - [observed-from-csv] tags = {"application":"billing"}
@@ -885,9 +885,9 @@
 **Missing information**
 - Network topology, private endpoints, encryption/CMK, managed identities, RBAC, locks, policy, data size, backup/replication state — require authenticated inspection
 
-### app-billing-web-prod
+### hcw-sample-app-billing-web-prod
 
-- Type: `Microsoft.Web/sites` · Region: eastus · RG: rg-contoso-billing-prod-eus · Application group: billing
+- Type: `Microsoft.Web/sites` · Region: eastus · RG: hcw-sample-rg-billing-prod-eus · Application group: billing
 - Disposition: **recreate-and-migrate** via **application-deployment** (alternatives: backup-and-restore, terraform-redeploy, slot-deployment)
 - Paths — infrastructure: recreate; configuration: reconstruct; identity: reconstruct; data: export-import
 - Support — RG move: conditional; subscription move: conditional; region: unsupported; target region/SKU availability: unknown/unknown
@@ -896,10 +896,10 @@
 - Rule: azure.web.sites v1.0.0 · reason codes: RULE_MATCH, REGION_MOVE_UNSUPPORTED_ALTERNATIVE_SELECTED · human approval: required
 
 **Dependencies**
-- parent → asp-billing-prod-eus [inferred] — an app belongs to an App Service plan (inferred from type and shared resource group; confirm with authenticated discovery)
-- soft → appi-billing-prod [inferred] — Application Insights connection string in app settings (inferred from type and shared resource group; confirm with authenticated discovery)
-- identity → kv-billing-prod-eus [inferred] — app settings commonly use Key Vault references (inferred from type and shared resource group; confirm with authenticated discovery)
-- identity → id-billing-app [inferred] — user-assigned identity may be bound to the app (inferred from type and shared resource group; confirm with authenticated discovery)
+- parent → hcw-sample-asp-billing-prod-eus [inferred] — an app belongs to an App Service plan (inferred from type and shared resource group; confirm with authenticated discovery)
+- soft → hcw-sample-appi-billing-prod [inferred] — Application Insights connection string in app settings (inferred from type and shared resource group; confirm with authenticated discovery)
+- identity → hcw-sample-kv-billing [inferred] — app settings commonly use Key Vault references (inferred from type and shared resource group; confirm with authenticated discovery)
+- identity → hcw-sample-id-billing-app [inferred] — user-assigned identity may be bound to the app (inferred from type and shared resource group; confirm with authenticated discovery)
 
 **Prerequisites**
 - Hostname/TLS certificate ownership available in destination
@@ -925,13 +925,13 @@
 - After cutover: re-establish backup and DR protection in the destination (Azure Backup / ASR / native redundancy). This is DR, not migration.
 
 **Evidence**
-- [observed-from-csv] name = app-billing-web-prod
+- [observed-from-csv] name = hcw-sample-app-billing-web-prod
 - [observed-from-csv] type = microsoft.web/sites
-- [observed-from-csv] resourceId = /subscriptions/<assessment-id>/resourceGroups/rg-contoso-billing-prod-eus/providers/Microsoft.Web/sites/app-billing-web-prod
-- [observed-from-csv] resourceGroup = rg-contoso-billing-prod-eus
-- [observed-from-csv] subscriptionId = <assessment-id>
+- [observed-from-csv] resourceId = /subscriptions/00000000-0000-0000-0000-000000000001/resourceGroups/hcw-sample-rg-billing-prod-eus/providers/Microsoft.Web/sites/hcw-sample-app-billing-web-prod
+- [observed-from-csv] resourceGroup = hcw-sample-rg-billing-prod-eus
+- [observed-from-csv] subscriptionId = 00000000-0000-0000-0000-000000000001
 - [observed-from-csv] location = eastus
-- [observed-from-csv] subscriptionName = Contoso-Prod
+- [observed-from-csv] subscriptionName = hcw-sample-prod
 - [observed-from-csv] kind = app,linux
 - [observed-from-csv] tags = {"application":"billing","environment":"prod"}
 - [requires-authenticated-validation] Analysis is based on an exported inventory only; configuration-dependent conclusions must be validated against the live environment.
@@ -947,22 +947,22 @@
 - Network topology, private endpoints, encryption/CMK, managed identities, RBAC, locks, policy, data size, backup/replication state — require authenticated inspection
 - Data volume, change rate and consistency requirements (needed to size the sync window)
 
-### func-billing-jobs-prod
+### hcw-sample-func-billing-jobs-prod
 
-- Type: `Microsoft.Web/sites` · Region: eastus · RG: rg-contoso-billing-prod-eus · Application group: billing
+- Type: `Microsoft.Web/sites` · Region: eastus · RG: hcw-sample-rg-billing-prod-eus · Application group: billing
 - Disposition: **recreate-and-migrate** via **application-deployment** (alternatives: backup-and-restore, terraform-redeploy, slot-deployment)
 - Paths — infrastructure: recreate; configuration: reconstruct; identity: reconstruct; data: export-import
 - Support — RG move: conditional; subscription move: conditional; region: unsupported; target region/SKU availability: unknown/unknown
-- Expected downtime: minutes; RTO/RPO compatibility: unknown/unknown; sequence: 15
+- Expected downtime: minutes; RTO/RPO compatibility: unknown/unknown; sequence: 14
 - Confidence: medium (0.74) — rule confidence 0.8; capped at 0.74: inventory-only evidence cannot yield high confidence
 - Rule: azure.web.sites v1.0.0 · reason codes: RULE_MATCH, REGION_MOVE_UNSUPPORTED_ALTERNATIVE_SELECTED · human approval: required
 
 **Dependencies**
-- parent → asp-billing-prod-eus [inferred] — an app belongs to an App Service plan (inferred from type and shared resource group; confirm with authenticated discovery)
-- soft → stcontosobillingprod [inferred] — Function Apps require a storage account (kind contains functionapp) (inferred from type and shared resource group; confirm with authenticated discovery)
-- soft → appi-billing-prod [inferred] — Application Insights connection string in app settings (inferred from type and shared resource group; confirm with authenticated discovery)
-- identity → kv-billing-prod-eus [inferred] — app settings commonly use Key Vault references (inferred from type and shared resource group; confirm with authenticated discovery)
-- identity → id-billing-app [inferred] — user-assigned identity may be bound to the app (inferred from type and shared resource group; confirm with authenticated discovery)
+- parent → hcw-sample-asp-billing-prod-eus [inferred] — an app belongs to an App Service plan (inferred from type and shared resource group; confirm with authenticated discovery)
+- soft → hcwsamplestbillingprod [inferred] — Function Apps require a storage account (kind contains functionapp) (inferred from type and shared resource group; confirm with authenticated discovery)
+- soft → hcw-sample-appi-billing-prod [inferred] — Application Insights connection string in app settings (inferred from type and shared resource group; confirm with authenticated discovery)
+- identity → hcw-sample-kv-billing [inferred] — app settings commonly use Key Vault references (inferred from type and shared resource group; confirm with authenticated discovery)
+- identity → hcw-sample-id-billing-app [inferred] — user-assigned identity may be bound to the app (inferred from type and shared resource group; confirm with authenticated discovery)
 
 **Prerequisites**
 - Hostname/TLS certificate ownership available in destination
@@ -988,13 +988,13 @@
 - After cutover: re-establish backup and DR protection in the destination (Azure Backup / ASR / native redundancy). This is DR, not migration.
 
 **Evidence**
-- [observed-from-csv] name = func-billing-jobs-prod
+- [observed-from-csv] name = hcw-sample-func-billing-jobs-prod
 - [observed-from-csv] type = microsoft.web/sites
-- [observed-from-csv] resourceId = /subscriptions/<assessment-id>/resourceGroups/rg-contoso-billing-prod-eus/providers/Microsoft.Web/sites/func-billing-jobs-prod
-- [observed-from-csv] resourceGroup = rg-contoso-billing-prod-eus
-- [observed-from-csv] subscriptionId = <assessment-id>
+- [observed-from-csv] resourceId = /subscriptions/00000000-0000-0000-0000-000000000001/resourceGroups/hcw-sample-rg-billing-prod-eus/providers/Microsoft.Web/sites/hcw-sample-func-billing-jobs-prod
+- [observed-from-csv] resourceGroup = hcw-sample-rg-billing-prod-eus
+- [observed-from-csv] subscriptionId = 00000000-0000-0000-0000-000000000001
 - [observed-from-csv] location = eastus
-- [observed-from-csv] subscriptionName = Contoso-Prod
+- [observed-from-csv] subscriptionName = hcw-sample-prod
 - [observed-from-csv] kind = functionapp,linux
 - [observed-from-csv] tags = {"application":"billing"}
 - [requires-authenticated-validation] Analysis is based on an exported inventory only; configuration-dependent conclusions must be validated against the live environment.
@@ -1010,9 +1010,9 @@
 - Network topology, private endpoints, encryption/CMK, managed identities, RBAC, locks, policy, data size, backup/replication state — require authenticated inspection
 - Data volume, change rate and consistency requirements (needed to size the sync window)
 
-### appi-billing-prod
+### hcw-sample-appi-billing-prod
 
-- Type: `Microsoft.Insights/components` · Region: eastus · RG: rg-contoso-billing-prod-eus · Application group: billing
+- Type: `Microsoft.Insights/components` · Region: eastus · RG: hcw-sample-rg-billing-prod-eus · Application group: billing
 - Disposition: **recreate-and-migrate** via **terraform-redeploy** (alternatives: manual-reconstruction)
 - Paths — infrastructure: recreate; configuration: reconstruct; identity: not-applicable; data: retain-in-source
 - Support — RG move: supported; subscription move: supported; region: unsupported; target region/SKU availability: unknown/unknown
@@ -1021,7 +1021,7 @@
 - Rule: azure.insights.components v1.0.0 · reason codes: RULE_MATCH, REGION_MOVE_UNSUPPORTED_ALTERNATIVE_SELECTED · human approval: required
 
 **Dependencies**
-- hard → log-contoso-prod-eus [inferred] — workspace-based Application Insights (inferred from type and shared resource group; confirm with authenticated discovery)
+- hard → hcw-sample-log-prod-eus [inferred] — workspace-based Application Insights (inferred from type and shared resource group; confirm with authenticated discovery)
 
 **Risks**
 - Constraint: Telemetry history stays with the source; the connection string/instrumentation key changes and must be redeployed to applications
@@ -1031,13 +1031,13 @@
 - After cutover: re-establish backup and DR protection in the destination (Azure Backup / ASR / native redundancy). This is DR, not migration.
 
 **Evidence**
-- [observed-from-csv] name = appi-billing-prod
+- [observed-from-csv] name = hcw-sample-appi-billing-prod
 - [observed-from-csv] type = microsoft.insights/components
-- [observed-from-csv] resourceId = /subscriptions/<assessment-id>/resourceGroups/rg-contoso-billing-prod-eus/providers/Microsoft.Insights/components/appi-billing-prod
-- [observed-from-csv] resourceGroup = rg-contoso-billing-prod-eus
-- [observed-from-csv] subscriptionId = <assessment-id>
+- [observed-from-csv] resourceId = /subscriptions/00000000-0000-0000-0000-000000000001/resourceGroups/hcw-sample-rg-billing-prod-eus/providers/Microsoft.Insights/components/hcw-sample-appi-billing-prod
+- [observed-from-csv] resourceGroup = hcw-sample-rg-billing-prod-eus
+- [observed-from-csv] subscriptionId = 00000000-0000-0000-0000-000000000001
 - [observed-from-csv] location = eastus
-- [observed-from-csv] subscriptionName = Contoso-Prod
+- [observed-from-csv] subscriptionName = hcw-sample-prod
 - [observed-from-csv] kind = web
 - [observed-from-csv] tags = {"application":"billing"}
 - [requires-authenticated-validation] Analysis is based on an exported inventory only; configuration-dependent conclusions must be validated against the live environment.
@@ -1052,9 +1052,9 @@
 - SKU/tier (affects regional availability, move eligibility and data-copy method)
 - Network topology, private endpoints, encryption/CMK, managed identities, RBAC, locks, policy, data size, backup/replication state — require authenticated inspection
 
-### log-contoso-prod-eus
+### hcw-sample-log-prod-eus
 
-- Type: `Microsoft.OperationalInsights/workspaces` · Region: eastus · RG: rg-contoso-billing-prod-eus · Application group: platform
+- Type: `Microsoft.OperationalInsights/workspaces` · Region: eastus · RG: hcw-sample-rg-billing-prod-eus · Application group: platform
 - Disposition: **recreate-and-migrate** via **terraform-redeploy** (alternatives: export-and-import, manual-reconstruction)
 - Paths — infrastructure: recreate; configuration: reconstruct; identity: not-applicable; data: retain-in-source
 - Support — RG move: supported; subscription move: supported; region: unsupported; target region/SKU availability: unknown/unknown
@@ -1070,13 +1070,13 @@
 - After cutover: re-establish backup and DR protection in the destination (Azure Backup / ASR / native redundancy). This is DR, not migration.
 
 **Evidence**
-- [observed-from-csv] name = log-contoso-prod-eus
+- [observed-from-csv] name = hcw-sample-log-prod-eus
 - [observed-from-csv] type = microsoft.operationalinsights/workspaces
-- [observed-from-csv] resourceId = /subscriptions/<assessment-id>/resourceGroups/rg-contoso-billing-prod-eus/providers/Microsoft.OperationalInsights/workspaces/log-contoso-prod-eus
-- [observed-from-csv] resourceGroup = rg-contoso-billing-prod-eus
-- [observed-from-csv] subscriptionId = <assessment-id>
+- [observed-from-csv] resourceId = /subscriptions/00000000-0000-0000-0000-000000000001/resourceGroups/hcw-sample-rg-billing-prod-eus/providers/Microsoft.OperationalInsights/workspaces/hcw-sample-log-prod-eus
+- [observed-from-csv] resourceGroup = hcw-sample-rg-billing-prod-eus
+- [observed-from-csv] subscriptionId = 00000000-0000-0000-0000-000000000001
 - [observed-from-csv] location = eastus
-- [observed-from-csv] subscriptionName = Contoso-Prod
+- [observed-from-csv] subscriptionName = hcw-sample-prod
 - [observed-from-csv] sku = PerGB2018
 - [observed-from-csv] tags = {"application":"platform"}
 - [requires-authenticated-validation] Analysis is based on an exported inventory only; configuration-dependent conclusions must be validated against the live environment.
@@ -1092,18 +1092,18 @@
 - Kind (e.g. functionapp vs app, StorageV2 vs BlobStorage)
 - Network topology, private endpoints, encryption/CMK, managed identities, RBAC, locks, policy, data size, backup/replication state — require authenticated inspection
 
-### rsv-contoso-prod-eus
+### hcw-sample-rsv-prod-eus
 
-- Type: `Microsoft.RecoveryServices/vaults` · Region: eastus · RG: rg-contoso-billing-prod-eus · Application group: platform
+- Type: `Microsoft.RecoveryServices/vaults` · Region: eastus · RG: hcw-sample-rg-billing-prod-eus · Application group: platform
 - Disposition: **recreate-only** via **terraform-redeploy** (alternatives: manual-reconstruction)
 - Paths — infrastructure: recreate; configuration: reconstruct; identity: reconstruct; data: retain-in-source
 - Support — RG move: conditional; subscription move: conditional; region: unsupported; target region/SKU availability: unknown/unknown
-- Expected downtime: none; RTO/RPO compatibility: unknown/unknown; sequence: 28
+- Expected downtime: none; RTO/RPO compatibility: unknown/unknown; sequence: 27
 - Confidence: medium (0.74) — rule confidence 0.8; capped at 0.74: inventory-only evidence cannot yield high confidence
 - Rule: azure.recoveryservices.vaults v1.0.0 · reason codes: RULE_MATCH, REGION_MOVE_UNSUPPORTED_ALTERNATIVE_SELECTED · human approval: required
 
 **Dependencies**
-- soft → vm-billing-01 [inferred] — vault may protect VMs; protection must be stopped before VM move (inferred from type and shared resource group; confirm with authenticated discovery)
+- soft → hcw-sample-vm-billing-01 [inferred] — vault may protect VMs; protection must be stopped before VM move (inferred from type and shared resource group; confirm with authenticated discovery)
 
 **Blockers**
 - Rule requires human review before this disposition is accepted.
@@ -1117,13 +1117,13 @@
 - After cutover: re-establish backup and DR protection in the destination (Azure Backup / ASR / native redundancy). This is DR, not migration.
 
 **Evidence**
-- [observed-from-csv] name = rsv-contoso-prod-eus
+- [observed-from-csv] name = hcw-sample-rsv-prod-eus
 - [observed-from-csv] type = microsoft.recoveryservices/vaults
-- [observed-from-csv] resourceId = /subscriptions/<assessment-id>/resourceGroups/rg-contoso-billing-prod-eus/providers/Microsoft.RecoveryServices/vaults/rsv-contoso-prod-eus
-- [observed-from-csv] resourceGroup = rg-contoso-billing-prod-eus
-- [observed-from-csv] subscriptionId = <assessment-id>
+- [observed-from-csv] resourceId = /subscriptions/00000000-0000-0000-0000-000000000001/resourceGroups/hcw-sample-rg-billing-prod-eus/providers/Microsoft.RecoveryServices/vaults/hcw-sample-rsv-prod-eus
+- [observed-from-csv] resourceGroup = hcw-sample-rg-billing-prod-eus
+- [observed-from-csv] subscriptionId = 00000000-0000-0000-0000-000000000001
 - [observed-from-csv] location = eastus
-- [observed-from-csv] subscriptionName = Contoso-Prod
+- [observed-from-csv] subscriptionName = hcw-sample-prod
 - [observed-from-csv] sku = RS0
 - [observed-from-csv] tags = {"application":"platform"}
 - [requires-authenticated-validation] Analysis is based on an exported inventory only; configuration-dependent conclusions must be validated against the live environment.
@@ -1140,18 +1140,18 @@
 - Kind (e.g. functionapp vs app, StorageV2 vs BlobStorage)
 - Network topology, private endpoints, encryption/CMK, managed identities, RBAC, locks, policy, data size, backup/replication state — require authenticated inspection
 
-### pe-sql-billing
+### hcw-sample-pe-sql-billing
 
-- Type: `Microsoft.Network/privateEndpoints` · Region: eastus · RG: rg-contoso-billing-prod-eus · Application group: billing
+- Type: `Microsoft.Network/privateEndpoints` · Region: eastus · RG: hcw-sample-rg-billing-prod-eus · Application group: billing
 - Disposition: **recreate-only** via **terraform-redeploy** (alternatives: none)
 - Paths — infrastructure: recreate; configuration: reconstruct; identity: reconstruct; data: not-applicable
 - Support — RG move: supported; subscription move: supported; region: unsupported; target region/SKU availability: unknown/unknown
-- Expected downtime: minutes; RTO/RPO compatibility: unknown/unknown; sequence: 22
+- Expected downtime: minutes; RTO/RPO compatibility: unknown/unknown; sequence: 21
 - Confidence: medium (0.74) — rule confidence 0.8; capped at 0.74: inventory-only evidence cannot yield high confidence
 - Rule: azure.network.privateendpoints v1.0.0 · reason codes: RULE_MATCH, REGION_MOVE_UNSUPPORTED_ALTERNATIVE_SELECTED · human approval: required
 
 **Dependencies**
-- network → vnet-billing-prod-eus [inferred] — private endpoint NIC lives in a subnet (inferred from type and shared resource group; confirm with authenticated discovery)
+- network → hcw-sample-vnet-billing-prod-eus [inferred] — private endpoint NIC lives in a subnet (inferred from type and shared resource group; confirm with authenticated discovery)
 - dns → privatelink.database.windows.net [inferred] — zone group writes A records (inferred from type and shared resource group; confirm with authenticated discovery)
 
 **Prerequisites**
@@ -1166,13 +1166,13 @@
 - After cutover: re-establish backup and DR protection in the destination (Azure Backup / ASR / native redundancy). This is DR, not migration.
 
 **Evidence**
-- [observed-from-csv] name = pe-sql-billing
+- [observed-from-csv] name = hcw-sample-pe-sql-billing
 - [observed-from-csv] type = microsoft.network/privateendpoints
-- [observed-from-csv] resourceId = /subscriptions/<assessment-id>/resourceGroups/rg-contoso-billing-prod-eus/providers/Microsoft.Network/privateEndpoints/pe-sql-billing
-- [observed-from-csv] resourceGroup = rg-contoso-billing-prod-eus
-- [observed-from-csv] subscriptionId = <assessment-id>
+- [observed-from-csv] resourceId = /subscriptions/00000000-0000-0000-0000-000000000001/resourceGroups/hcw-sample-rg-billing-prod-eus/providers/Microsoft.Network/privateEndpoints/hcw-sample-pe-sql-billing
+- [observed-from-csv] resourceGroup = hcw-sample-rg-billing-prod-eus
+- [observed-from-csv] subscriptionId = 00000000-0000-0000-0000-000000000001
 - [observed-from-csv] location = eastus
-- [observed-from-csv] subscriptionName = Contoso-Prod
+- [observed-from-csv] subscriptionName = hcw-sample-prod
 - [observed-from-csv] tags = {"application":"billing"}
 - [requires-authenticated-validation] Analysis is based on an exported inventory only; configuration-dependent conclusions must be validated against the live environment.
 - [general-rule] Move operation support for resources (https://learn.microsoft.com/azure/azure-resource-manager/management/move-support-resources, 2026-10-03)
@@ -1189,22 +1189,22 @@
 
 ### privatelink.database.windows.net
 
-- Type: `Microsoft.Network/privateDnsZones` · Region: global · RG: rg-contoso-billing-prod-eus · Application group: platform
+- Type: `Microsoft.Network/privateDnsZones` · Region: global · RG: hcw-sample-rg-billing-prod-eus · Application group: platform
 - Disposition: **retain** via **none** (alternatives: export-and-import, terraform-redeploy)
 - Paths — infrastructure: not-applicable; configuration: not-applicable; identity: not-applicable; data: not-applicable
 - Support — RG move: supported; subscription move: supported; region: supported; target region/SKU availability: unknown/unknown
-- Expected downtime: none; RTO/RPO compatibility: unknown/unknown; sequence: 21
+- Expected downtime: none; RTO/RPO compatibility: unknown/unknown; sequence: 20
 - Confidence: medium (0.74) — rule confidence 0.8; capped at 0.74: inventory-only evidence cannot yield high confidence
 - Rule: azure.network.privatednszones v1.0.0 · reason codes: RULE_MATCH, GLOBAL_RESOURCE · human approval: required
 
 **Evidence**
 - [observed-from-csv] name = privatelink.database.windows.net
 - [observed-from-csv] type = microsoft.network/privatednszones
-- [observed-from-csv] resourceId = /subscriptions/<assessment-id>/resourceGroups/rg-contoso-billing-prod-eus/providers/Microsoft.Network/privateDnsZones/privatelink.database.windows.net
-- [observed-from-csv] resourceGroup = rg-contoso-billing-prod-eus
-- [observed-from-csv] subscriptionId = <assessment-id>
+- [observed-from-csv] resourceId = /subscriptions/00000000-0000-0000-0000-000000000001/resourceGroups/hcw-sample-rg-billing-prod-eus/providers/Microsoft.Network/privateDnsZones/privatelink.database.windows.net
+- [observed-from-csv] resourceGroup = hcw-sample-rg-billing-prod-eus
+- [observed-from-csv] subscriptionId = 00000000-0000-0000-0000-000000000001
 - [observed-from-csv] location = global
-- [observed-from-csv] subscriptionName = Contoso-Prod
+- [observed-from-csv] subscriptionName = hcw-sample-prod
 - [observed-from-csv] tags = {"application":"platform"}
 - [requires-authenticated-validation] Analysis is based on an exported inventory only; configuration-dependent conclusions must be validated against the live environment.
 - [general-rule] Move operation support for resources (https://learn.microsoft.com/azure/azure-resource-manager/management/move-support-resources, 2026-10-03)
@@ -1220,9 +1220,9 @@
 - Kind (e.g. functionapp vs app, StorageV2 vs BlobStorage)
 - Network topology, private endpoints, encryption/CMK, managed identities, RBAC, locks, policy, data size, backup/replication state — require authenticated inspection
 
-### id-billing-app
+### hcw-sample-id-billing-app
 
-- Type: `Microsoft.ManagedIdentity/userAssignedIdentities` · Region: eastus · RG: rg-contoso-billing-prod-eus · Application group: billing
+- Type: `Microsoft.ManagedIdentity/userAssignedIdentities` · Region: eastus · RG: hcw-sample-rg-billing-prod-eus · Application group: billing
 - Disposition: **recreate-only** via **terraform-redeploy** (alternatives: manual-reconstruction)
 - Paths — infrastructure: recreate; configuration: reconstruct; identity: reconstruct; data: not-applicable
 - Support — RG move: supported; subscription move: supported; region: unsupported; target region/SKU availability: unknown/unknown
@@ -1238,13 +1238,13 @@
 - After cutover: re-establish backup and DR protection in the destination (Azure Backup / ASR / native redundancy). This is DR, not migration.
 
 **Evidence**
-- [observed-from-csv] name = id-billing-app
+- [observed-from-csv] name = hcw-sample-id-billing-app
 - [observed-from-csv] type = microsoft.managedidentity/userassignedidentities
-- [observed-from-csv] resourceId = /subscriptions/<assessment-id>/resourceGroups/rg-contoso-billing-prod-eus/providers/Microsoft.ManagedIdentity/userAssignedIdentities/id-billing-app
-- [observed-from-csv] resourceGroup = rg-contoso-billing-prod-eus
-- [observed-from-csv] subscriptionId = <assessment-id>
+- [observed-from-csv] resourceId = /subscriptions/00000000-0000-0000-0000-000000000001/resourceGroups/hcw-sample-rg-billing-prod-eus/providers/Microsoft.ManagedIdentity/userAssignedIdentities/hcw-sample-id-billing-app
+- [observed-from-csv] resourceGroup = hcw-sample-rg-billing-prod-eus
+- [observed-from-csv] subscriptionId = 00000000-0000-0000-0000-000000000001
 - [observed-from-csv] location = eastus
-- [observed-from-csv] subscriptionName = Contoso-Prod
+- [observed-from-csv] subscriptionName = hcw-sample-prod
 - [observed-from-csv] tags = {"application":"billing"}
 - [requires-authenticated-validation] Analysis is based on an exported inventory only; configuration-dependent conclusions must be validated against the live environment.
 - [general-rule] Move operation support for resources (https://learn.microsoft.com/azure/azure-resource-manager/management/move-support-resources, 2026-10-03)
@@ -1260,9 +1260,9 @@
 - Kind (e.g. functionapp vs app, StorageV2 vs BlobStorage)
 - Network topology, private endpoints, encryption/CMK, managed identities, RBAC, locks, policy, data size, backup/replication state — require authenticated inspection
 
-### ag-platform-oncall
+### hcw-sample-ag-platform-oncall
 
-- Type: `Microsoft.Insights/actionGroups` · Region: global · RG: rg-contoso-billing-prod-eus · Application group: platform
+- Type: `Microsoft.Insights/actionGroups` · Region: global · RG: hcw-sample-rg-billing-prod-eus · Application group: platform
 - Disposition: **retain** via **none** (alternatives: terraform-redeploy)
 - Paths — infrastructure: not-applicable; configuration: not-applicable; identity: not-applicable; data: not-applicable
 - Support — RG move: supported; subscription move: supported; region: supported; target region/SKU availability: unknown/unknown
@@ -1271,13 +1271,13 @@
 - Rule: azure.insights.actiongroups v1.0.0 · reason codes: RULE_MATCH, GLOBAL_RESOURCE · human approval: required
 
 **Evidence**
-- [observed-from-csv] name = ag-platform-oncall
+- [observed-from-csv] name = hcw-sample-ag-platform-oncall
 - [observed-from-csv] type = microsoft.insights/actiongroups
-- [observed-from-csv] resourceId = /subscriptions/<assessment-id>/resourceGroups/rg-contoso-billing-prod-eus/providers/Microsoft.Insights/actionGroups/ag-platform-oncall
-- [observed-from-csv] resourceGroup = rg-contoso-billing-prod-eus
-- [observed-from-csv] subscriptionId = <assessment-id>
+- [observed-from-csv] resourceId = /subscriptions/00000000-0000-0000-0000-000000000001/resourceGroups/hcw-sample-rg-billing-prod-eus/providers/Microsoft.Insights/actionGroups/hcw-sample-ag-platform-oncall
+- [observed-from-csv] resourceGroup = hcw-sample-rg-billing-prod-eus
+- [observed-from-csv] subscriptionId = 00000000-0000-0000-0000-000000000001
 - [observed-from-csv] location = global
-- [observed-from-csv] subscriptionName = Contoso-Prod
+- [observed-from-csv] subscriptionName = hcw-sample-prod
 - [observed-from-csv] tags = {"application":"platform"}
 - [requires-authenticated-validation] Analysis is based on an exported inventory only; configuration-dependent conclusions must be validated against the live environment.
 - [general-rule] Move operation support for resources (https://learn.microsoft.com/azure/azure-resource-manager/management/move-support-resources, 2026-10-03)
@@ -1292,9 +1292,9 @@
 - Kind (e.g. functionapp vs app, StorageV2 vs BlobStorage)
 - Network topology, private endpoints, encryption/CMK, managed identities, RBAC, locks, policy, data size, backup/replication state — require authenticated inspection
 
-### alert-vm-cpu
+### hcw-sample-alert-vm-cpu
 
-- Type: `Microsoft.Insights/metricAlerts` · Region: global · RG: rg-contoso-billing-prod-eus · Application group: billing
+- Type: `Microsoft.Insights/metricAlerts` · Region: global · RG: hcw-sample-rg-billing-prod-eus · Application group: billing
 - Disposition: **recreate-only** via **terraform-redeploy** (alternatives: none)
 - Paths — infrastructure: recreate; configuration: reconstruct; identity: reconstruct; data: not-applicable
 - Support — RG move: supported; subscription move: supported; region: supported; target region/SKU availability: unknown/unknown
@@ -1303,20 +1303,20 @@
 - Rule: azure.insights.metricalerts v1.0.0 · reason codes: RULE_MATCH, REGION_MOVE_SUPPORTED · human approval: required
 
 **Dependencies**
-- soft → ag-platform-oncall [inferred] — alert actions reference action groups (inferred from type and shared resource group; confirm with authenticated discovery)
+- soft → hcw-sample-ag-platform-oncall [inferred] — alert actions reference action groups (inferred from type and shared resource group; confirm with authenticated discovery)
 
 **Secondary actions**
 - Identity path: managed identities / Entra bindings are recreated; every RBAC assignment and Key Vault access must be rebound.
 - After cutover: re-establish backup and DR protection in the destination (Azure Backup / ASR / native redundancy). This is DR, not migration.
 
 **Evidence**
-- [observed-from-csv] name = alert-vm-cpu
+- [observed-from-csv] name = hcw-sample-alert-vm-cpu
 - [observed-from-csv] type = microsoft.insights/metricalerts
-- [observed-from-csv] resourceId = /subscriptions/<assessment-id>/resourceGroups/rg-contoso-billing-prod-eus/providers/Microsoft.Insights/metricAlerts/alert-vm-cpu
-- [observed-from-csv] resourceGroup = rg-contoso-billing-prod-eus
-- [observed-from-csv] subscriptionId = <assessment-id>
+- [observed-from-csv] resourceId = /subscriptions/00000000-0000-0000-0000-000000000001/resourceGroups/hcw-sample-rg-billing-prod-eus/providers/Microsoft.Insights/metricAlerts/hcw-sample-alert-vm-cpu
+- [observed-from-csv] resourceGroup = hcw-sample-rg-billing-prod-eus
+- [observed-from-csv] subscriptionId = 00000000-0000-0000-0000-000000000001
 - [observed-from-csv] location = global
-- [observed-from-csv] subscriptionName = Contoso-Prod
+- [observed-from-csv] subscriptionName = hcw-sample-prod
 - [observed-from-csv] tags = {"application":"billing"}
 - [requires-authenticated-validation] Analysis is based on an exported inventory only; configuration-dependent conclusions must be validated against the live environment.
 - [general-rule] Move operation support for resources (https://learn.microsoft.com/azure/azure-resource-manager/management/move-support-resources, 2026-10-03)
@@ -1331,13 +1331,13 @@
 - Kind (e.g. functionapp vs app, StorageV2 vs BlobStorage)
 - Network topology, private endpoints, encryption/CMK, managed identities, RBAC, locks, policy, data size, backup/replication state — require authenticated inspection
 
-### quantum-research-01
+### hcw-sample-quantum-research-01
 
-- Type: `Microsoft.Quantum/Workspaces` · Region: eastus · RG: rg-contoso-billing-prod-eus · Application group: research
+- Type: `Microsoft.Quantum/Workspaces` · Region: eastus · RG: hcw-sample-rg-billing-prod-eus · Application group: research
 - Disposition: **unknown-requires-validation** via **none** (alternatives: manual-reconstruction)
 - Paths — infrastructure: unknown; configuration: unknown; identity: unknown; data: unknown
 - Support — RG move: unknown; subscription move: unknown; region: unknown; target region/SKU availability: unknown/unknown
-- Expected downtime: unknown; RTO/RPO compatibility: unknown/unknown; sequence: 24
+- Expected downtime: unknown; RTO/RPO compatibility: unknown/unknown; sequence: 23
 - Confidence: low (0.2) — No versioned rule exists for this resource type; the engine does not guess support.
 - Rule: none v— · reason codes: NO_RULE_FOR_TYPE · human approval: required
 
@@ -1348,13 +1348,13 @@
 - Escalate for manual review against the Microsoft Learn move-support matrix.
 
 **Evidence**
-- [observed-from-csv] name = quantum-research-01
+- [observed-from-csv] name = hcw-sample-quantum-research-01
 - [observed-from-csv] type = microsoft.quantum/workspaces
-- [observed-from-csv] resourceId = /subscriptions/<assessment-id>/resourceGroups/rg-contoso-billing-prod-eus/providers/Microsoft.Quantum/Workspaces/quantum-research-01
-- [observed-from-csv] resourceGroup = rg-contoso-billing-prod-eus
-- [observed-from-csv] subscriptionId = <assessment-id>
+- [observed-from-csv] resourceId = /subscriptions/00000000-0000-0000-0000-000000000001/resourceGroups/hcw-sample-rg-billing-prod-eus/providers/Microsoft.Quantum/Workspaces/hcw-sample-quantum-research-01
+- [observed-from-csv] resourceGroup = hcw-sample-rg-billing-prod-eus
+- [observed-from-csv] subscriptionId = 00000000-0000-0000-0000-000000000001
 - [observed-from-csv] location = eastus
-- [observed-from-csv] subscriptionName = Contoso-Prod
+- [observed-from-csv] subscriptionName = hcw-sample-prod
 - [observed-from-csv] tags = {"application":"research"}
 - [requires-authenticated-validation] Analysis is based on an exported inventory only; configuration-dependent conclusions must be validated against the live environment.
 
@@ -1379,7 +1379,7 @@ _Everything else binds to these._
 
 - Entry: Destination landing zone scope approved; Address space and naming approved
 - Exit: VNets/subnets/NSGs reachable; Key Vaults and identities exist; Log Analytics receiving data
-- Resources (8): log-contoso-prod-eus, kv-billing-prod-eus, id-billing-app, pip-lb-billing, vnet-billing-prod-eus, nsg-app, rg-contoso-billing-prod-eus, snet-app
+- Resources (8): hcw-sample-log-prod-eus, hcw-sample-kv-billing, hcw-sample-id-billing-app, hcw-sample-pip-lb-billing, hcw-sample-vnet-billing-prod-eus, hcw-sample-nsg-app, hcw-sample-rg-billing-prod-eus, hcw-sample-snet-app
 
 ### Wave 2: Data platforms: storage, databases, registries
 
@@ -1387,7 +1387,7 @@ _Long-running copies start early; applications cut over last._
 
 - Entry: Wave 1 complete; Private connectivity in place; Data copy tooling authorised
 - Exit: Initial copy complete; Reconciliation plan agreed
-- Resources (6): sql-billing-prod-eus, billingdb, cosmos-billing-prod, crcontosobilling, stcontosobillingprod, psql-billing-prod-eus
+- Resources (6): hcw-sample-sql-billing-prod-eus, hcw-sample-billingdb, hcw-sample-cosmos-billing-prod, hcwsamplestbillingprod, hcw-sample-psql-billing-prod-eus, hcwsampleacrbilling
 
 ### Wave 3: Edge and platform: load balancers, gateways, private endpoints, plans
 
@@ -1395,7 +1395,7 @@ _Connectivity for compute and apps._
 
 - Entry: Wave 2 initial copy complete
 - Exit: Frontends healthy against staging backends
-- Resources (3): asp-billing-prod-eus, lb-billing-prod, pe-sql-billing
+- Resources (3): hcw-sample-asp-billing-prod-eus, hcw-sample-lb-billing-prod, hcw-sample-pe-sql-billing
 
 ### Wave 4: Compute and applications
 
@@ -1403,7 +1403,7 @@ _Cutover wave._
 
 - Entry: Waves 1–3 complete; Change freeze scheduled
 - Exit: Smoke tests pass; Final data sync reconciled; DNS cutover
-- Resources (6): app-billing-web-prod, avset-billing, func-billing-jobs-prod, nic-vm-billing-01, vm-billing-01_OsDisk, vm-billing-01
+- Resources (6): hcw-sample-app-billing-web-prod, hcw-sample-avset-billing, hcw-sample-func-billing-jobs-prod, hcw-sample-nic-vm-billing-01, hcw-sample-vm-billing-01_OsDisk, hcw-sample-vm-billing-01
 
 ### Wave 5: Observability, backup and DR re-protection
 
@@ -1411,7 +1411,7 @@ _Protection follows the migrated workload._
 
 - Entry: Wave 4 cutover accepted
 - Exit: Alerts firing on destination; Backup/DR protection re-enabled
-- Resources (5): ag-platform-oncall, alert-vm-cpu, appi-billing-prod, privatelink.database.windows.net, rsv-contoso-prod-eus
+- Resources (5): hcw-sample-ag-platform-oncall, hcw-sample-alert-vm-cpu, hcw-sample-appi-billing-prod, privatelink.database.windows.net, hcw-sample-rsv-prod-eus
 
 ### Wave 6: Requires validation / manual review
 
@@ -1419,4 +1419,4 @@ _Unknowns are not scheduled until evidence exists._
 
 - Entry: Authenticated inspection completed
 - Exit: Each item assigned to a wave or retired
-- Resources (1): quantum-research-01
+- Resources (1): hcw-sample-quantum-research-01
