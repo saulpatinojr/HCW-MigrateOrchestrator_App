@@ -4,7 +4,7 @@ import { StaticTokenCredential } from "@amo/azure-auth";
 import { demoPrincipal, type Principal } from "@amo/authorization";
 import { ResourceMoverClient } from "./index.js";
 
-const col = { subscriptionId: "00000000-0000-4000-8000-000000000001", resourceGroup: "rg-mover", name: "mc1" };
+const col = { subscriptionId: "00000000-0000-0000-0000-000000000001", resourceGroup: "rg-mover", name: "mc1" };
 const calls: string[] = [];
 const fake = (async (url: string, init?: RequestInit) => { calls.push(`${init?.method ?? "GET"} ${url}`); return new Response(JSON.stringify({ value: [] }), { status: 202, headers: { "azure-asyncoperation": "https://op/1" } }); }) as unknown as typeof fetch;
 const client = new ResourceMoverClient(new StaticTokenCredential(), fake);
