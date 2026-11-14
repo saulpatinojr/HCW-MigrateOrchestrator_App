@@ -3,7 +3,7 @@ import assert from "node:assert/strict";
 import type { Assessment, ResourceDecisionRecord } from "@amo/domain";
 import { computeNewId, stateImpactEntries, generateStateImpact, generateHcpFiles, buildArgumentManifest, checkArguments, FileSchemaSource, McpSchemaSource } from "./index.js";
 
-const SUB = "00000000-0000-4000-8000-000000000001";
+const SUB = "00000000-0000-0000-0000-000000000001";
 const dec = (p: Partial<ResourceDecisionRecord>): ResourceDecisionRecord => ({ displayName: "x", resourceType: "Microsoft.Storage/storageAccounts", resourceId: `/subscriptions/${SUB}/resourceGroups/rg-a/providers/Microsoft.Storage/storageAccounts/stx`, disposition: "native-move", recommendedTool: "arm-move", infrastructureDisposition: "move-with-resource", kind: null, ...p } as ResourceDecisionRecord);
 const asm = (intent: Partial<Assessment["intent"]>, decisions: ResourceDecisionRecord[]): Assessment => ({ id: "aaaaaaaa-bbbb-4ccc-8ddd-eeeeeeeeeeee", applicationVersion: "0.3.0", intent: { desiredOperation: "resource-group-move", destinationSubscriptionId: null, destinationResourceGroup: null, ...intent } as Assessment["intent"], decisions } as Assessment);
 

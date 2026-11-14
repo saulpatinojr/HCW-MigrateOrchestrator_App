@@ -223,7 +223,7 @@ test("authentication is still enforced after a preflight: the real request needs
   const base = await start(APP);
   const pre = await call(base, "OPTIONS", "/api/assessments", { origin: APP, "access-control-request-method": "POST", "access-control-request-headers": "authorization,content-type" });
   assert.equal(pre.status, 204);
-  const body = JSON.stringify({ scope: { kind: "subscription", id: "00000000-0000-4000-8000-000000000001" }, intent: {} });
+  const body = JSON.stringify({ scope: { kind: "subscription", id: "00000000-0000-0000-0000-000000000001" }, intent: {} });
   const noToken = await call(base, "POST", "/api/assessments", { origin: APP, "content-type": "application/json" }, body);
   assert.equal(noToken.status, 401);
   assert.equal(noToken.headers["access-control-allow-origin"], APP, "the browser can read the 401");

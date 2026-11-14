@@ -12,7 +12,7 @@ import { ALLOW_SELF_APPROVAL_VAR, configFromEnv, countableApprovals, createEnter
  * calls go to a fake fetch that counts them.
  */
 const TENANT = "11111111-2222-3333-4444-555555555555";
-const SUB = "00000000-0000-4000-8000-000000000001";
+const SUB = "00000000-0000-0000-0000-000000000001";
 const { publicKey, privateKey } = generateKeyPairSync("rsa", { modulusLength: 2048 });
 const jwk = publicKey.export({ format: "jwk" }) as { n: string; e: string };
 const b64 = (o: unknown) => Buffer.from(JSON.stringify(o)).toString("base64url");

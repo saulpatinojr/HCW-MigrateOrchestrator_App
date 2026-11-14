@@ -3,7 +3,7 @@ import assert from "node:assert/strict";
 import { StaticTokenCredential } from "@amo/azure-auth";
 import { ResourceGraphDiscoveryProvider, MoveValidator, toNormalized } from "./index.js";
 
-const SUB = "00000000-0000-4000-8000-000000000001";
+const SUB = "00000000-0000-0000-0000-000000000001";
 const row = (name: string, type: string) => ({ id: `/subscriptions/${SUB}/resourceGroups/rg/providers/${type}/${name}`, name, type, location: "eastus", resourceGroup: "rg", subscriptionId: SUB, kind: null, sku: { name: "Standard_LRS" }, tags: { app: "x" } });
 
 test("Resource Graph pages with $skipToken and labels evidence as observed-from-azure-api", async () => {
