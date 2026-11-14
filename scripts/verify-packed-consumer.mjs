@@ -8,12 +8,15 @@
  * `--tarballs DIR [--version X.Y.Z]` checks tarballs that already exist instead of packing dist-packages: the post-release
  * job of release-cli.yml passes the two files it downloaded from the public GitHub Release, so what consumers fetch is what
  * is tested (ADR-0034). The React peers and their types are installed at the exact versions in package-lock.json, not a range. With `--version` the installed packages must report exactly that version.
+ * Each installed package's LICENSE must equal the root LICENSE byte for byte, so this always runs from a checkout (it also
+ * reads the sample CSV and the TypeScript compiler from it).
  */
 import { spawnSync } from "node:child_process";
 import { cpSync, existsSync, mkdtempSync, readdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join, resolve } from "node:path";
 import { CONSUMER_PEERS, CONSUMER_TYPES, lockedSpecs } from "./lib/locked-versions.mjs";
+import { assertLicenceCopy } from "./lib/licence-copy.mjs";
 
 const ROOT = join(dirname(new URL(import.meta.url).pathname.replace(/^\/([A-Za-z]:)/, "$1")), "..");
 const OUT = join(ROOT, "dist-packages");
@@ -46,6 +49,10 @@ try {
   const uiPkg = JSON.parse(readFileSync(join(proj, "node_modules/@hybridcloudworks/migration-ui/package.json"), "utf8"));
   if (EXPECT_VERSION) for (const pkg of [corePkg, uiPkg]) if (pkg.version !== EXPECT_VERSION) throw new Error(`${pkg.name} installed as ${pkg.version}, expected ${EXPECT_VERSION}`);
   for (const bad of ["./azure-auth", "./azure-arm", "./azure-execution"]) if (bad in corePkg.exports) throw new Error(`published core must not export ${bad}`);
+  // each installed package carries the root LICENSE byte for byte (every caller runs this from a checkout of the same commit)
+  for (const name of ["migration-core", "migration-ui"]) {
+    assertLicenceCopy(join(proj, "node_modules/@hybridcloudworks", name, "LICENSE"), join(ROOT, "LICENSE"), `@hybridcloudworks/${name}`);
+  }
 
   // 2. runtime: assess the sample through the installed package, rules found inside node_modules without configuration
   writeFileSync(join(proj, "consumer.mjs"), `
