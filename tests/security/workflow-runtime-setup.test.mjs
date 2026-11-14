@@ -170,8 +170,11 @@ const RUNNER_DEFAULT_ALLOWED = {};
 // runtime the check cannot see. scripts/package-repository.sh (ci.yml, build-test) runs zip, unzip and the like only;
 // every scripts/*.mjs is started with `node`, which the check sees; every `npm run` and `npx` is itself seen as Node.js;
 // the composite action .github/actions/self-merging-pr runs gh only. iac-validate.yml's checkov step needs no entry:
-// it runs `pipx`, which the check counts as Python, and gives it `--python`.
+// it runs `pipx`, which the check counts as Python, and gives it `--python`. Of the linters ci.yml's build-test job
+// installs (2026-11-14), actionlint and hadolint are single binaries that start no runtime; zizmor is a Python program,
+// listed below.
 const INDIRECT_RUNTIME = {
+  "ci.yml > build-test > zizmor > python": "zizmor is a Python program, run from the environment the lint-tools step made with python3 (setup-python's)",
   "release-cli.yml > sea > Build the single-file binary > node": "`bash scripts/build-sea.sh` runs `node` and `npx esbuild`, and copies that node into the binary",
 };
 
