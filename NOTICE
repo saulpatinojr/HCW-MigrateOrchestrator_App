@@ -1,9 +1,10 @@
-Hybrid Cloud Works Azure Migration Orchestrator (appliance and migration intelligence core)
+Hybrid Cloud Works Azure Migration Orchestrator (core packages, rule corpus, amo CLI, explorer UI, Azure appliance)
 Copyright (c) 2026 Hybrid Cloud Works. Licensed under MIT (see LICENSE).
 
-License: MIT, decided in docs/adr/ADR-0016-mit-license.md (accepted 2026-10-03) and confirmed as final by the owner on
-2026-11-14. The packages this repository releases, @hybridcloudworks/migration-core and @hybridcloudworks/migration-ui,
-declare the same licence, and so does the web-front edition, HCW-MigrateOrchestrator_AddOn, which consumes them.
+License: MIT, decided in docs/adr/ADR-0016-mit-license.md (accepted 2026-10-03). On 2026-11-14 the owner asked for this
+NOTICE to state it without the earlier "may replace the license before publication" caveat. The packages this repository
+releases, @hybridcloudworks/migration-core and @hybridcloudworks/migration-ui, declare the same licence, and so does the
+web-front edition, HCW-MigrateOrchestrator_AddOn, which consumes them.
 
 Migration support rules under rules/azure are derived from public Microsoft Learn documentation, cited per rule with
 retrieval dates. Microsoft, Azure, Entra and related marks are trademarks of Microsoft Corporation. This project is not
