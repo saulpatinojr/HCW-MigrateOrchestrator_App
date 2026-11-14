@@ -1,0 +1,31 @@
+# zizmor configuration, read by the lint steps in ci.yml's build-test job
+# (HCW-HybridCloudWorks#1707, following #1575).
+#
+# self-repository: two workflows run this repository's own action with
+# `uses: ./.github/actions/self-merging-pr`, and that action is handed the
+# App key (secrets.APP_PRIVATE_KEY). zizmor asks for GitHub's newer
+# `uses: $/...` form, which reads the action from the commit that is running
+# rather than from the checked-out folder. That is the better form, but
+# actionlint 1.7.12, the release this CI pins (the same one every HCW
+# repository pins), does not understand `$/` and fails the actionlint step
+# on it, so both lines are ignored for now. The planned fix is the `$/` form,
+# once actionlint accepts it and it has been tested here.
+#
+# - rehearse-self-merging-pr.yml: between the checkout and that line the job
+#   runs one step, a `printf` that writes .github/rehearsal.txt.
+# - rules-refresh.yml: the action runs in the `pull-request` job, which runs
+#   only a fresh checkout and a download of the report files (data, into
+#   rules/reports/) before it. npm ci, the build and the refresh script run
+#   in the separate `diff` job, which has no environment and no secrets, so
+#   nothing that could rewrite the action's files runs where the key is.
+#   (Until HCW-HybridCloudWorks#1707's linter change they ran in the same
+#   job, before the action; that was the reachable risk this split removes.)
+#
+# Each ignore names a line, and zizmor matches it against the whole step, so
+# the finding comes back if the step moves up, but a move of one line down
+# can stay ignored: check the numbers here whenever these workflows change.
+rules:
+  self-repository:
+    ignore:
+      - rehearse-self-merging-pr.yml:47
+      - rules-refresh.yml:50

@@ -5,8 +5,12 @@
 # setting "Allow GitHub Actions to create and approve pull requests" is off, so every scheduled run from 5 Oct 2026 failed
 # with "GitHub Actions is not permitted to create or approve pull requests" (ticket AMO-7). An App-token pull request also
 # starts the required checks. It is a report for a person, so auto-merge is off.
-# The credential is the admin-ops environment's App (interim, see rehearse-self-merging-pr.yml); the job only reaches it in
-# the last step, after npm has run.
+# The credential is the admin-ops environment's App (interim, see rehearse-self-merging-pr.yml).
+#
+# Two jobs, so no npm or repository script ever runs where the App key is. `diff` installs and builds (npm runs
+# dependency install scripts) and runs the refresh script, with no environment and no secrets, and hands over only the
+# report files as an artifact. `pull-request` checks out afresh, puts those files back under rules/reports/, and only then
+# runs the action with the key: nothing before it can rewrite the action's files (HCW-HybridCloudWorks#1707).
 name: rules-refresh
 on:
   schedule: [{ cron: "23 5 * * 1" }]
@@ -16,16 +20,33 @@ permissions:
 jobs:
   diff:
     runs-on: ubuntu-26.04
-    environment: admin-ops
     steps:
-      # persist-credentials: false — create-pull-request pushes with its own token; with the checkout's persisted
-      # header beside it, git sends two and GitHub answers 400 (an earlier weekly run failed this way).
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with: { persist-credentials: false }
       - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
         with: { node-version: 26, cache: npm }
       - run: npm ci && npm run build
       - run: node scripts/refresh-rules-from-learn.mjs --out rules/reports
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: learn-refresh-report
+          path: rules/reports/
+          if-no-files-found: error
+          retention-days: 1
+  pull-request:
+    needs: diff
+    runs-on: ubuntu-26.04
+    environment: admin-ops
+    steps:
+      # persist-credentials: false — create-pull-request pushes with its own token; with the checkout's persisted
+      # header beside it, git sends two and GitHub answers 400 (an earlier weekly run failed this way).
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with: { persist-credentials: false }
+      # Data only: the report files the diff job wrote, back under rules/reports/. No code from the diff job runs here.
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          name: learn-refresh-report
+          path: rules/reports/
       - uses: ./.github/actions/self-merging-pr
         with:
           client-id: ${{ vars.APP_CLIENT_ID }}          # credential
