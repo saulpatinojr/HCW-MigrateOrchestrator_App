@@ -10,8 +10,8 @@ import { fileURLToPath } from "node:url";
 // The canonical twin of this check is the website's, scripts/workflow-runtime-setup.test.mjs in
 // saulpatinojr/HCW-HybridCloudWorks: change the logic there first, then copy it here unchanged. This file is taken from
 // the node:test copy in HCW-MigrateOrchestrator_AddOn (tests/security/workflow-runtime-setup.test.mjs), which carries
-// the same logic. It was last brought up to the website's round four (HCW-HybridCloudWorks#1725, with
-// HCW-NetworkEyes_App#403 for the Python copies). The logic between the lists and the workflow reader is the website's,
+// the same logic. It was last brought up to the website's round five (HCW-HybridCloudWorks#1726, with
+// HCW-NetworkEyes_App#405 for the Python copies). The logic between the lists and the workflow reader is the website's,
 // line for line, with its single-quoted strings written in double quotes, and its tests are the website's, with
 // `expect` written as `assert`. This copy keeps only its own parts: the lists below, the floors written in (the website
 // reads scripts/version-floors.json), the workflow reader (the website parses with the `yaml` package, which is no
@@ -166,24 +166,39 @@ import { fileURLToPath } from "node:url";
 // (Copilot on HCW-NetworkEyes_App#403 and HCW-HybridCloudWorks#1725; see `shellChoices`); pipx is read under each
 // matrix value, and a step that runs pipx under a `shell:` this check cannot read is reported.
 //
-// Limits, known and kept: a composite action whose set-up step takes its version from `${{ inputs.* }}` cannot be read,
-// so it fails closed and needs an entry in BELOW_FLOOR_ALLOWED; these are reported though they need not be, which can
-// only add findings: a `shell: python` step's text is still read as shell too; an `eval` script is read as a child
-// shell (a name set but not exported before it is not seen); a `$PATH` written inside double quotes or an unquoted
-// heredoc in a nested script is read as the inner script's, so `sudo bash -c "sudo env PATH=$PATH node x"` is reported
-// though the outer shell fills it in first; a folder put in front of `$PATH`, even the set-up one
-// (`PATH=$pythonLocation/bin:$PATH python3 x`), on purpose; and a version named below the floor (`python3.14`), even
-// where BELOW_FLOOR_ALLOWED lets the job set that version up. These are not reported: `eval` of a word joined from
-// quoted parts (`eval no'de x'`); a `--python` path to a Python outside the folders of RUNNER_PYTHON_FOLDERS
-// (`/opt/hostedtoolcache/Python/3.12…`, `/usr/share/miniconda/bin/python3`); a relative path after `cd` (`cd /usr/bin
-// && pipx run --python ./python3 x`); a value a `for` loop or `read` sets (`for P in /usr/bin/python3; do …`), which
-// counts as chosen; a PATH the script sets in an earlier command (`export PATH=/usr/bin; python3 x`, or `PATH=/usr/bin;
-// python3 x`); a PATH or setting written to `$GITHUB_PATH` or `$GITHUB_ENV` by an earlier step; the commands of a
-// `case` clause whose pattern holds parentheses (`@(a|b))`, `?(a))`) or an escaped `)` (`a\))`, or whose `case` has a
-// subject `$(…)` with spaces or `in` on the next line; and a set-up version `3` or `3.x` (a major line only), which
-// reads as at the floor. `unset -n P` is read as unsetting P, which is what bash does unless P is a name reference. The
-// runner fills `{0}` in with .NET's `string.Format`, where `{{` and `}}` stand for one brace and any other `{…}` stops
-// the step; this check only replaces `{0}`.
+// Round 5 (HCW-HybridCloudWorks#1707) reads a step's `shell:` that is written but empty (`shell:`, `~`, `null`, a
+// comment alone, `''`) as the runner does: as no shell of its own, so the step uses the job's `defaults.run.shell`,
+// else the workflow's, the same as a step with no `shell:` at all (actions/runner
+// src/Runner.Worker/Handlers/ScriptHandler.cs, lines 70-79 at 8cfa1049; see `givenShell`). A job's own
+// `defaults.run.shell` that is null (`shell:`, `~`, a comment alone) is no shell either, so the workflow's applies, as
+// the website's YAML library reads it and as this copy's reader has read it since HCW-MigrateOrchestrator_AddOn#80 (see
+// `defaultShell`; the Python copies read it as the job's own empty shell until round 5), while a quoted `''` still
+// counts as the job's own empty shell: GitHub merges the job's defaults over the workflow's before the runner sees
+// them, and that merge is not visible here.
+//
+// When this check changes. Owner decision 2026-11-14: round five is the last planned round. After it, this check
+// changes only when (1) a real HCW workflow trips it or would get past it, or (2) a reviewer shows a way past it that a
+// workflow could plausibly be written with. Any other edge case a reviewer raises is added to the known-limits list in
+// this header, not to a new round.
+//
+// Known limits (the list later edge cases are added to): a composite action whose set-up step takes its version from
+// `${{ inputs.* }}` cannot be read, so it fails closed and needs an entry in BELOW_FLOOR_ALLOWED; these are reported
+// though they need not be, which can only add findings: a `shell: python` step's text is still read as shell too; an
+// `eval` script is read as a child shell (a name set but not exported before it is not seen); a `$PATH` written inside
+// double quotes or an unquoted heredoc in a nested script is read as the inner script's, so `sudo bash -c "sudo env
+// PATH=$PATH node x"` is reported though the outer shell fills it in first; a folder put in front of `$PATH`, even the
+// set-up one (`PATH=$pythonLocation/bin:$PATH python3 x`), on purpose; and a version named below the floor
+// (`python3.14`), even where BELOW_FLOOR_ALLOWED lets the job set that version up. These are not reported: `eval` of a
+// word joined from quoted parts (`eval no'de x'`); a `--python` path to a Python outside the folders of
+// RUNNER_PYTHON_FOLDERS (`/opt/hostedtoolcache/Python/3.12…`, `/usr/share/miniconda/bin/python3`); a relative path
+// after `cd` (`cd /usr/bin && pipx run --python ./python3 x`); a value a `for` loop or `read` sets (`for P in
+// /usr/bin/python3; do …`), which counts as chosen; a PATH the script sets in an earlier command (`export
+// PATH=/usr/bin; python3 x`, or `PATH=/usr/bin; python3 x`); a PATH or setting written to `$GITHUB_PATH` or
+// `$GITHUB_ENV` by an earlier step; the commands of a `case` clause whose pattern holds parentheses (`@(a|b))`,
+// `?(a))`) or an escaped `)` (`a\))`, or whose `case` has a subject `$(…)` with spaces or `in` on the next line; and a
+// set-up version `3` or `3.x` (a major line only), which reads as at the floor. `unset -n P` is read as unsetting P,
+// which is what bash does unless P is a name reference. The runner fills `{0}` in with .NET's `string.Format`, where
+// `{{` and `}}` stand for one brace and any other `{…}` stops the step; this check only replaces `{0}`.
 //
 // This copy reads YAML with its own line reader (`readJobs`, see "The workflow reader" below), which refuses the forms
 // the website's `readWorkflow` and the Python copies' line reader refuse: `jobs`, a job, `steps`, a step, `strategy` or
@@ -1520,9 +1535,20 @@ export function stepShell(step, job, defaults = {}) {
   return literalShell(givenShell(step, job, defaults));
 }
 
-/** A step's `shell:` as written: the step's own, else the job's or the workflow's `defaults.run.shell`; '' for none. */
+/**
+ * A step's `shell:` as written: the step's own, else the job's or the workflow's `defaults.run.shell`; '' for none. A
+ * step's `shell:` that is there but null or empty (`shell:`, `~`, `null`, a comment alone, `''`) counts as missing,
+ * as the runner reads it: it falls back to the job's defaults when the step's shell is null or empty (round 5, #1707;
+ * actions/runner src/Runner.Worker/Handlers/ScriptHandler.cs, lines 70-79 at 8cfa1049). A job's own
+ * `defaults.run.shell: ''` stays the job's own empty shell: GitHub merges the job's defaults over the workflow's
+ * before the runner sees them, and that merge is not visible here. The same rule as the Python copies' `_given_shell`.
+ * This copy's `stepKeys` reads every one of those forms as '' (see `scalar`), which counts as missing here too.
+ */
 const givenShell = (step, job, defaults = {}) =>
-  String((step && Object.hasOwn(step, "shell") ? step.shell : job?.defaults?.run?.shell ?? defaults?.run?.shell) ?? "");
+  String((ownShell(step) ? step.shell : job?.defaults?.run?.shell ?? defaults?.run?.shell) ?? "");
+
+/** Whether a step names a `shell:` of its own: one that is there and neither null nor empty (see `givenShell`). */
+const ownShell = (step) => Boolean(step) && Object.hasOwn(step, "shell") && step.shell !== null && step.shell !== undefined && step.shell !== "";
 
 // A matrix value in a job's `defaults.run.shell` (`${{ matrix.shell }}`), which GitHub fills in before the
 // runner sees it.
@@ -1546,7 +1572,7 @@ export function shellChoices(step, job, defaults = {}) {
   if (!given.includes("${{")) return [literalShell(given)];
   // `jobShell` is this copy's own (see `readJobs`, which folds the workflow's `defaults.run.shell` into each job): false
   // when the job's shell is the workflow's. A job not read by `readJobs` has none, and is read as the website reads it.
-  const fromJob = !(step && Object.hasOwn(step, "shell")) && job?.jobShell !== false && job?.defaults?.run?.shell !== undefined && job?.defaults?.run?.shell !== null;
+  const fromJob = !ownShell(step) && job?.jobShell !== false && job?.defaults?.run?.shell !== undefined && job?.defaults?.run?.shell !== null;
   if (!fromJob) return null;
   const names = [...new Set([...given.matchAll(MATRIX_IN_SHELL)].map((found) => found[1]))].sort();
   const matrix = job?.strategy?.matrix;
@@ -6089,6 +6115,52 @@ describe("round 4 (#1707): coproc, a shell: read as the runner passes it, and Py
   it("reads a matrix shell as unreadable when the matrix has an include", () => {
     const workflow = readWorkflow(MATRIX_INCLUDE_SHELL_YAML);
     assert.deepEqual(unsetSteps("x.yml", workflow.jobs, {}, workflow.env, workflow.defaults), ["x.yml > include-sudo > Run > node", "x.yml > include-sudo > Run > python", "x.yml > include-python > Run > node", "x.yml > include-python > Run > python"]);
+  });
+});
+
+describe("round 5 (#1707): a step whose shell: is empty falls back to the defaults, as a missing one does", () => {
+  // A step's `shell:` that is there but null or empty is no shell of its own: the runner falls back to the job's
+  // `defaults.run.shell`, else the workflow's (actions/runner src/Runner.Worker/Handlers/ScriptHandler.cs, lines 70-79
+  // at 8cfa1049). Until round 5 every form below read as the runner's default shell, so a `sudo python3 {0}` default
+  // went unreported. Each test builds one job per form, in this order.
+  const EMPTY_STEP_SHELLS = ["", "~", "null", "Null", "NULL", "# no shell of its own", "''", '""'];
+  const ROUND5_SET_UP_PYTHON = '      - uses: actions/setup-python@abc\n        with: { python-version: "3.15" }\n';
+  const emptyShellWorkflow = (top, head, steps = ROUND5_SET_UP_PYTHON) =>
+    `on: push\n${top}jobs:\n${EMPTY_STEP_SHELLS.map((form, i) => `  empty-${i}:\n    runs-on: ubuntu-26.04\n${head}    steps:\n${steps}      - name: Run\n        shell:${form ? ` ${form}` : ""}\n        run: python3 x\n`).join("")}`;
+  const EMPTY_SHELL_REPORTED = EMPTY_STEP_SHELLS.map((form, i) => `x.yml > empty-${i} > Run > python`);
+  const unsetIn = (text) => {
+    const workflow = readWorkflow(text);
+    return unsetSteps("x.yml", workflow.jobs, {}, workflow.env, workflow.defaults);
+  };
+
+  it("falls back to the job's defaults.run.shell, and a step's own shell: bash still wins", () => {
+    const head = "    defaults:\n      run:\n        shell: sudo python3 {0}\n";
+    const ownBash = `  own-bash:\n    runs-on: ubuntu-26.04\n${head}    steps:\n${ROUND5_SET_UP_PYTHON}      - name: Run\n        shell: bash\n        run: python3 x\n`;
+    assert.deepEqual(unsetIn(emptyShellWorkflow("", head) + ownBash), EMPTY_SHELL_REPORTED);
+  });
+
+  it("falls back to a job's ${{ matrix.shell }} default, read under each matrix value", () => {
+    const head = '    strategy:\n      matrix:\n        shell: [bash, "sudo python3 {0}"]\n    defaults:\n      run:\n        shell: ${{ matrix.shell }}\n';
+    assert.deepEqual(unsetIn(emptyShellWorkflow("", head)), EMPTY_SHELL_REPORTED);
+  });
+
+  it("falls back to the workflow's defaults.run.shell, and with no default anywhere to the runner's default shell", () => {
+    assert.deepEqual(unsetIn(emptyShellWorkflow("defaults:\n  run:\n    shell: sudo python3 {0}\n", "")), EMPTY_SHELL_REPORTED);
+    assert.deepEqual(unsetIn(emptyShellWorkflow("", "")), []);
+  });
+
+  it("reads pipx under the job's default when the step's shell: is ''", () => {
+    const text = 'on: push\njobs:\n  empty-shell-pipx:\n    runs-on: ubuntu-26.04\n    env:\n      PIPX_DEFAULT_PYTHON: /opt/py/bin/python3\n    defaults:\n      run:\n        shell: env PIPX_DEFAULT_PYTHON=/usr/bin/python3 bash -e {0}\n    steps:\n      - id: py\n        uses: actions/setup-python@abc\n        with: { python-version: "3.15" }\n      - name: Scan\n        shell: \'\'\n        run: pipx run x\n';
+    assert.deepEqual(pipxProblems("x.yml", readWorkflow(text)), ["x.yml > empty-shell-pipx > Scan > pipx"]);
+  });
+
+  // A job's own `defaults.run.shell` that is null (every form above but the quoted two) is no shell either, so the job
+  // uses the workflow's; a quoted `''` or `""` stays the job's own empty shell (as in HCW-MigrateOrchestrator_AddOn#80;
+  // the Python copy read every form as the job's own empty shell until round 5).
+  it("reads a job's null defaults.run.shell as none, so the workflow's applies, and a quoted '' as the job's own", () => {
+    const jobs = EMPTY_STEP_SHELLS.map((form, i) => `  job-${i}:\n    runs-on: ubuntu-26.04\n    defaults:\n      run:\n        shell:${form ? ` ${form}` : ""}\n    steps:\n${ROUND5_SET_UP_PYTHON}      - name: Run\n        run: python3 x\n`).join("");
+    const reported = EMPTY_STEP_SHELLS.flatMap((form, i) => (form === "''" || form === '""' ? [] : [`x.yml > job-${i} > Run > python`]));
+    assert.deepEqual(unsetIn(`on: push\ndefaults:\n  run:\n    shell: sudo python3 {0}\njobs:\n${jobs}`), reported);
   });
 });
 
