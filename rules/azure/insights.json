@@ -196,7 +196,7 @@
   },
   {
     "ruleId": "azure.insights.metricalerts",
-    "ruleVersion": "1.0.0",
+    "ruleVersion": "1.1.0",
     "provider": "Microsoft.Insights",
     "resourceType": "Microsoft.Insights/metricAlerts",
     "applicableApiVersions": [
@@ -226,19 +226,19 @@
     "destinationRegion": "any",
     "tenantApplicability": "any",
     "support": {
-      "resourceGroupMove": "supported",
-      "subscriptionMove": "supported",
-      "regionRelocation": "supported",
+      "resourceGroupMove": "unsupported",
+      "subscriptionMove": "unsupported",
+      "regionRelocation": "unsupported",
       "crossTenant": "unsupported"
     },
     "recommendedPattern": {
-      "disposition": "native-move",
-      "tool": "arm-move",
-      "infrastructure": "move-with-resource",
-      "configuration": "move-with-resource",
-      "identity": "move-with-resource",
-      "data": "move-with-resource",
-      "expectedDowntime": "none"
+      "disposition": "recreate-only",
+      "tool": "terraform-redeploy",
+      "infrastructure": "recreate",
+      "configuration": "reconstruct",
+      "identity": "reconstruct",
+      "data": "not-applicable",
+      "expectedDowntime": "minutes"
     },
     "regionRelocationPattern": {
       "disposition": "recreate-only",
@@ -265,10 +265,10 @@
       {
         "title": "Move operation support for resources",
         "url": "https://learn.microsoft.com/azure/azure-resource-manager/management/move-support-resources",
-        "retrievedOn": "2026-10-03"
+        "retrievedOn": "2026-11-16"
       }
     ],
-    "reviewDate": "2027-04-03",
+    "reviewDate": "2027-05-16",
     "confidence": 0.8,
     "exceptions": [],
     "requiredEvidence": [
@@ -286,7 +286,8 @@
     ],
     "precedence": 10,
     "notes": [
-      "Alert scopes reference resource IDs; recreate against the destination resources."
+      "Alert scopes reference resource IDs; recreate against the destination resources.",
+      "Learn lists metric alerts as not movable to another resource group, subscription or region (2026-11-16)."
     ]
   }
 ]

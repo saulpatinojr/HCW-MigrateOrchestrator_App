@@ -1,7 +1,7 @@
 [
   {
     "ruleId": "azure.managedidentity.userassignedidentities",
-    "ruleVersion": "1.0.0",
+    "ruleVersion": "1.1.0",
     "provider": "Microsoft.ManagedIdentity",
     "resourceType": "Microsoft.ManagedIdentity/userAssignedIdentities",
     "applicableApiVersions": [
@@ -33,19 +33,19 @@
     "destinationRegion": "any",
     "tenantApplicability": "any",
     "support": {
-      "resourceGroupMove": "supported",
-      "subscriptionMove": "supported",
+      "resourceGroupMove": "unsupported",
+      "subscriptionMove": "unsupported",
       "regionRelocation": "unsupported",
       "crossTenant": "unsupported"
     },
     "recommendedPattern": {
-      "disposition": "native-move",
-      "tool": "arm-move",
-      "infrastructure": "move-with-resource",
-      "configuration": "move-with-resource",
-      "identity": "move-with-resource",
+      "disposition": "recreate-only",
+      "tool": "terraform-redeploy",
+      "infrastructure": "recreate",
+      "configuration": "reconstruct",
+      "identity": "reconstruct",
       "data": "not-applicable",
-      "expectedDowntime": "none"
+      "expectedDowntime": "minutes"
     },
     "regionRelocationPattern": {
       "disposition": "recreate-only",
@@ -72,12 +72,12 @@
       {
         "title": "Move operation support for resources",
         "url": "https://learn.microsoft.com/azure/azure-resource-manager/management/move-support-resources",
-        "retrievedOn": "2026-10-03"
+        "retrievedOn": "2026-11-16"
       },
       {
         "title": "Managed identities FAQ",
         "url": "https://learn.microsoft.com/entra/identity/managed-identities-azure-resources/managed-identities-faq",
-        "retrievedOn": "2026-10-03"
+        "retrievedOn": "2026-11-16"
       },
       {
         "title": "Relocate managed identities",
@@ -85,7 +85,7 @@
         "retrievedOn": "2026-10-03"
       }
     ],
-    "reviewDate": "2027-04-03",
+    "reviewDate": "2027-05-16",
     "confidence": 0.85,
     "exceptions": [],
     "requiredEvidence": [
@@ -100,6 +100,9 @@
     "crossTenantImplications": [
       "Managed identities are tenant-bound service principals; they are always recreated in the destination tenant."
     ],
-    "precedence": 10
+    "precedence": 10,
+    "notes": [
+      "Learn lists user-assigned identities as not movable to another resource group or subscription, and its managed identities FAQ says moving one to a different resource group isn't supported (2026-11-16): create a new identity and grant it the same access."
+    ]
   }
 ]

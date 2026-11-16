@@ -214,10 +214,10 @@
 - Type: `Microsoft.Network/publicIPAddresses` · Region: eastus · RG: hcw-sample-rg-billing-prod-eus · Application group: billing
 - Disposition: **recreate-and-migrate** via **azure-resource-mover** (alternatives: terraform-redeploy)
 - Paths — infrastructure: recreate; configuration: reconstruct; identity: not-applicable; data: not-applicable
-- Support — RG move: supported; subscription move: supported; region: conditional; target region/SKU availability: unknown/unknown
+- Support — RG move: supported; subscription move: conditional; region: conditional; target region/SKU availability: unknown/unknown
 - Expected downtime: minutes; RTO/RPO compatibility: unknown/unknown; sequence: 15
 - Confidence: medium (0.7) — rule confidence 0.8; conditional support (-0.1)
-- Rule: azure.network.publicipaddresses v1.0.0 · reason codes: RULE_MATCH, REGION_MOVE_CONDITIONAL · human approval: required
+- Rule: azure.network.publicipaddresses v1.1.0 · reason codes: RULE_MATCH, REGION_MOVE_CONDITIONAL · human approval: required
 
 **Blockers**
 - Rule requires human review before this disposition is accepted.
@@ -243,9 +243,11 @@
 - [observed-from-csv] sku = Standard
 - [observed-from-csv] tags = {"application":"billing"}
 - [requires-authenticated-validation] Analysis is based on an exported inventory only; configuration-dependent conclusions must be validated against the live environment.
-- [general-rule] Move operation support for resources (https://learn.microsoft.com/azure/azure-resource-manager/management/move-support-resources, 2026-10-03)
+- [general-rule] Move operation support for resources (https://learn.microsoft.com/azure/azure-resource-manager/management/move-support-resources, 2026-11-16)
 - [general-rule] Azure Resource Mover overview (https://learn.microsoft.com/azure/resource-mover/overview, 2026-10-03)
 - [general-rule] Public IP addresses in Azure (https://learn.microsoft.com/azure/virtual-network/ip-services/public-ip-addresses, 2026-10-03)
+- [general-rule] Move networking resources to new resource group or subscription (https://learn.microsoft.com/azure/azure-resource-manager/management/move-limitations/networking-move-limitations, 2026-11-16)
+- [general-rule] Subscription move: Learn says a resource associated with a Standard SKU public IP address can't be moved across subscriptions; disassociate the address first (2026-11-16).
 
 **Assumptions**
 - Questionnaire field 'migrationMode' was not supplied; default used.
@@ -260,10 +262,10 @@
 - Type: `Microsoft.Network/loadBalancers` · Region: eastus · RG: hcw-sample-rg-billing-prod-eus · Application group: billing
 - Disposition: **native-move** via **azure-resource-mover** (alternatives: terraform-redeploy)
 - Paths — infrastructure: recreate; configuration: reconstruct; identity: reconstruct; data: replicate
-- Support — RG move: supported; subscription move: supported; region: conditional; target region/SKU availability: unknown/unknown
+- Support — RG move: supported; subscription move: conditional; region: conditional; target region/SKU availability: unknown/unknown
 - Expected downtime: minutes; RTO/RPO compatibility: unknown/unknown; sequence: 17
 - Confidence: medium (0.65) — rule confidence 0.75; conditional support (-0.1)
-- Rule: azure.network.loadbalancers v1.0.0 · reason codes: RULE_MATCH, REGION_MOVE_CONDITIONAL · human approval: required
+- Rule: azure.network.loadbalancers v1.1.0 · reason codes: RULE_MATCH, REGION_MOVE_CONDITIONAL · human approval: required
 
 **Dependencies**
 - network → hcw-sample-pip-lb-billing [inferred] — frontend IP configuration (inferred from type and shared resource group; confirm with authenticated discovery)
@@ -289,8 +291,9 @@
 - [observed-from-csv] sku = Standard
 - [observed-from-csv] tags = {"application":"billing"}
 - [requires-authenticated-validation] Analysis is based on an exported inventory only; configuration-dependent conclusions must be validated against the live environment.
-- [general-rule] Move operation support for resources (https://learn.microsoft.com/azure/azure-resource-manager/management/move-support-resources, 2026-10-03)
+- [general-rule] Move operation support for resources (https://learn.microsoft.com/azure/azure-resource-manager/management/move-support-resources, 2026-11-16)
 - [general-rule] Azure Resource Mover overview (https://learn.microsoft.com/azure/resource-mover/overview, 2026-10-03)
+- [general-rule] Subscription move: Learn lists Basic SKU as Yes and Standard SKU as No (2026-11-16); for a Standard load balancer plan a redeploy in the destination subscription.
 
 **Assumptions**
 - Questionnaire field 'migrationMode' was not supplied; default used.
@@ -662,10 +665,10 @@
 - Type: `Microsoft.Sql/servers/databases` · Region: eastus · RG: hcw-sample-rg-billing-prod-eus · Application group: billing
 - Disposition: **recreate-and-migrate** via **geo-replication** (alternatives: failover-group, export-and-import, azure-database-migration-service, backup-and-restore)
 - Paths — infrastructure: recreate; configuration: reconstruct; identity: not-applicable; data: replicate
-- Support — RG move: supported; subscription move: supported; region: unsupported; target region/SKU availability: unknown/unknown
+- Support — RG move: supported; subscription move: supported; region: conditional; target region/SKU availability: unknown/unknown
 - Expected downtime: minutes; RTO/RPO compatibility: unknown/unknown; sequence: 11
-- Confidence: medium (0.74) — rule confidence 0.85; capped at 0.74: inventory-only evidence cannot yield high confidence
-- Rule: azure.sql.servers.databases v1.0.0 · reason codes: RULE_MATCH, REGION_MOVE_UNSUPPORTED_ALTERNATIVE_SELECTED · human approval: required
+- Confidence: medium (0.74) — rule confidence 0.85; conditional support (-0.1); capped at 0.74: inventory-only evidence cannot yield high confidence
+- Rule: azure.sql.servers.databases v1.1.0 · reason codes: RULE_MATCH, REGION_MOVE_CONDITIONAL · human approval: required
 
 **Dependencies**
 - parent → hcw-sample-sql-billing-prod-eus [discovered] — parent present in inventory
@@ -697,9 +700,11 @@
 - [observed-from-csv] sku = GP_Gen5_4
 - [observed-from-csv] tags = {"application":"billing"}
 - [requires-authenticated-validation] Analysis is based on an exported inventory only; configuration-dependent conclusions must be validated against the live environment.
-- [general-rule] Move operation support for resources (https://learn.microsoft.com/azure/azure-resource-manager/management/move-support-resources, 2026-10-03)
+- [general-rule] Move operation support for resources (https://learn.microsoft.com/azure/azure-resource-manager/management/move-support-resources, 2026-11-16)
 - [general-rule] Active geo-replication (https://learn.microsoft.com/azure/azure-sql/database/active-geo-replication-overview, 2026-10-03)
 - [general-rule] Import a BACPAC file (https://learn.microsoft.com/azure/azure-sql/database/database-import, 2026-10-03)
+- [general-rule] Move Azure SQL Database resources to another region (Resource Mover) (https://learn.microsoft.com/azure/resource-mover/tutorial-move-region-sql, 2026-11-16)
+- [general-rule] Region move: Learn lists databases as movable across regions with Azure Resource Mover or the SQL move guidance; Resource Mover doesn't move the logical server, so a target server must exist in the destination region first (2026-11-16).
 
 **Assumptions**
 - Questionnaire field 'migrationMode' was not supplied; default used.
@@ -1145,10 +1150,10 @@
 - Type: `Microsoft.Network/privateEndpoints` · Region: eastus · RG: hcw-sample-rg-billing-prod-eus · Application group: billing
 - Disposition: **recreate-only** via **terraform-redeploy** (alternatives: none)
 - Paths — infrastructure: recreate; configuration: reconstruct; identity: reconstruct; data: not-applicable
-- Support — RG move: supported; subscription move: supported; region: unsupported; target region/SKU availability: unknown/unknown
+- Support — RG move: conditional; subscription move: conditional; region: unsupported; target region/SKU availability: unknown/unknown
 - Expected downtime: minutes; RTO/RPO compatibility: unknown/unknown; sequence: 21
 - Confidence: medium (0.74) — rule confidence 0.8; capped at 0.74: inventory-only evidence cannot yield high confidence
-- Rule: azure.network.privateendpoints v1.0.0 · reason codes: RULE_MATCH, REGION_MOVE_UNSUPPORTED_ALTERNATIVE_SELECTED · human approval: required
+- Rule: azure.network.privateendpoints v1.1.0 · reason codes: RULE_MATCH, REGION_MOVE_UNSUPPORTED_ALTERNATIVE_SELECTED · human approval: required
 
 **Dependencies**
 - network → hcw-sample-vnet-billing-prod-eus [inferred] — private endpoint NIC lives in a subnet (inferred from type and shared resource group; confirm with authenticated discovery)
@@ -1175,8 +1180,10 @@
 - [observed-from-csv] subscriptionName = hcw-sample-prod
 - [observed-from-csv] tags = {"application":"billing"}
 - [requires-authenticated-validation] Analysis is based on an exported inventory only; configuration-dependent conclusions must be validated against the live environment.
-- [general-rule] Move operation support for resources (https://learn.microsoft.com/azure/azure-resource-manager/management/move-support-resources, 2026-10-03)
+- [general-rule] Move operation support for resources (https://learn.microsoft.com/azure/azure-resource-manager/management/move-support-resources, 2026-11-16)
 - [general-rule] Relocate Azure Private Link Service / private endpoints (https://learn.microsoft.com/azure/operational-excellence/relocation-private-link, 2026-10-03)
+- [general-rule] Move networking resources to new resource group or subscription (https://learn.microsoft.com/azure/azure-resource-manager/management/move-limitations/networking-move-limitations, 2026-11-16)
+- [general-rule] Resource group and subscription moves: Learn allows them only for private endpoints of the listed private-link resources (for example Microsoft.Sql/servers and Microsoft.DocumentDB/databaseAccounts); all other private endpoints are recreated (2026-11-16).
 
 **Assumptions**
 - Questionnaire field 'migrationMode' was not supplied; default used.
@@ -1225,10 +1232,10 @@
 - Type: `Microsoft.ManagedIdentity/userAssignedIdentities` · Region: eastus · RG: hcw-sample-rg-billing-prod-eus · Application group: billing
 - Disposition: **recreate-only** via **terraform-redeploy** (alternatives: manual-reconstruction)
 - Paths — infrastructure: recreate; configuration: reconstruct; identity: reconstruct; data: not-applicable
-- Support — RG move: supported; subscription move: supported; region: unsupported; target region/SKU availability: unknown/unknown
+- Support — RG move: unsupported; subscription move: unsupported; region: unsupported; target region/SKU availability: unknown/unknown
 - Expected downtime: none; RTO/RPO compatibility: unknown/unknown; sequence: 7
 - Confidence: medium (0.74) — rule confidence 0.85; capped at 0.74: inventory-only evidence cannot yield high confidence
-- Rule: azure.managedidentity.userassignedidentities v1.0.0 · reason codes: RULE_MATCH, REGION_MOVE_UNSUPPORTED_ALTERNATIVE_SELECTED · human approval: required
+- Rule: azure.managedidentity.userassignedidentities v1.1.0 · reason codes: RULE_MATCH, REGION_MOVE_UNSUPPORTED_ALTERNATIVE_SELECTED · human approval: required
 
 **Risks**
 - Constraint: Identity principal ID and client ID change when recreated: every role assignment, Key Vault policy, and federated credential must be rebound
@@ -1247,9 +1254,10 @@
 - [observed-from-csv] subscriptionName = hcw-sample-prod
 - [observed-from-csv] tags = {"application":"billing"}
 - [requires-authenticated-validation] Analysis is based on an exported inventory only; configuration-dependent conclusions must be validated against the live environment.
-- [general-rule] Move operation support for resources (https://learn.microsoft.com/azure/azure-resource-manager/management/move-support-resources, 2026-10-03)
-- [general-rule] Managed identities FAQ (https://learn.microsoft.com/entra/identity/managed-identities-azure-resources/managed-identities-faq, 2026-10-03)
+- [general-rule] Move operation support for resources (https://learn.microsoft.com/azure/azure-resource-manager/management/move-support-resources, 2026-11-16)
+- [general-rule] Managed identities FAQ (https://learn.microsoft.com/entra/identity/managed-identities-azure-resources/managed-identities-faq, 2026-11-16)
 - [general-rule] Relocate managed identities (https://learn.microsoft.com/azure/operational-excellence/relocation-managed-identity, 2026-10-03)
+- [general-rule] Learn lists user-assigned identities as not movable to another resource group or subscription, and its managed identities FAQ says moving one to a different resource group isn't supported (2026-11-16): create a new identity and grant it the same access.
 
 **Assumptions**
 - Questionnaire field 'migrationMode' was not supplied; default used.
@@ -1297,10 +1305,10 @@
 - Type: `Microsoft.Insights/metricAlerts` · Region: global · RG: hcw-sample-rg-billing-prod-eus · Application group: billing
 - Disposition: **recreate-only** via **terraform-redeploy** (alternatives: none)
 - Paths — infrastructure: recreate; configuration: reconstruct; identity: reconstruct; data: not-applicable
-- Support — RG move: supported; subscription move: supported; region: supported; target region/SKU availability: unknown/unknown
+- Support — RG move: unsupported; subscription move: unsupported; region: unsupported; target region/SKU availability: unknown/unknown
 - Expected downtime: minutes; RTO/RPO compatibility: unknown/unknown; sequence: 2
 - Confidence: medium (0.74) — rule confidence 0.8; capped at 0.74: inventory-only evidence cannot yield high confidence
-- Rule: azure.insights.metricalerts v1.0.0 · reason codes: RULE_MATCH, REGION_MOVE_SUPPORTED · human approval: required
+- Rule: azure.insights.metricalerts v1.1.0 · reason codes: RULE_MATCH, REGION_MOVE_UNSUPPORTED_ALTERNATIVE_SELECTED · human approval: required
 
 **Dependencies**
 - soft → hcw-sample-ag-platform-oncall [inferred] — alert actions reference action groups (inferred from type and shared resource group; confirm with authenticated discovery)
@@ -1319,8 +1327,9 @@
 - [observed-from-csv] subscriptionName = hcw-sample-prod
 - [observed-from-csv] tags = {"application":"billing"}
 - [requires-authenticated-validation] Analysis is based on an exported inventory only; configuration-dependent conclusions must be validated against the live environment.
-- [general-rule] Move operation support for resources (https://learn.microsoft.com/azure/azure-resource-manager/management/move-support-resources, 2026-10-03)
+- [general-rule] Move operation support for resources (https://learn.microsoft.com/azure/azure-resource-manager/management/move-support-resources, 2026-11-16)
 - [general-rule] Alert scopes reference resource IDs; recreate against the destination resources.
+- [general-rule] Learn lists metric alerts as not movable to another resource group, subscription or region (2026-11-16).
 
 **Assumptions**
 - Questionnaire field 'migrationMode' was not supplied; default used.

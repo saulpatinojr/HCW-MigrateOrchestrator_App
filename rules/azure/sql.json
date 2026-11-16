@@ -107,7 +107,7 @@
   },
   {
     "ruleId": "azure.sql.servers.databases",
-    "ruleVersion": "1.0.0",
+    "ruleVersion": "1.1.0",
     "provider": "Microsoft.Sql",
     "resourceType": "Microsoft.Sql/servers/databases",
     "applicableApiVersions": [
@@ -142,7 +142,7 @@
     "support": {
       "resourceGroupMove": "supported",
       "subscriptionMove": "supported",
-      "regionRelocation": "unsupported",
+      "regionRelocation": "conditional",
       "crossTenant": "conditional"
     },
     "recommendedPattern": {
@@ -182,7 +182,7 @@
       {
         "title": "Move operation support for resources",
         "url": "https://learn.microsoft.com/azure/azure-resource-manager/management/move-support-resources",
-        "retrievedOn": "2026-10-03"
+        "retrievedOn": "2026-11-16"
       },
       {
         "title": "Active geo-replication",
@@ -193,9 +193,14 @@
         "title": "Import a BACPAC file",
         "url": "https://learn.microsoft.com/azure/azure-sql/database/database-import",
         "retrievedOn": "2026-10-03"
+      },
+      {
+        "title": "Move Azure SQL Database resources to another region (Resource Mover)",
+        "url": "https://learn.microsoft.com/azure/resource-mover/tutorial-move-region-sql",
+        "retrievedOn": "2026-11-16"
       }
     ],
-    "reviewDate": "2027-04-03",
+    "reviewDate": "2027-05-16",
     "confidence": 0.85,
     "exceptions": [],
     "requiredEvidence": [
@@ -217,6 +222,9 @@
       "Direct cross-tenant move is not an ARM operation; the supported native path is transferring the whole subscription to the destination directory, after which tenant-bound objects (role assignments, managed identities, Key Vault access, Entra-integrated auth) must be rebuilt.",
       "If the subscription cannot be transferred, recreate in the destination tenant and migrate data separately."
     ],
-    "precedence": 10
+    "precedence": 10,
+    "notes": [
+      "Region move: Learn lists databases as movable across regions with Azure Resource Mover or the SQL move guidance; Resource Mover doesn't move the logical server, so a target server must exist in the destination region first (2026-11-16)."
+    ]
   }
 ]

@@ -9,6 +9,10 @@ import { join } from "node:path";
 
 const RETRIEVED = "2026-10-03";
 const REVIEW = "2027-04-03";
+// Rules re-checked against the live Learn pages on 2026-11-16 (the learn-diff of PR #130) carry this date on the sources
+// that were re-read, a 1.1.0 ruleVersion and a review date six months on. The other rules keep RETRIEVED and REVIEW.
+const RECHECKED = "2026-11-16";
+const RECHECKED_REVIEW = "2027-05-16";
 const L = (path) => `https://learn.microsoft.com/azure/${path}`;
 const SRC = {
   move: { title: "Move operation support for resources", url: L("azure-resource-manager/management/move-support-resources") },
@@ -20,7 +24,8 @@ const SRC = {
   migrate: { title: "Azure Migrate services overview", url: L("migrate/migrate-services-overview") },
   asr: { title: "Azure Site Recovery overview (DR only)", url: L("site-recovery/site-recovery-overview") },
 };
-const src = (...keys) => keys.map((k) => (typeof k === "string" ? { ...SRC[k], retrievedOn: RETRIEVED } : { ...k, retrievedOn: RETRIEVED }));
+// `retrieved` maps a source key to the date it was last read; an inline source may carry its own retrievedOn.
+const src = (keys, retrieved = {}) => keys.map((k) => (typeof k === "string" ? { ...SRC[k], retrievedOn: retrieved[k] ?? RETRIEVED } : { ...k, retrievedOn: k.retrievedOn ?? RETRIEVED }));
 
 const P = (disposition, tool, infrastructure, configuration, identity, data, expectedDowntime) => ({ disposition, tool, infrastructure, configuration, identity, data, expectedDowntime });
 const RECREATE_REDEPLOY = P("recreate-only", "terraform-redeploy", "recreate", "reconstruct", "reconstruct", "not-applicable", "minutes");
@@ -44,7 +49,7 @@ function rule(id, type, o) {
   const provider = type.split("/")[0];
   return {
     ruleId: id,
-    ruleVersion: "1.0.0",
+    ruleVersion: o.version ?? "1.0.0",
     provider,
     resourceType: type,
     applicableApiVersions: o.apiVersions ?? ["*"],
@@ -62,8 +67,8 @@ function rule(id, type, o) {
     regionRelocationPattern: o.region,
     crossTenantPattern: o.crossTenant ?? defaultCrossTenant(o),
     alternatives: o.alternatives,
-    documentationSources: src(...(o.sources ?? ["move", "moveHowTo"])),
-    reviewDate: REVIEW,
+    documentationSources: src(o.sources ?? ["move", "moveHowTo"], o.retrieved),
+    reviewDate: o.reviewDate ?? REVIEW,
     confidence: o.confidence ?? 0.8,
     exceptions: o.exceptions ?? [],
     requiredEvidence: o.requiredEvidence ?? ["Confirm the resource's current configuration via authenticated inspection before relying on this rule."],
@@ -107,11 +112,12 @@ const rules = [
     rollback: ["Source disk/snapshot retained until cutover is verified"],
   }),
   rule("azure.compute.snapshots", "Microsoft.Compute/snapshots", {
-    support: S("supported", "supported", "conditional", "unsupported"),
+    version: "1.1.0", reviewDate: RECHECKED_REVIEW, retrieved: { move: RECHECKED },
+    support: S("conditional", "conditional", "conditional", "unsupported"),
     pattern: NATIVE,
     region: P("orchestrated-migration", "export-and-import", "recreate", "not-applicable", "not-applicable", "export-import", "none"),
     alternatives: ["backup-and-restore"],
-    notes: ["Region copy uses incremental snapshot copy (az snapshot create --copy-start) or SAS export/import."],
+    notes: ["Region copy uses incremental snapshot copy (az snapshot create --copy-start) or SAS export/import.", "Resource group and subscription moves: Learn lists full snapshots as movable and incremental snapshots as not movable (2026-11-16)."],
     confidence: 0.75,
   }),
   rule("azure.compute.availabilitysets", "Microsoft.Compute/availabilitySets", {
@@ -126,7 +132,8 @@ const rules = [
     confidence: 0.75,
   }),
   rule("azure.compute.virtualmachines.extensions", "Microsoft.Compute/virtualMachines/extensions", {
-    support: S("supported", "supported", "supported", "unsupported"),
+    version: "1.1.0", reviewDate: RECHECKED_REVIEW, retrieved: { move: RECHECKED },
+    support: S("supported", "supported", "unsupported", "unsupported"),
     pattern: P("native-move", "arm-move", "move-with-resource", "move-with-resource", "not-applicable", "not-applicable", "none"),
     region: P("recreate-only", "terraform-redeploy", "recreate", "reconstruct", "not-applicable", "not-applicable", "none"),
     alternatives: ["terraform-redeploy"],
@@ -160,22 +167,26 @@ const rules = [
     validation: ["Rule count and effective security rules match", "Associations re-established"],
   }),
   rule("azure.network.publicipaddresses", "Microsoft.Network/publicIPAddresses", {
-    support: S("supported", "supported", "conditional", "unsupported"),
+    version: "1.1.0", reviewDate: RECHECKED_REVIEW, retrieved: { move: RECHECKED },
+    support: S("supported", "conditional", "conditional", "unsupported"),
     pattern: NATIVE,
     region: P("recreate-and-migrate", "azure-resource-mover", "recreate", "reconstruct", "not-applicable", "not-applicable", "minutes"),
     alternatives: ["terraform-redeploy"],
-    sources: ["move", "mover", { title: "Public IP addresses in Azure", url: L("virtual-network/ip-services/public-ip-addresses") }],
+    sources: ["move", "mover", { title: "Public IP addresses in Azure", url: L("virtual-network/ip-services/public-ip-addresses") }, { title: "Move networking resources to new resource group or subscription", url: L("azure-resource-manager/management/move-limitations/networking-move-limitations"), retrievedOn: RECHECKED }],
+    notes: ["Subscription move: Learn says a resource associated with a Standard SKU public IP address can't be moved across subscriptions; disassociate the address first (2026-11-16)."],
     risks: ["The IP address value cannot be preserved across regions; DNS records, firewall allowlists and partner integrations must be updated", "Basic SKU public IPs are retired and must be replaced with Standard SKU"],
     mitigations: ["Lower DNS TTL ahead of cutover; inventory external allowlists"],
     humanReview: true,
     confidence: 0.8,
   }),
   rule("azure.network.loadbalancers", "Microsoft.Network/loadBalancers", {
-    support: S("supported", "supported", "conditional", "unsupported"),
+    version: "1.1.0", reviewDate: RECHECKED_REVIEW, retrieved: { move: RECHECKED },
+    support: S("supported", "conditional", "conditional", "unsupported"),
     pattern: NATIVE, region: MOVER,
     alternatives: ["terraform-redeploy"],
     sources: ["move", "mover"],
     features: ["Basic SKU load balancers are retired; plan an upgrade to Standard as part of the migration", "Resource Mover supports internal and Standard public load balancers; backend pool members must move in the same move collection"],
+    notes: ["Subscription move: Learn lists Basic SKU as Yes and Standard SKU as No (2026-11-16); for a Standard load balancer plan a redeploy in the destination subscription."],
     confidence: 0.75,
   }),
   rule("azure.network.routetables", "Microsoft.Network/routeTables", {
@@ -183,23 +194,29 @@ const rules = [
     pattern: NATIVE, region: RECREATE_REDEPLOY, alternatives: ["terraform-redeploy"],
   }),
   rule("azure.network.natgateways", "Microsoft.Network/natGateways", {
-    support: S("supported", "supported", "unsupported", "unsupported"),
-    pattern: NATIVE, region: RECREATE_REDEPLOY, alternatives: ["terraform-redeploy"],
+    version: "1.1.0", reviewDate: RECHECKED_REVIEW, retrieved: { move: RECHECKED },
+    support: S("unsupported", "unsupported", "unsupported", "unsupported"),
+    pattern: RECREATE_REDEPLOY, region: RECREATE_REDEPLOY, alternatives: ["terraform-redeploy"],
+    notes: ["Learn lists NAT gateways as not movable to another resource group, subscription or region (2026-11-16): recreate in the destination."],
     risks: ["Outbound IP changes; update downstream allowlists"],
     confidence: 0.7,
   }),
   rule("azure.network.applicationgateways", "Microsoft.Network/applicationGateways", {
-    support: S("supported", "supported", "unsupported", "unsupported"),
-    pattern: NATIVE, region: RECREATE_REDEPLOY,
+    version: "1.1.0", reviewDate: RECHECKED_REVIEW, retrieved: { move: RECHECKED },
+    support: S("unsupported", "unsupported", "unsupported", "unsupported"),
+    pattern: RECREATE_REDEPLOY, region: RECREATE_REDEPLOY,
+    notes: ["Learn lists application gateways as not movable to another resource group, subscription or region (2026-11-16): recreate in the destination."],
     alternatives: ["terraform-redeploy"],
     risks: ["Certificates (Key Vault references) and WAF policies must be re-bound in the destination"],
     humanReview: true, confidence: 0.75,
   }),
   rule("azure.network.privateendpoints", "Microsoft.Network/privateEndpoints", {
-    support: S("supported", "supported", "unsupported", "unsupported"),
+    version: "1.1.0", reviewDate: RECHECKED_REVIEW, retrieved: { move: RECHECKED },
+    support: S("conditional", "conditional", "unsupported", "unsupported"),
     pattern: NATIVE, region: RECREATE_REDEPLOY,
     alternatives: ["terraform-redeploy"],
-    sources: ["move", { title: "Relocate Azure Private Link Service / private endpoints", url: L("operational-excellence/relocation-private-link") }],
+    sources: ["move", { title: "Relocate Azure Private Link Service / private endpoints", url: L("operational-excellence/relocation-private-link") }, { title: "Move networking resources to new resource group or subscription", url: L("azure-resource-manager/management/move-limitations/networking-move-limitations"), retrievedOn: RECHECKED }],
+    notes: ["Resource group and subscription moves: Learn allows them only for private endpoints of the listed private-link resources (for example Microsoft.Sql/servers and Microsoft.DocumentDB/databaseAccounts); all other private endpoints are recreated (2026-11-16)."],
     prerequisites: ["The target PaaS resource must already exist in the destination; the private endpoint is recreated against it", "Private DNS zone group records must be regenerated"],
     risks: ["Stale A records in the private DNS zone cause resolution to the old region"],
     confidence: 0.8,
@@ -280,11 +297,13 @@ const rules = [
     confidence: 0.8,
   }),
   rule("azure.sql.servers.databases", "Microsoft.Sql/servers/databases", {
-    support: S("supported", "supported", "unsupported", "conditional"),
+    version: "1.1.0", reviewDate: RECHECKED_REVIEW, retrieved: { move: RECHECKED },
+    support: S("supported", "supported", "conditional", "conditional"),
     pattern: P("native-move", "arm-move", "move-with-resource", "move-with-resource", "not-applicable", "move-with-resource", "none"),
     region: P("recreate-and-migrate", "geo-replication", "recreate", "reconstruct", "not-applicable", "replicate", "minutes"),
     alternatives: ["failover-group", "export-and-import", "azure-database-migration-service", "backup-and-restore"],
-    sources: ["move", { title: "Active geo-replication", url: L("azure-sql/database/active-geo-replication-overview") }, { title: "Import a BACPAC file", url: L("azure-sql/database/database-import") }],
+    sources: ["move", { title: "Active geo-replication", url: L("azure-sql/database/active-geo-replication-overview") }, { title: "Import a BACPAC file", url: L("azure-sql/database/database-import") }, { title: "Move Azure SQL Database resources to another region (Resource Mover)", url: L("resource-mover/tutorial-move-region-sql"), retrievedOn: RECHECKED }],
+    notes: ["Region move: Learn lists databases as movable across regions with Azure Resource Mover or the SQL move guidance; Resource Mover doesn't move the logical server, so a target server must exist in the destination region first (2026-11-16)."],
     features: ["Databases move with the logical server; a cross-region move creates a geo-secondary then promotes it (near-zero data loss) or uses BACPAC export/import for offline moves", "Elastic pool membership must exist at the destination before the database is replicated"],
     validation: ["Row counts per table; checksum on critical tables", "Replication lag zero at cutover", "Application connection string switched to the listener/new server"],
     rollback: ["Keep the source primary until the application is verified; fail back via the group"],
@@ -342,9 +361,10 @@ const rules = [
     notes: ["Global resource; verify receivers (webhooks, logic apps, automation runbooks) that are themselves migrated."],
   }),
   rule("azure.insights.metricalerts", "Microsoft.Insights/metricAlerts", {
-    support: S("supported", "supported", "supported", "unsupported"),
-    pattern: NATIVE, region: RECREATE_REDEPLOY, alternatives: ["terraform-redeploy"], sources: ["move"],
-    notes: ["Alert scopes reference resource IDs; recreate against the destination resources."],
+    version: "1.1.0", reviewDate: RECHECKED_REVIEW, retrieved: { move: RECHECKED },
+    support: S("unsupported", "unsupported", "unsupported", "unsupported"),
+    pattern: RECREATE_REDEPLOY, region: RECREATE_REDEPLOY, alternatives: ["terraform-redeploy"], sources: ["move"],
+    notes: ["Alert scopes reference resource IDs; recreate against the destination resources.", "Learn lists metric alerts as not movable to another resource group, subscription or region (2026-11-16)."],
   }),
   rule("azure.recoveryservices.vaults", "Microsoft.RecoveryServices/vaults", {
     support: S("conditional", "conditional", "unsupported", "unsupported"),
@@ -357,14 +377,16 @@ const rules = [
     humanReview: true, confidence: 0.8,
   }),
   rule("azure.managedidentity.userassignedidentities", "Microsoft.ManagedIdentity/userAssignedIdentities", {
-    support: S("supported", "supported", "unsupported", "unsupported"),
-    pattern: P("native-move", "arm-move", "move-with-resource", "move-with-resource", "move-with-resource", "not-applicable", "none"),
+    version: "1.1.0", reviewDate: RECHECKED_REVIEW, retrieved: { move: RECHECKED },
+    support: S("unsupported", "unsupported", "unsupported", "unsupported"),
+    pattern: P("recreate-only", "terraform-redeploy", "recreate", "reconstruct", "reconstruct", "not-applicable", "minutes"),
     region: P("recreate-only", "terraform-redeploy", "recreate", "reconstruct", "reconstruct", "not-applicable", "none"),
     crossTenant: P("recreate-only", "terraform-redeploy", "recreate", "reconstruct", "reconstruct", "not-applicable", "minutes"),
     alternatives: ["manual-reconstruction"],
-    sources: ["move", { title: "Managed identities FAQ", url: L("../entra/identity/managed-identities-azure-resources/managed-identities-faq").replace("azure/../", "") }, { title: "Relocate managed identities", url: L("operational-excellence/relocation-managed-identity") }],
+    sources: ["move", { title: "Managed identities FAQ", url: L("../entra/identity/managed-identities-azure-resources/managed-identities-faq").replace("azure/../", ""), retrievedOn: RECHECKED }, { title: "Relocate managed identities", url: L("operational-excellence/relocation-managed-identity") }],
     features: ["Identity principal ID and client ID change when recreated: every role assignment, Key Vault policy, and federated credential must be rebound"],
     xt: ["Managed identities are tenant-bound service principals; they are always recreated in the destination tenant."],
+    notes: ["Learn lists user-assigned identities as not movable to another resource group or subscription, and its managed identities FAQ says moving one to a different resource group isn't supported (2026-11-16): create a new identity and grant it the same access."],
     confidence: 0.85,
   }),
   rule("azure.resources.resourcegroups", "Microsoft.Resources/resourceGroups", {
