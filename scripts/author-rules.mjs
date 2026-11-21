@@ -118,6 +118,8 @@ const rules = [
     region: P("orchestrated-migration", "export-and-import", "recreate", "not-applicable", "not-applicable", "export-import", "none"),
     alternatives: ["backup-and-restore"],
     notes: ["Region copy uses incremental snapshot copy (az snapshot create --copy-start) or SAS export/import.", "Resource group and subscription moves: Learn lists full snapshots as movable and incremental snapshots as not movable (2026-11-16)."],
+    // Conditional on the snapshot kind, which the inventory does not carry: a person confirms it is a full snapshot.
+    humanReview: true,
     confidence: 0.75,
   }),
   rule("azure.compute.availabilitysets", "Microsoft.Compute/availabilitySets", {
@@ -187,6 +189,8 @@ const rules = [
     sources: ["move", "mover"],
     features: ["Basic SKU load balancers are retired; plan an upgrade to Standard as part of the migration", "Resource Mover supports internal and Standard public load balancers; backend pool members must move in the same move collection"],
     notes: ["Subscription move: Learn lists Basic SKU as Yes and Standard SKU as No (2026-11-16); for a Standard load balancer plan a redeploy in the destination subscription."],
+    // Conditional on the SKU: a person confirms Basic before a subscription move is accepted.
+    humanReview: true,
     confidence: 0.75,
   }),
   rule("azure.network.routetables", "Microsoft.Network/routeTables", {
@@ -219,6 +223,8 @@ const rules = [
     notes: ["Resource group and subscription moves: Learn allows them only for private endpoints of the listed private-link resources (for example Microsoft.Sql/servers and Microsoft.DocumentDB/databaseAccounts); all other private endpoints are recreated (2026-11-16)."],
     prerequisites: ["The target PaaS resource must already exist in the destination; the private endpoint is recreated against it", "Private DNS zone group records must be regenerated"],
     risks: ["Stale A records in the private DNS zone cause resolution to the old region"],
+    // Conditional on the private-link resource it points to: a person confirms it is one Learn lists.
+    humanReview: true,
     confidence: 0.8,
   }),
   rule("azure.network.privatednszones", "Microsoft.Network/privateDnsZones", {

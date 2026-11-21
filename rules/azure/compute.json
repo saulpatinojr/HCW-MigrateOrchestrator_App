@@ -318,7 +318,7 @@
     "requiredEvidence": [
       "Confirm the resource's current configuration via authenticated inspection before relying on this rule."
     ],
-    "humanReviewRequired": false,
+    "humanReviewRequired": true,
     "prerequisites": [],
     "risks": [],
     "mitigations": [],

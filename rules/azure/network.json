@@ -611,7 +611,7 @@
     "requiredEvidence": [
       "Confirm the resource's current configuration via authenticated inspection before relying on this rule."
     ],
-    "humanReviewRequired": false,
+    "humanReviewRequired": true,
     "prerequisites": [],
     "risks": [],
     "mitigations": [],
@@ -1017,7 +1017,7 @@
     "requiredEvidence": [
       "Confirm the resource's current configuration via authenticated inspection before relying on this rule."
     ],
-    "humanReviewRequired": false,
+    "humanReviewRequired": true,
     "prerequisites": [
       "The target PaaS resource must already exist in the destination; the private endpoint is recreated against it",
       "Private DNS zone group records must be regenerated"

@@ -29,7 +29,7 @@
 
 ## Key blockers
 
-- Rule requires human review before this disposition is accepted. (5)
+- Rule requires human review before this disposition is accepted. (7)
 - No rule coverage: disposition cannot be determined automatically. (1)
 
 ## Assumptions from the questionnaire

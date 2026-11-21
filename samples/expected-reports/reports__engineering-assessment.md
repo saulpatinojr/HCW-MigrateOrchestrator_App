@@ -271,6 +271,9 @@
 - network → hcw-sample-pip-lb-billing [inferred] — frontend IP configuration (inferred from type and shared resource group; confirm with authenticated discovery)
 - network → hcw-sample-vnet-billing-prod-eus [inferred] — internal frontend in a subnet (inferred from type and shared resource group; confirm with authenticated discovery)
 
+**Blockers**
+- Rule requires human review before this disposition is accepted.
+
 **Risks**
 - Constraint: Basic SKU load balancers are retired; plan an upgrade to Standard as part of the migration
 - Constraint: Resource Mover supports internal and Standard public load balancers; backend pool members must move in the same move collection
@@ -1162,6 +1165,9 @@
 **Prerequisites**
 - The target PaaS resource must already exist in the destination; the private endpoint is recreated against it
 - Private DNS zone group records must be regenerated
+
+**Blockers**
+- Rule requires human review before this disposition is accepted.
 
 **Risks**
 - Stale A records in the private DNS zone cause resolution to the old region
