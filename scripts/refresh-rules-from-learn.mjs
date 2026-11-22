@@ -55,7 +55,7 @@ writeFileSync(join(outDir, "learn-diff.json"), JSON.stringify(report, null, 2) +
 const md = [
   `# Learn move-support diff — ${retrievedOn}`, "", ...(warning ? [`> **${warning}**`, ""] : []), `Source: ${source} · matrix rows: ${matrix.length} · rules checked: ${loaded.rules.length}`, "",
   `## Disagreements (${diffs.length})`, "", "| Rule | Field | Rule says | Learn says | Learn cell |", "|---|---|---|---|---|",
-  ...diffs.map((d) => `| ${d.ruleId} | ${d.field} | ${d.rule} | ${d.learn} | ${escapeTableCell(learnCell(d))} |`),
+  ...diffs.map((d) => `| ${d.ruleId} | ${d.field} | ${d.rule} | ${d.learn} | ${escapeTableCell(learnCell(d))}${d.learnVariant ? ` (Learn row labelled "${escapeTableCell(d.learnVariant.slice(0, 60))}")` : ""} |`),
   "", `## Resource types in the matrix without a rule (${uncovered.length})`, "", ...uncovered.slice(0, 200).map((u) => `- ${u}`),
   "", `## Rule types not found in the matrix (${notInMatrix.length})`, "", ...notInMatrix.map((u) => `- ${u}`),
   "", "Region-move disagreements are expected where a rule encodes a service-native relocation path rather than Resource Mover support. Review each row; update `scripts/author-rules.mjs`, bump `ruleVersion`, set `retrievedOn`, regenerate and re-snapshot.", "",

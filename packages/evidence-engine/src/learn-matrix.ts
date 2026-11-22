@@ -10,7 +10,9 @@ import type { MigrationRule, SupportState } from "@amo/domain";
  */
 export interface LearnMatrixRow {
   provider: string;
-  resourceType: string; // fully qualified, lowercased
+  resourceType: string; // fully qualified, lowercased, without Learn's bracketed label
+  /** Learn's label in brackets after the type, e.g. "managed" in "certificates (managed)"; absent on a plain row. */
+  variant?: string;
   resourceGroupMove: SupportState;
   subscriptionMove: SupportState;
   regionRelocation: SupportState;
@@ -98,6 +100,17 @@ function withoutHtmlComments(text: string): string {
   }
 }
 
+/**
+ * Split a type cell such as "certificates (managed)" or "vpngateways (Virtual WAN)" into the type and its label. The label
+ * runs from the first "(" to the closing ")" at the end of the cell, so a label holding its own brackets stays whole.
+ */
+function splitTypeLabel(cell: string): { type: string; variant?: string } {
+  const m = cell.match(/^([^()]*?)\s*\((.*)\)$/);
+  if (!m) return { type: cell };
+  const variant = m[2].trim();
+  return variant ? { type: m[1], variant } : { type: m[1] };
+}
+
 export function parseLearnMoveSupport(markdown: string): LearnMatrixRow[] {
   const rows: LearnMatrixRow[] = [];
   let provider = "";
@@ -136,7 +149,8 @@ export function parseLearnMoveSupport(markdown: string): LearnMatrixRow[] {
     if (/^\|[\s:|-]+$/.test(line.trim())) continue; // separator row, with or without alignment colons
     const cells = line.split("|").slice(1, -1).map((c) => c.trim());
     if (cells.length < 3) continue;
-    const typeCell = stripMarkdown(cells[0]).replace(/\s*\/\s*/g, "/");
+    const { type, variant } = splitTypeLabel(stripMarkdown(cells[0]));
+    const typeCell = type.replace(/\s*\/\s*/g, "/");
     if (!typeCell) continue;
     const qualified = typeCell.toLowerCase().startsWith("microsoft.");
     if (!qualified && !provider) continue; // a table outside any provider section
@@ -147,6 +161,7 @@ export function parseLearnMoveSupport(markdown: string): LearnMatrixRow[] {
     rows.push({
       provider: fq.split("/")[0],
       resourceType: fq.toLowerCase(),
+      ...(variant ? { variant } : {}),
       resourceGroupMove: withGuidance(normalizeLearnCell(rg)),
       subscriptionMove: withGuidance(normalizeLearnCell(sub)),
       regionRelocation: normalizeLearnCell(region),
@@ -167,16 +182,22 @@ export interface MatrixDiff {
   learnRaw: string;
   /** The guidance link from the section note when it is what made a plain "Yes" read as conditional. */
   learnGuidance?: string;
+  /** Set when the Learn row compared carries a label, e.g. "Virtual WAN" for "vpngateways (Virtual WAN)". */
+  learnVariant?: string;
 }
 
 /**
  * Compare the parsed matrix with the rule corpus. Region-move differences are reported but expected in places:
  * Learn's column describes Resource Mover, while rules also encode service-native relocation paths.
- * When a type appears in more than one row (a later table in the same section repeats it), the first row is used.
+ * When a type appears in more than one row (a later table in the same section repeats it), the first row is used, except
+ * that a plain row is preferred to a labelled one: "certificates" over "certificates (managed)" under Microsoft.Web.
  */
 export function diffRulesAgainstMatrix(rules: MigrationRule[], matrix: LearnMatrixRow[]): { diffs: MatrixDiff[]; uncovered: string[]; notInMatrix: string[] } {
   const byType = new Map<string, LearnMatrixRow>();
-  for (const m of matrix) if (!byType.has(m.resourceType)) byType.set(m.resourceType, m);
+  for (const m of matrix) {
+    const seen = byType.get(m.resourceType);
+    if (!seen || (seen.variant !== undefined && m.variant === undefined)) byType.set(m.resourceType, m);
+  }
   const diffs: MatrixDiff[] = [];
   const notInMatrix: string[] = [];
   const ruleTypes = new Set(rules.map((r) => r.resourceType.toLowerCase()));
@@ -187,7 +208,7 @@ export function diffRulesAgainstMatrix(rules: MigrationRule[], matrix: LearnMatr
       if (learn === "unknown") continue;
       if (r.support[field] === learn) continue;
       const guided = m.guidance && field !== "regionRelocation" && learn === "conditional" && normalizeLearnCell(raw) === "supported";
-      diffs.push({ ruleId: r.ruleId, resourceType: r.resourceType, field, rule: r.support[field], learn, learnRaw: raw, ...(guided ? { learnGuidance: m.guidance!.url } : {}) });
+      diffs.push({ ruleId: r.ruleId, resourceType: r.resourceType, field, rule: r.support[field], learn, learnRaw: raw, ...(guided ? { learnGuidance: m.guidance!.url } : {}), ...(m.variant !== undefined ? { learnVariant: m.variant } : {}) });
     }
   }
   const uncovered = [...byType.values()].filter((m) => !ruleTypes.has(m.resourceType) && m.resourceGroupMove !== "unknown").map((m) => m.resourceType);
