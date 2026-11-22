@@ -2,12 +2,10 @@
 
 Source: https://raw.githubusercontent.com/MicrosoftDocs/azure-docs/main/articles/azure-resource-manager/management/move-support-resources.md · matrix rows: 757 · rules checked: 35
 
-## Disagreements (33)
+## Disagreements (26)
 
 | Rule | Field | Rule says | Learn says | Learn cell |
 |---|---|---|---|---|
-| azure.compute.virtualmachines | resourceGroupMove | supported | conditional | Yes, with guidance (https://learn.microsoft.com/en-us/azure/azure-resource-manager/management/move-limitations/virtual-machines-move-limitations) |
-| azure.compute.virtualmachines | subscriptionMove | supported | conditional | Yes, with guidance (https://learn.microsoft.com/en-us/azure/azure-resource-manager/management/move-limitations/virtual-machines-move-limitations) |
 | azure.compute.virtualmachines | regionRelocation | supported | conditional | **Yes** <br/><br/> Use [Azure Resource Mover](../../resource-mover/tutorial-move |
 | azure.compute.disks | resourceGroupMove | supported | conditional | Yes, with guidance (https://learn.microsoft.com/en-us/azure/azure-resource-manager/management/move-limitations/virtual-machines-move-limitations) |
 | azure.compute.disks | subscriptionMove | supported | conditional | Yes, with guidance (https://learn.microsoft.com/en-us/azure/azure-resource-manager/management/move-limitations/virtual-machines-move-limitations) |
@@ -16,17 +14,12 @@ Source: https://raw.githubusercontent.com/MicrosoftDocs/azure-docs/main/articles
 | azure.compute.availabilitysets | resourceGroupMove | supported | conditional | Yes, with guidance (https://learn.microsoft.com/en-us/azure/azure-resource-manager/management/move-limitations/virtual-machines-move-limitations) |
 | azure.compute.availabilitysets | subscriptionMove | supported | conditional | Yes, with guidance (https://learn.microsoft.com/en-us/azure/azure-resource-manager/management/move-limitations/virtual-machines-move-limitations) |
 | azure.compute.availabilitysets | regionRelocation | supported | conditional | **Yes** <br/><br/> Use [Azure Resource Mover](../../resource-mover/tutorial-move |
-| azure.compute.virtualmachinescalesets | resourceGroupMove | supported | conditional | Yes, with guidance (https://learn.microsoft.com/en-us/azure/azure-resource-manager/management/move-limitations/virtual-machines-move-limitations) |
-| azure.compute.virtualmachinescalesets | subscriptionMove | supported | conditional | Yes, with guidance (https://learn.microsoft.com/en-us/azure/azure-resource-manager/management/move-limitations/virtual-machines-move-limitations) |
 | azure.compute.virtualmachines.extensions | resourceGroupMove | supported | conditional | Yes, with guidance (https://learn.microsoft.com/en-us/azure/azure-resource-manager/management/move-limitations/virtual-machines-move-limitations) |
 | azure.compute.virtualmachines.extensions | subscriptionMove | supported | conditional | Yes, with guidance (https://learn.microsoft.com/en-us/azure/azure-resource-manager/management/move-limitations/virtual-machines-move-limitations) |
 | azure.documentdb.databaseaccounts | regionRelocation | conditional | unsupported | No |
 | azure.insights.actiongroups | regionRelocation | supported | unsupported | No |
 | azure.network.networkinterfaces | resourceGroupMove | supported | conditional | Yes, with guidance (https://learn.microsoft.com/en-us/azure/azure-resource-manager/management/move-limitations/networking-move-limitations) |
-| azure.network.networkinterfaces | subscriptionMove | supported | conditional | Yes, with guidance (https://learn.microsoft.com/en-us/azure/azure-resource-manager/management/move-limitations/networking-move-limitations) |
 | azure.network.networkinterfaces | regionRelocation | supported | conditional | **Yes** <br/><br/> Use [Azure Resource Mover](../../resource-mover/tutorial-move |
-| azure.network.virtualnetworks | resourceGroupMove | supported | conditional | Yes, with guidance (https://learn.microsoft.com/en-us/azure/azure-resource-manager/management/move-limitations/networking-move-limitations) |
-| azure.network.virtualnetworks | subscriptionMove | supported | conditional | Yes, with guidance (https://learn.microsoft.com/en-us/azure/azure-resource-manager/management/move-limitations/networking-move-limitations) |
 | azure.network.networksecuritygroups | resourceGroupMove | supported | conditional | Yes, with guidance (https://learn.microsoft.com/en-us/azure/azure-resource-manager/management/move-limitations/networking-move-limitations) |
 | azure.network.networksecuritygroups | subscriptionMove | supported | conditional | Yes, with guidance (https://learn.microsoft.com/en-us/azure/azure-resource-manager/management/move-limitations/networking-move-limitations) |
 | azure.network.networksecuritygroups | regionRelocation | supported | conditional | **Yes** <br/><br/> Use [Azure Resource Mover](../../resource-mover/tutorial-move |
@@ -40,7 +33,7 @@ Source: https://raw.githubusercontent.com/MicrosoftDocs/azure-docs/main/articles
 | azure.network.privatednszones | regionRelocation | supported | unsupported | No |
 | azure.sql.servers | regionRelocation | unsupported | supported | **Yes** |
 
-## Resource types in the matrix without a rule (721)
+## Resource types in the matrix without a rule (719)
 
 - microsoft.aad/domainservices
 - microsoft.aadiam/diagnosticsettings
@@ -138,8 +131,7 @@ Source: https://raw.githubusercontent.com/MicrosoftDocs/azure-docs/main/articles
 - microsoft.blueprint/blueprints
 - microsoft.botservice/botservices
 - microsoft.cache/redis
-- microsoft.cache/redisenterprise (azure cache for redis enterprise)
-- microsoft.cache/redisenterprise (azure managed redis)
+- microsoft.cache/redisenterprise
 - microsoft.capacity/appliedreservations
 - microsoft.capacity/calculateexchange
 - microsoft.capacity/calculateprice
@@ -242,6 +234,7 @@ Source: https://raw.githubusercontent.com/MicrosoftDocs/azure-docs/main/articles
 - microsoft.cortanaanalytics/accounts
 - microsoft.costmanagement/alerts
 - microsoft.costmanagement/billingaccounts
+- microsoft.costmanagement/budgets
 
 ## Rule types not found in the matrix (1)
 
