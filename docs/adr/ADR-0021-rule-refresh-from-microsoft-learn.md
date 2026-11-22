@@ -14,3 +14,10 @@ authoring tool, bumps versions and re-snapshots.
 ## Consequences
 Drift is visible within a week; the parser is tested offline with fixtures; the source path in the azure-docs repository is
 marked [VERIFY] and the script accepts `--from <file>` for offline runs.
+
+## Amendment (2026-11-18)
+The source is the article `articles/azure-resource-manager/management/move-support-resources.md`; the include-file path
+answered 404 and was removed, so the path is no longer marked [VERIFY]. The article's tables sit inside quote blocks, which
+the parser now reads. A run that parses 0 rows exits with an error and writes no report, because an empty matrix otherwise
+reads as agreement. A plain "Yes" for resource group or subscription move under a section note that links move guidance is
+treated as `conditional`, matching the rule that any qualifier makes a Learn cell conditional.
