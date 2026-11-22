@@ -10,9 +10,9 @@ import { join } from "node:path";
 import { escapeTableCell } from "./lib/escape-table-cell.mjs";
 import { loadRules, defaultRulesDir, parseLearnMoveSupport, diffRulesAgainstMatrix } from "@amo/evidence-engine";
 
-// [VERIFY] Source paths in MicrosoftDocs/azure-docs. The support tables are maintained as include files; adjust if moved.
+// The move-support tables live in this article in MicrosoftDocs/azure-docs (checked 2026-11-18; it answers 200). An include
+// file that used to be listed first here answered 404 and was removed (CHANGELOG, 2026-11-18).
 const SOURCES = [
-  "https://raw.githubusercontent.com/MicrosoftDocs/azure-docs/main/includes/azure-resource-manager/move-support-resources.md",
   "https://raw.githubusercontent.com/MicrosoftDocs/azure-docs/main/articles/azure-resource-manager/management/move-support-resources.md",
 ];
 
@@ -35,16 +35,27 @@ async function fetchMarkdown() {
 
 const { text, source } = await fetchMarkdown();
 const matrix = parseLearnMoveSupport(text);
+if (matrix.length === 0) {
+  // A page the parser cannot read would otherwise produce a report saying "0 disagreements", which looks like agreement.
+  console.error(`parsed 0 rows from ${source}: the page layout has probably changed. No report was written.`);
+  process.exit(1);
+}
 const loaded = loadRules(defaultRulesDir());
 const { diffs, uncovered, notInMatrix } = diffRulesAgainstMatrix(loaded.rules, matrix);
+// A page that parses but matches few rule types has probably lost most of its tables to a layout change: say so loudly.
+const mostlyMissing = notInMatrix.length * 2 > loaded.rules.length;
+const warning = mostlyMissing ? `Warning: ${notInMatrix.length} of ${loaded.rules.length} rule types were not found on the page; the page layout has probably changed, so the disagreements below are incomplete.` : "";
+if (warning) console.error(`warning: ${warning}`);
+// A plain "Yes" under a section note that links move guidance is shown as "Yes, with guidance (<link>)".
+const learnCell = (d) => (d.learnGuidance ? `Yes, with guidance (${d.learnGuidance})` : d.learnRaw.slice(0, 80));
 mkdirSync(outDir, { recursive: true });
 const retrievedOn = new Date().toISOString().slice(0, 10);
 const report = { retrievedOn, source, matrixRows: matrix.length, rulesChecked: loaded.rules.length, diffs, uncoveredTypesInMatrix: uncovered, ruleTypesNotInMatrix: notInMatrix };
 writeFileSync(join(outDir, "learn-diff.json"), JSON.stringify(report, null, 2) + "\n");
 const md = [
-  `# Learn move-support diff — ${retrievedOn}`, "", `Source: ${source} · matrix rows: ${matrix.length} · rules checked: ${loaded.rules.length}`, "",
+  `# Learn move-support diff — ${retrievedOn}`, "", ...(warning ? [`> **${warning}**`, ""] : []), `Source: ${source} · matrix rows: ${matrix.length} · rules checked: ${loaded.rules.length}`, "",
   `## Disagreements (${diffs.length})`, "", "| Rule | Field | Rule says | Learn says | Learn cell |", "|---|---|---|---|---|",
-  ...diffs.map((d) => `| ${d.ruleId} | ${d.field} | ${d.rule} | ${d.learn} | ${escapeTableCell(d.learnRaw.slice(0, 80))}${d.learnVariant ? ` (Learn row labelled "${escapeTableCell(d.learnVariant.slice(0, 60))}")` : ""} |`),
+  ...diffs.map((d) => `| ${d.ruleId} | ${d.field} | ${d.rule} | ${d.learn} | ${escapeTableCell(learnCell(d))}${d.learnVariant ? ` (Learn row labelled "${escapeTableCell(d.learnVariant.slice(0, 60))}")` : ""} |`),
   "", `## Resource types in the matrix without a rule (${uncovered.length})`, "", ...uncovered.slice(0, 200).map((u) => `- ${u}`),
   "", `## Rule types not found in the matrix (${notInMatrix.length})`, "", ...notInMatrix.map((u) => `- ${u}`),
   "", "Region-move disagreements are expected where a rule encodes a service-native relocation path rather than Resource Mover support. Review each row; update `scripts/author-rules.mjs`, bump `ruleVersion`, set `retrievedOn`, regenerate and re-snapshot.", "",
