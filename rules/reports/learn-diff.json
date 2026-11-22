@@ -7,24 +7,6 @@
     {
       "ruleId": "azure.compute.virtualmachines",
       "resourceType": "Microsoft.Compute/virtualMachines",
-      "field": "resourceGroupMove",
-      "rule": "supported",
-      "learn": "conditional",
-      "learnRaw": "**Yes**",
-      "learnGuidance": "https://learn.microsoft.com/en-us/azure/azure-resource-manager/management/move-limitations/virtual-machines-move-limitations"
-    },
-    {
-      "ruleId": "azure.compute.virtualmachines",
-      "resourceType": "Microsoft.Compute/virtualMachines",
-      "field": "subscriptionMove",
-      "rule": "supported",
-      "learn": "conditional",
-      "learnRaw": "**Yes**",
-      "learnGuidance": "https://learn.microsoft.com/en-us/azure/azure-resource-manager/management/move-limitations/virtual-machines-move-limitations"
-    },
-    {
-      "ruleId": "azure.compute.virtualmachines",
-      "resourceType": "Microsoft.Compute/virtualMachines",
       "field": "regionRelocation",
       "rule": "supported",
       "learn": "conditional",
@@ -91,24 +73,6 @@
       "learnRaw": "**Yes** <br/><br/> Use [Azure Resource Mover](../../resource-mover/tutorial-move-region-virtual-machines.md) to move availability sets."
     },
     {
-      "ruleId": "azure.compute.virtualmachinescalesets",
-      "resourceType": "Microsoft.Compute/virtualMachineScaleSets",
-      "field": "resourceGroupMove",
-      "rule": "supported",
-      "learn": "conditional",
-      "learnRaw": "**Yes**",
-      "learnGuidance": "https://learn.microsoft.com/en-us/azure/azure-resource-manager/management/move-limitations/virtual-machines-move-limitations"
-    },
-    {
-      "ruleId": "azure.compute.virtualmachinescalesets",
-      "resourceType": "Microsoft.Compute/virtualMachineScaleSets",
-      "field": "subscriptionMove",
-      "rule": "supported",
-      "learn": "conditional",
-      "learnRaw": "**Yes**",
-      "learnGuidance": "https://learn.microsoft.com/en-us/azure/azure-resource-manager/management/move-limitations/virtual-machines-move-limitations"
-    },
-    {
       "ruleId": "azure.compute.virtualmachines.extensions",
       "resourceType": "Microsoft.Compute/virtualMachines/extensions",
       "field": "resourceGroupMove",
@@ -154,37 +118,10 @@
     {
       "ruleId": "azure.network.networkinterfaces",
       "resourceType": "Microsoft.Network/networkInterfaces",
-      "field": "subscriptionMove",
-      "rule": "supported",
-      "learn": "conditional",
-      "learnRaw": "**Yes**",
-      "learnGuidance": "https://learn.microsoft.com/en-us/azure/azure-resource-manager/management/move-limitations/networking-move-limitations"
-    },
-    {
-      "ruleId": "azure.network.networkinterfaces",
-      "resourceType": "Microsoft.Network/networkInterfaces",
       "field": "regionRelocation",
       "rule": "supported",
       "learn": "conditional",
       "learnRaw": "**Yes** <br/><br/> Use [Azure Resource Mover](../../resource-mover/tutorial-move-region-virtual-machines.md) to move NICs."
-    },
-    {
-      "ruleId": "azure.network.virtualnetworks",
-      "resourceType": "Microsoft.Network/virtualNetworks",
-      "field": "resourceGroupMove",
-      "rule": "supported",
-      "learn": "conditional",
-      "learnRaw": "**Yes**",
-      "learnGuidance": "https://learn.microsoft.com/en-us/azure/azure-resource-manager/management/move-limitations/networking-move-limitations"
-    },
-    {
-      "ruleId": "azure.network.virtualnetworks",
-      "resourceType": "Microsoft.Network/virtualNetworks",
-      "field": "subscriptionMove",
-      "rule": "supported",
-      "learn": "conditional",
-      "learnRaw": "**Yes**",
-      "learnGuidance": "https://learn.microsoft.com/en-us/azure/azure-resource-manager/management/move-limitations/networking-move-limitations"
     },
     {
       "ruleId": "azure.network.networksecuritygroups",
@@ -387,8 +324,7 @@
     "microsoft.blueprint/blueprints",
     "microsoft.botservice/botservices",
     "microsoft.cache/redis",
-    "microsoft.cache/redisenterprise (azure cache for redis enterprise)",
-    "microsoft.cache/redisenterprise (azure managed redis)",
+    "microsoft.cache/redisenterprise",
     "microsoft.capacity/appliedreservations",
     "microsoft.capacity/calculateexchange",
     "microsoft.capacity/calculateprice",
@@ -746,7 +682,7 @@
     "microsoft.network/expressroutegateways",
     "microsoft.network/expressrouteserviceproviders",
     "microsoft.network/firewallpolicies",
-    "microsoft.network/frontdoors (this row is for front door classic tier only. for front door standard/premium, refer to microsoft.cdn/profiles)",
+    "microsoft.network/frontdoors",
     "microsoft.network/ipallocations",
     "microsoft.network/ipgroups",
     "microsoft.network/localnetworkgateways",
@@ -775,9 +711,9 @@
     "microsoft.network/virtualnetworktaps",
     "microsoft.network/virtualrouters",
     "microsoft.network/virtualwans",
-    "microsoft.network/vpngateways (virtual wan)",
+    "microsoft.network/vpngateways",
     "microsoft.network/vpnserverconfigurations",
-    "microsoft.network/vpnsites (virtual wan)",
+    "microsoft.network/vpnsites",
     "microsoft.notificationhubs/namespaces",
     "microsoft.notificationhubs/namespaces/notificationhubs",
     "microsoft.objectstore/osnamespaces",
@@ -987,7 +923,6 @@
     "microsoft.web/availablestacks",
     "microsoft.web/billingmeters",
     "microsoft.web/certificates",
-    "microsoft.web/certificates (managed)",
     "microsoft.web/connectiongateways",
     "microsoft.web/connections",
     "microsoft.web/customapis",
