@@ -273,7 +273,9 @@ test("when Learn lists a type on two plain rows, the diff uses the first", () =>
 `;
   const vm = loadRules(defaultRulesDir()).rules.find((r) => r.resourceType === "Microsoft.Compute/virtualMachines");
   assert.ok(vm, "the corpus has a virtual machine rule");
-  const rule = { ...vm, support: { ...vm.support, regionRelocation: "unsupported" as const } };
+  // Only the region column is under test. Resource group and subscription are pinned to match the fixture's plain "Yes", so the
+  // test does not depend on the corpus: the real rule says "conditional" for both since #136.
+  const rule = { ...vm, support: { ...vm.support, resourceGroupMove: "supported" as const, subscriptionMove: "supported" as const, regionRelocation: "unsupported" as const } };
   const { diffs } = diffRulesAgainstMatrix([rule], parseLearnMoveSupport(twice));
   assert.deepEqual(diffs.map((d) => [d.field, d.learn]), [["regionRelocation", "conditional"]], "compared with the first row, not the last");
   assert.ok(!("learnVariant" in diffs[0]), "a diff from a plain row has no learnVariant key");
