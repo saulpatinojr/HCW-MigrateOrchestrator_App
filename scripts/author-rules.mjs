@@ -13,7 +13,13 @@ const REVIEW = "2027-04-03";
 // that were re-read, a 1.1.0 ruleVersion and a review date six months on. The other rules keep RETRIEVED and REVIEW.
 const RECHECKED = "2026-11-16";
 const RECHECKED_REVIEW = "2027-05-16";
+// Rules re-checked on 2026-11-22 against the move-guidance pages the Learn move-support sections link (the first weekly
+// report after the parser fix, PR #135): the same 1.1.0 version, these dates, and the guidance page as a source.
+const GUIDED = "2026-11-22";
+const GUIDED_REVIEW = "2027-05-22";
 const L = (path) => `https://learn.microsoft.com/azure/${path}`;
+const VM_MOVE_GUIDE = { title: "Handling special cases when moving virtual machines to resource group or subscription", url: L("azure-resource-manager/management/move-limitations/virtual-machines-move-limitations"), retrievedOn: GUIDED };
+const NET_MOVE_GUIDE = { title: "Move networking resources to new resource group or subscription", url: L("azure-resource-manager/management/move-limitations/networking-move-limitations"), retrievedOn: GUIDED };
 const SRC = {
   move: { title: "Move operation support for resources", url: L("azure-resource-manager/management/move-support-resources") },
   moveHowTo: { title: "Move resources to a new resource group or subscription", url: L("azure-resource-manager/management/move-resource-group-and-subscription") },
@@ -87,18 +93,27 @@ const S = (rg, sub, region, xt) => ({ resourceGroupMove: rg, subscriptionMove: s
 
 const rules = [
   rule("azure.compute.virtualmachines", "Microsoft.Compute/virtualMachines", {
-    support: S("supported", "supported", "supported", "unsupported"),
+    version: "1.1.0", reviewDate: GUIDED_REVIEW, retrieved: { move: GUIDED },
+    support: S("conditional", "conditional", "supported", "unsupported"),
     pattern: NATIVE,
     region: MOVER,
     alternatives: ["azure-migrate", "backup-and-restore", "terraform-redeploy"],
-    sources: ["move", "moverVm", "mover", "transfer"],
-    features: ["VMs with Azure Site Recovery replication, Azure Backup protection, or marketplace plans need the protection removed or the plan accepted before move", "Resource Mover requires managed disks; unmanaged disks are not supported"],
+    sources: ["move", "moverVm", "mover", "transfer", VM_MOVE_GUIDE],
+    features: [
+      "VMs with Azure Site Recovery replication, Azure Backup protection, or marketplace plans need the protection removed or the plan accepted before move",
+      "Resource Mover requires managed disks; unmanaged disks are not supported",
+      "Low-priority virtual machines and virtual machines using scheduled patching can't be moved to another resource group or subscription.",
+      "A virtual machine in an availability set can't be moved on its own; move the set with all its virtual machines.",
+      "A virtual machine created from a Marketplace image with a plan can't be moved to another subscription; redeploy it there from a cloned OS disk after accepting the plan's terms.",
+      "A virtual machine with Azure Disk Encryption moves to another resource group only while deallocated, and to another subscription only after encryption is disabled.",
+      "A virtual machine in an existing virtual network moves to another subscription only together with the virtual network and all its dependent resources.",
+    ],
     prerequisites: ["Dependent NICs, disks, VNet, NSG and public IPs move together or already exist at the destination", "Stop Azure Backup/ASR protection before the move; re-enable afterwards"],
     risks: ["VM must be deallocated for a region move; public IP address changes", "Extensions and boot diagnostics storage must be re-pointed"],
     mitigations: ["Schedule within the downtime window; pre-stage DNS TTL reductions"],
     validation: ["VM boots and agent reports Ready", "Disk count/size match", "NSG/route effective rules match", "Application smoke test"],
     rollback: ["Resource Mover: discard the move and restore source; ARM move: move back to the source scope"],
-    notes: ["Azure Site Recovery is listed only as the DR mechanism for the migrated VM, never as the migration tool."],
+    notes: ["Azure Site Recovery is listed only as the DR mechanism for the migrated VM, never as the migration tool.", "Resource group and subscription moves: Learn's move-support page sends virtual machines to its special-cases guidance, which lists configurations that can't be moved or need extra steps (2026-11-22)."],
     confidence: 0.85,
   }),
   rule("azure.compute.disks", "Microsoft.Compute/disks", {
@@ -127,10 +142,19 @@ const rules = [
     pattern: NATIVE, region: MOVER, alternatives: ["terraform-redeploy"], sources: ["move", "moverVm"],
   }),
   rule("azure.compute.virtualmachinescalesets", "Microsoft.Compute/virtualMachineScaleSets", {
-    support: S("supported", "supported", "unsupported", "unsupported"),
+    version: "1.1.0", reviewDate: GUIDED_REVIEW, retrieved: { move: GUIDED },
+    support: S("conditional", "conditional", "unsupported", "unsupported"),
     pattern: NATIVE, region: RECREATE_REDEPLOY,
     alternatives: ["terraform-redeploy", "azure-migrate"],
+    sources: ["move", "moveHowTo", VM_MOVE_GUIDE],
+    features: [
+      "A scale set with a Standard SKU load balancer or a Standard SKU public IP address can't be moved; redeploy it in the destination.",
+      "A low-priority scale set can't be moved to another resource group or subscription.",
+    ],
+    notes: ["Resource group and subscription moves: Learn's virtual machine move guidance says scale sets with a Standard SKU load balancer or Standard SKU public IP can't be moved (2026-11-22). Basic SKU load balancers and public IPs are retired, so most scale sets behind either one need a redeploy."],
     risks: ["Region relocation requires recreating the scale set and redeploying the image/model"],
+    // Conditional on the load balancer and public IP SKUs, which the inventory does not carry: a person confirms them.
+    humanReview: true,
     confidence: 0.75,
   }),
   rule("azure.compute.virtualmachines.extensions", "Microsoft.Compute/virtualMachines/extensions", {
@@ -142,15 +166,25 @@ const rules = [
     notes: ["Child resource: moves with the parent VM. Re-apply after a region move."],
   }),
   rule("azure.network.networkinterfaces", "Microsoft.Network/networkInterfaces", {
-    support: S("supported", "supported", "supported", "unsupported"),
-    pattern: NATIVE, region: MOVER, alternatives: ["terraform-redeploy"], sources: ["move", "moverVm"],
-    features: ["Private IP addresses are re-allocated at the destination unless statically configured in the target subnet range"],
+    version: "1.1.0", reviewDate: GUIDED_REVIEW, retrieved: { move: GUIDED },
+    support: S("supported", "conditional", "supported", "unsupported"),
+    pattern: NATIVE, region: MOVER, alternatives: ["terraform-redeploy"], sources: ["move", "moverVm", NET_MOVE_GUIDE],
+    features: ["Private IP addresses are re-allocated at the destination unless statically configured in the target subnet range", "A network interface associated with a Standard SKU public IP address can't be moved to another subscription until the address is disassociated."],
+    prerequisites: ["Subscription move: move the virtual network of the network interface and every other network interface in that virtual network in the same operation"],
+    notes: ["Subscription move: Learn's networking move guidance requires the whole virtual network and all its network interfaces to move together, and blocks anything associated with a Standard SKU public IP address (2026-11-22)."],
   }),
   rule("azure.network.virtualnetworks", "Microsoft.Network/virtualNetworks", {
-    support: S("supported", "supported", "supported", "unsupported"),
+    version: "1.1.0", reviewDate: GUIDED_REVIEW, retrieved: { move: GUIDED },
+    support: S("conditional", "conditional", "supported", "unsupported"),
     pattern: NATIVE, region: MOVER,
     alternatives: ["terraform-redeploy"],
-    sources: ["move", "mover", { title: "Relocate Azure Virtual Network to another region", url: L("operational-excellence/relocation-virtual-network") }],
+    sources: ["move", "mover", { title: "Relocate Azure Virtual Network to another region", url: L("operational-excellence/relocation-virtual-network") }, NET_MOVE_GUIDE],
+    features: [
+      "A peered virtual network moves only after its peering is disabled; re-enable the peering after the move.",
+      "A virtual network with a subnet that has a resource navigation link (for example a subnet with Azure Databricks deployed into it) can't be moved to another subscription.",
+      "Moving the virtual network of an AKS cluster stops the cluster working.",
+    ],
+    notes: ["Resource group and subscription moves: Learn's networking move guidance lists peering, subnet navigation links and AKS as limits (2026-11-22)."],
     prerequisites: ["All VNet peerings must be removed before a move and re-established afterwards", "Subnets with delegations, service endpoints or private endpoints require the dependent services to be handled first"],
     risks: ["Address space collisions with existing destination networks/hub", "Peering, UDR and DNS settings are not carried by an ARM move"],
     validation: ["Address space, subnets, NSG/UDR associations, peering state, DNS servers"],

@@ -198,7 +198,9 @@ test("diff against the real corpus surfaces disagreements and uncovered types wi
   const loaded = loadRules(defaultRulesDir());
   const { diffs, uncovered } = diffRulesAgainstMatrix(loaded.rules, parseLearnMoveSupport(FIXTURE));
   assert.ok(!diffs.some((d) => d.ruleId === "azure.storage.storageaccounts"), "storage rule agrees with fixture");
-  assert.ok(!diffs.some((d) => d.ruleId === "azure.compute.virtualmachinescalesets"));
+  // A plain "Yes, Yes" row against a rule that says supported, supported. (Scale sets were the example until their rule became
+  // conditional on 2026-11-22, under the guidance note that this fixture leaves out.)
+  assert.ok(!diffs.some((d) => d.ruleId === "azure.compute.availabilitysets" && d.field !== "regionRelocation"));
   assert.ok(uncovered.includes("microsoft.storage/storageaccounts/tableservices"));
   assert.ok(!uncovered.includes("microsoft.storage/storageaccounts/something"), "pending rows are not actionable");
 });

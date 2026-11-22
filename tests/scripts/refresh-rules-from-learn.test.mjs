@@ -44,7 +44,7 @@ test("a quoted table, as on the live Learn page, produces a report with rows", (
 });
 
 test("a plain Yes under a guidance note is reported as 'Yes, with guidance' with the absolute Learn link", () => {
-  // azure.compute.virtualmachines in rules/azure says resource group move is supported; under the note Learn's Yes is conditional.
+  // azure.compute.disks in rules/azure says resource group move is supported; under the note Learn's Yes is conditional.
   const { status, md } = run(`## Microsoft.Compute
 
 > [!IMPORTANT]
@@ -53,10 +53,10 @@ test("a plain Yes under a guidance note is reported as 'Yes, with guidance' with
 > [!div class="mx-tableFixed"]
 > | Resource type | Resource group | Subscription | Region move |
 > | ------------- | ----------- | ---------- | ----------- |
-> | virtualmachines | **Yes** | **Yes** | **Yes** <br/><br/> Use Azure Resource Mover. |
+> | disks | **Yes** | **Yes** | **Yes** <br/><br/> Use Azure Resource Mover. |
 `);
   assert.equal(status, 0);
-  assert.match(md, /\| azure\.compute\.virtualmachines \| resourceGroupMove \| supported \| conditional \| Yes, with guidance \(https:\/\/learn\.microsoft\.com\/en-us\/azure\/azure-resource-manager\/management\/move-limitations\/virtual-machines-move-limitations\) \|/);
+  assert.match(md, /\| azure\.compute\.disks \| resourceGroupMove \| supported \| conditional \| Yes, with guidance \(https:\/\/learn\.microsoft\.com\/en-us\/azure\/azure-resource-manager\/management\/move-limitations\/virtual-machines-move-limitations\) \|/);
 });
 
 test("a page that matches few of the rule types gets a warning at the top of the report", () => {
