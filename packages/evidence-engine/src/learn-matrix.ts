@@ -80,6 +80,24 @@ const guidanceIn = (notes: string[][]): LearnMatrixRow["guidance"] => {
   return undefined;
 };
 
+/**
+ * Drops `<!-- … -->` comments in one pass from left to right. An unclosed `<!--` hides the rest of the text, as it does in a
+ * browser. A scan rather than a regular expression, so that text with many unclosed openings is not read in time that grows
+ * with the square of its length (CodeQL alert 27).
+ */
+function withoutHtmlComments(text: string): string {
+  let out = "";
+  let from = 0;
+  for (;;) {
+    const open = text.indexOf("<!--", from);
+    if (open < 0) return out + text.slice(from);
+    out += text.slice(from, open);
+    const close = text.indexOf("-->", open + 4);
+    if (close < 0) return out;
+    from = close + 3;
+  }
+}
+
 export function parseLearnMoveSupport(markdown: string): LearnMatrixRow[] {
   const rows: LearnMatrixRow[] = [];
   let provider = "";
@@ -88,7 +106,7 @@ export function parseLearnMoveSupport(markdown: string): LearnMatrixRow[] {
   let readingNote = false;
   let guidance: LearnMatrixRow["guidance"];
   // HTML comments are not rendered on Learn; the Microsoft.Maintenance section keeps an old, contradicting table in one.
-  const visible = markdown.replace(/<!--[\s\S]*?-->/g, "");
+  const visible = withoutHtmlComments(markdown);
   for (const rawLine of visible.split(/\r?\n/)) {
     const quoted = /^\s*>/.test(rawLine);
     const line = unquote(rawLine);

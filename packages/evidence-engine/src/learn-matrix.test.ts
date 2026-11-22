@@ -277,3 +277,22 @@ test("a separator row with alignment colons is not read as a resource type", () 
   const rows = parseLearnMoveSupport("## Microsoft.Storage\n\n| Resource type | Resource group | Subscription | Region move |\n| :--- | :---: | ---: | --- |\n| storageaccounts | Yes | Yes | No |\n");
   assert.deepEqual(rows.map((r) => r.resourceType), ["microsoft.storage/storageaccounts"]);
 });
+
+test("an unclosed HTML comment hides the rest of the page, as a browser does", () => {
+  const rows = parseLearnMoveSupport(`## Microsoft.Storage
+
+| Resource type | Resource group | Subscription | Region move |
+| --- | --- | --- | --- |
+| storageaccounts | Yes | Yes | No |
+<!-- an old note that was never closed
+| blobservices | Yes | Yes | No |
+`);
+  assert.deepEqual(rows.map((r) => r.resourceType), ["microsoft.storage/storageaccounts"]);
+});
+
+test("removing HTML comments takes time in proportion to the page, even with many unclosed openings (CodeQL alert 27)", { timeout: 5000 }, () => {
+  // A regex that searches for "-->" from every "<!--" takes time in the square of the length: 40,000 openings took 3.6 s.
+  const started = performance.now();
+  assert.deepEqual(parseLearnMoveSupport("<!--".repeat(200_000)), []);
+  assert.ok(performance.now() - started < 2000, "200,000 unclosed openings are read in well under two seconds");
+});
