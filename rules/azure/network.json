@@ -410,7 +410,7 @@
   },
   {
     "ruleId": "azure.network.publicipaddresses",
-    "ruleVersion": "1.0.0",
+    "ruleVersion": "1.1.0",
     "provider": "Microsoft.Network",
     "resourceType": "Microsoft.Network/publicIPAddresses",
     "applicableApiVersions": [
@@ -441,7 +441,7 @@
     "tenantApplicability": "any",
     "support": {
       "resourceGroupMove": "supported",
-      "subscriptionMove": "supported",
+      "subscriptionMove": "conditional",
       "regionRelocation": "conditional",
       "crossTenant": "unsupported"
     },
@@ -479,7 +479,7 @@
       {
         "title": "Move operation support for resources",
         "url": "https://learn.microsoft.com/azure/azure-resource-manager/management/move-support-resources",
-        "retrievedOn": "2026-10-03"
+        "retrievedOn": "2026-11-16"
       },
       {
         "title": "Azure Resource Mover overview",
@@ -490,9 +490,14 @@
         "title": "Public IP addresses in Azure",
         "url": "https://learn.microsoft.com/azure/virtual-network/ip-services/public-ip-addresses",
         "retrievedOn": "2026-10-03"
+      },
+      {
+        "title": "Move networking resources to new resource group or subscription",
+        "url": "https://learn.microsoft.com/azure/azure-resource-manager/management/move-limitations/networking-move-limitations",
+        "retrievedOn": "2026-11-16"
       }
     ],
-    "reviewDate": "2027-04-03",
+    "reviewDate": "2027-05-16",
     "confidence": 0.8,
     "exceptions": [],
     "requiredEvidence": [
@@ -513,11 +518,14 @@
       "Direct cross-tenant move is not an ARM operation; the supported native path is transferring the whole subscription to the destination directory, after which tenant-bound objects (role assignments, managed identities, Key Vault access, Entra-integrated auth) must be rebuilt.",
       "If the subscription cannot be transferred, recreate in the destination tenant and migrate data separately."
     ],
-    "precedence": 10
+    "precedence": 10,
+    "notes": [
+      "Subscription move: Learn says a resource associated with a Standard SKU public IP address can't be moved across subscriptions; disassociate the address first (2026-11-16)."
+    ]
   },
   {
     "ruleId": "azure.network.loadbalancers",
-    "ruleVersion": "1.0.0",
+    "ruleVersion": "1.1.0",
     "provider": "Microsoft.Network",
     "resourceType": "Microsoft.Network/loadBalancers",
     "applicableApiVersions": [
@@ -551,7 +559,7 @@
     "tenantApplicability": "any",
     "support": {
       "resourceGroupMove": "supported",
-      "subscriptionMove": "supported",
+      "subscriptionMove": "conditional",
       "regionRelocation": "conditional",
       "crossTenant": "unsupported"
     },
@@ -589,7 +597,7 @@
       {
         "title": "Move operation support for resources",
         "url": "https://learn.microsoft.com/azure/azure-resource-manager/management/move-support-resources",
-        "retrievedOn": "2026-10-03"
+        "retrievedOn": "2026-11-16"
       },
       {
         "title": "Azure Resource Mover overview",
@@ -597,13 +605,13 @@
         "retrievedOn": "2026-10-03"
       }
     ],
-    "reviewDate": "2027-04-03",
+    "reviewDate": "2027-05-16",
     "confidence": 0.75,
     "exceptions": [],
     "requiredEvidence": [
       "Confirm the resource's current configuration via authenticated inspection before relying on this rule."
     ],
-    "humanReviewRequired": false,
+    "humanReviewRequired": true,
     "prerequisites": [],
     "risks": [],
     "mitigations": [],
@@ -613,7 +621,10 @@
       "Direct cross-tenant move is not an ARM operation; the supported native path is transferring the whole subscription to the destination directory, after which tenant-bound objects (role assignments, managed identities, Key Vault access, Entra-integrated auth) must be rebuilt.",
       "If the subscription cannot be transferred, recreate in the destination tenant and migrate data separately."
     ],
-    "precedence": 10
+    "precedence": 10,
+    "notes": [
+      "Subscription move: Learn lists Basic SKU as Yes and Standard SKU as No (2026-11-16); for a Standard load balancer plan a redeploy in the destination subscription."
+    ]
   },
   {
     "ruleId": "azure.network.routetables",
@@ -714,7 +725,7 @@
   },
   {
     "ruleId": "azure.network.natgateways",
-    "ruleVersion": "1.0.0",
+    "ruleVersion": "1.1.0",
     "provider": "Microsoft.Network",
     "resourceType": "Microsoft.Network/natGateways",
     "applicableApiVersions": [
@@ -744,19 +755,19 @@
     "destinationRegion": "any",
     "tenantApplicability": "any",
     "support": {
-      "resourceGroupMove": "supported",
-      "subscriptionMove": "supported",
+      "resourceGroupMove": "unsupported",
+      "subscriptionMove": "unsupported",
       "regionRelocation": "unsupported",
       "crossTenant": "unsupported"
     },
     "recommendedPattern": {
-      "disposition": "native-move",
-      "tool": "arm-move",
-      "infrastructure": "move-with-resource",
-      "configuration": "move-with-resource",
-      "identity": "move-with-resource",
-      "data": "move-with-resource",
-      "expectedDowntime": "none"
+      "disposition": "recreate-only",
+      "tool": "terraform-redeploy",
+      "infrastructure": "recreate",
+      "configuration": "reconstruct",
+      "identity": "reconstruct",
+      "data": "not-applicable",
+      "expectedDowntime": "minutes"
     },
     "regionRelocationPattern": {
       "disposition": "recreate-only",
@@ -783,7 +794,7 @@
       {
         "title": "Move operation support for resources",
         "url": "https://learn.microsoft.com/azure/azure-resource-manager/management/move-support-resources",
-        "retrievedOn": "2026-10-03"
+        "retrievedOn": "2026-11-16"
       },
       {
         "title": "Move resources to a new resource group or subscription",
@@ -791,7 +802,7 @@
         "retrievedOn": "2026-10-03"
       }
     ],
-    "reviewDate": "2027-04-03",
+    "reviewDate": "2027-05-16",
     "confidence": 0.7,
     "exceptions": [],
     "requiredEvidence": [
@@ -809,11 +820,14 @@
       "Direct cross-tenant move is not an ARM operation; the supported native path is transferring the whole subscription to the destination directory, after which tenant-bound objects (role assignments, managed identities, Key Vault access, Entra-integrated auth) must be rebuilt.",
       "If the subscription cannot be transferred, recreate in the destination tenant and migrate data separately."
     ],
-    "precedence": 10
+    "precedence": 10,
+    "notes": [
+      "Learn lists NAT gateways as not movable to another resource group, subscription or region (2026-11-16): recreate in the destination."
+    ]
   },
   {
     "ruleId": "azure.network.applicationgateways",
-    "ruleVersion": "1.0.0",
+    "ruleVersion": "1.1.0",
     "provider": "Microsoft.Network",
     "resourceType": "Microsoft.Network/applicationGateways",
     "applicableApiVersions": [
@@ -843,19 +857,19 @@
     "destinationRegion": "any",
     "tenantApplicability": "any",
     "support": {
-      "resourceGroupMove": "supported",
-      "subscriptionMove": "supported",
+      "resourceGroupMove": "unsupported",
+      "subscriptionMove": "unsupported",
       "regionRelocation": "unsupported",
       "crossTenant": "unsupported"
     },
     "recommendedPattern": {
-      "disposition": "native-move",
-      "tool": "arm-move",
-      "infrastructure": "move-with-resource",
-      "configuration": "move-with-resource",
-      "identity": "move-with-resource",
-      "data": "move-with-resource",
-      "expectedDowntime": "none"
+      "disposition": "recreate-only",
+      "tool": "terraform-redeploy",
+      "infrastructure": "recreate",
+      "configuration": "reconstruct",
+      "identity": "reconstruct",
+      "data": "not-applicable",
+      "expectedDowntime": "minutes"
     },
     "regionRelocationPattern": {
       "disposition": "recreate-only",
@@ -882,7 +896,7 @@
       {
         "title": "Move operation support for resources",
         "url": "https://learn.microsoft.com/azure/azure-resource-manager/management/move-support-resources",
-        "retrievedOn": "2026-10-03"
+        "retrievedOn": "2026-11-16"
       },
       {
         "title": "Move resources to a new resource group or subscription",
@@ -890,7 +904,7 @@
         "retrievedOn": "2026-10-03"
       }
     ],
-    "reviewDate": "2027-04-03",
+    "reviewDate": "2027-05-16",
     "confidence": 0.75,
     "exceptions": [],
     "requiredEvidence": [
@@ -908,11 +922,14 @@
       "Direct cross-tenant move is not an ARM operation; the supported native path is transferring the whole subscription to the destination directory, after which tenant-bound objects (role assignments, managed identities, Key Vault access, Entra-integrated auth) must be rebuilt.",
       "If the subscription cannot be transferred, recreate in the destination tenant and migrate data separately."
     ],
-    "precedence": 10
+    "precedence": 10,
+    "notes": [
+      "Learn lists application gateways as not movable to another resource group, subscription or region (2026-11-16): recreate in the destination."
+    ]
   },
   {
     "ruleId": "azure.network.privateendpoints",
-    "ruleVersion": "1.0.0",
+    "ruleVersion": "1.1.0",
     "provider": "Microsoft.Network",
     "resourceType": "Microsoft.Network/privateEndpoints",
     "applicableApiVersions": [
@@ -942,8 +959,8 @@
     "destinationRegion": "any",
     "tenantApplicability": "any",
     "support": {
-      "resourceGroupMove": "supported",
-      "subscriptionMove": "supported",
+      "resourceGroupMove": "conditional",
+      "subscriptionMove": "conditional",
       "regionRelocation": "unsupported",
       "crossTenant": "unsupported"
     },
@@ -981,21 +998,26 @@
       {
         "title": "Move operation support for resources",
         "url": "https://learn.microsoft.com/azure/azure-resource-manager/management/move-support-resources",
-        "retrievedOn": "2026-10-03"
+        "retrievedOn": "2026-11-16"
       },
       {
         "title": "Relocate Azure Private Link Service / private endpoints",
         "url": "https://learn.microsoft.com/azure/operational-excellence/relocation-private-link",
         "retrievedOn": "2026-10-03"
+      },
+      {
+        "title": "Move networking resources to new resource group or subscription",
+        "url": "https://learn.microsoft.com/azure/azure-resource-manager/management/move-limitations/networking-move-limitations",
+        "retrievedOn": "2026-11-16"
       }
     ],
-    "reviewDate": "2027-04-03",
+    "reviewDate": "2027-05-16",
     "confidence": 0.8,
     "exceptions": [],
     "requiredEvidence": [
       "Confirm the resource's current configuration via authenticated inspection before relying on this rule."
     ],
-    "humanReviewRequired": false,
+    "humanReviewRequired": true,
     "prerequisites": [
       "The target PaaS resource must already exist in the destination; the private endpoint is recreated against it",
       "Private DNS zone group records must be regenerated"
@@ -1010,7 +1032,10 @@
       "Direct cross-tenant move is not an ARM operation; the supported native path is transferring the whole subscription to the destination directory, after which tenant-bound objects (role assignments, managed identities, Key Vault access, Entra-integrated auth) must be rebuilt.",
       "If the subscription cannot be transferred, recreate in the destination tenant and migrate data separately."
     ],
-    "precedence": 10
+    "precedence": 10,
+    "notes": [
+      "Resource group and subscription moves: Learn allows them only for private endpoints of the listed private-link resources (for example Microsoft.Sql/servers and Microsoft.DocumentDB/databaseAccounts); all other private endpoints are recreated (2026-11-16)."
+    ]
   },
   {
     "ruleId": "azure.network.privatednszones",

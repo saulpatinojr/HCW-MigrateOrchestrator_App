@@ -1,12 +1,12 @@
 {
-  "snapshotVersion": "1.0.35",
-  "createdAt": "2026-10-03T21:14:07.150Z",
+  "snapshotVersion": "1.1.35",
+  "createdAt": "2026-11-21T23:54:55.847Z",
   "ruleCount": 35,
-  "checksum": "f5794584ade134f86ae39722a520f01bb1fb648a7767e0c7d23a960e32ed888f",
+  "checksum": "f8c22fdf169ba50c2bfde12c6d67f2f31b0749b7350e3f95f33891ad883674ac",
   "files": [
     {
       "path": "azure/compute.json",
-      "sha256": "18b7d33f85a1ff81bc3ce6ef74aa37ceeee46680969ec62f13dc35245418e444",
+      "sha256": "89677f591e1b470089ce43dd9a808a1d6f6cde46f06d0e376cea84d8afc0c6fd",
       "ruleIds": [
         "azure.compute.virtualmachines",
         "azure.compute.disks",
@@ -39,7 +39,7 @@
     },
     {
       "path": "azure/insights.json",
-      "sha256": "d92dd07fb6c73ba515191e6302021da2f01f3180e877d31ab61938901b1d2eb7",
+      "sha256": "d26f3540e6d90530dc7b4580c94ee32147b0e0aca3e8a84320892014b07daacb",
       "ruleIds": [
         "azure.insights.components",
         "azure.insights.actiongroups",
@@ -55,14 +55,14 @@
     },
     {
       "path": "azure/managedidentity.json",
-      "sha256": "7d15f649d898b8a8d53847a38380ef6f5c8f0ed7822467939ce6a5bb74635e24",
+      "sha256": "4c7fa00b2e959839cf2077ca814f49db6e92bfddeee8298c8a46f8afb460c8e5",
       "ruleIds": [
         "azure.managedidentity.userassignedidentities"
       ]
     },
     {
       "path": "azure/network.json",
-      "sha256": "9ac98196d9508d805d1daf31572837374c2ad6f608f42619df4babd304074bbe",
+      "sha256": "113d916374826d47fcf742caf982e449ec010bc0f6cc58d35c3de70134767b88",
       "ruleIds": [
         "azure.network.networkinterfaces",
         "azure.network.virtualnetworks",
@@ -100,7 +100,7 @@
     },
     {
       "path": "azure/sql.json",
-      "sha256": "35e22bd7f19f6f82ff4a76211e40b3e00d5e30d36e1376280b13d84f72e33eff",
+      "sha256": "6ca2a4fdb66e66da9ea89a91cdf8e4133c2c570f1018e360fb08e594c6077b2a",
       "ruleIds": [
         "azure.sql.servers",
         "azure.sql.servers.databases"

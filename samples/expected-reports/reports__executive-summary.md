@@ -7,7 +7,7 @@
 - Assessment ID: `<assessment-id>`
 - Generated: 2026-10-03T12:00:00.000Z
 - Input hash (sha256): `fa6cba1f71b04dc1ba86fc9326e5c843734f480b72a057685408cd9b67364c33`
-- Rules: 1.0.35 (checksum `<rules-checksum>`)
+- Rules: 1.1.35 (checksum `<rules-checksum>`)
 - Operation assessed: **region-relocation** → westus3
 - Authenticated against Azure: **no**
 
@@ -29,7 +29,7 @@
 
 ## Key blockers
 
-- Rule requires human review before this disposition is accepted. (5)
+- Rule requires human review before this disposition is accepted. (7)
 - No rule coverage: disposition cannot be determined automatically. (1)
 
 ## Assumptions from the questionnaire

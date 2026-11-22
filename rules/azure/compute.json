@@ -235,7 +235,7 @@
   },
   {
     "ruleId": "azure.compute.snapshots",
-    "ruleVersion": "1.0.0",
+    "ruleVersion": "1.1.0",
     "provider": "Microsoft.Compute",
     "resourceType": "Microsoft.Compute/snapshots",
     "applicableApiVersions": [
@@ -265,8 +265,8 @@
     "destinationRegion": "any",
     "tenantApplicability": "any",
     "support": {
-      "resourceGroupMove": "supported",
-      "subscriptionMove": "supported",
+      "resourceGroupMove": "conditional",
+      "subscriptionMove": "conditional",
       "regionRelocation": "conditional",
       "crossTenant": "unsupported"
     },
@@ -304,7 +304,7 @@
       {
         "title": "Move operation support for resources",
         "url": "https://learn.microsoft.com/azure/azure-resource-manager/management/move-support-resources",
-        "retrievedOn": "2026-10-03"
+        "retrievedOn": "2026-11-16"
       },
       {
         "title": "Move resources to a new resource group or subscription",
@@ -312,13 +312,13 @@
         "retrievedOn": "2026-10-03"
       }
     ],
-    "reviewDate": "2027-04-03",
+    "reviewDate": "2027-05-16",
     "confidence": 0.75,
     "exceptions": [],
     "requiredEvidence": [
       "Confirm the resource's current configuration via authenticated inspection before relying on this rule."
     ],
-    "humanReviewRequired": false,
+    "humanReviewRequired": true,
     "prerequisites": [],
     "risks": [],
     "mitigations": [],
@@ -330,7 +330,8 @@
     ],
     "precedence": 10,
     "notes": [
-      "Region copy uses incremental snapshot copy (az snapshot create --copy-start) or SAS export/import."
+      "Region copy uses incremental snapshot copy (az snapshot create --copy-start) or SAS export/import.",
+      "Resource group and subscription moves: Learn lists full snapshots as movable and incremental snapshots as not movable (2026-11-16)."
     ]
   },
   {
@@ -532,7 +533,7 @@
   },
   {
     "ruleId": "azure.compute.virtualmachines.extensions",
-    "ruleVersion": "1.0.0",
+    "ruleVersion": "1.1.0",
     "provider": "Microsoft.Compute",
     "resourceType": "Microsoft.Compute/virtualMachines/extensions",
     "applicableApiVersions": [
@@ -564,7 +565,7 @@
     "support": {
       "resourceGroupMove": "supported",
       "subscriptionMove": "supported",
-      "regionRelocation": "supported",
+      "regionRelocation": "unsupported",
       "crossTenant": "unsupported"
     },
     "recommendedPattern": {
@@ -601,7 +602,7 @@
       {
         "title": "Move operation support for resources",
         "url": "https://learn.microsoft.com/azure/azure-resource-manager/management/move-support-resources",
-        "retrievedOn": "2026-10-03"
+        "retrievedOn": "2026-11-16"
       },
       {
         "title": "Move resources to a new resource group or subscription",
@@ -609,7 +610,7 @@
         "retrievedOn": "2026-10-03"
       }
     ],
-    "reviewDate": "2027-04-03",
+    "reviewDate": "2027-05-16",
     "confidence": 0.8,
     "exceptions": [],
     "requiredEvidence": [
