@@ -80,10 +80,10 @@
 - Type: `Microsoft.Network/virtualNetworks` · Region: eastus · RG: hcw-sample-rg-billing-prod-eus · Application group: billing
 - Disposition: **native-move** via **azure-resource-mover** (alternatives: terraform-redeploy)
 - Paths — infrastructure: recreate; configuration: reconstruct; identity: reconstruct; data: replicate
-- Support — RG move: supported; subscription move: supported; region: supported; target region/SKU availability: unknown/unknown
+- Support — RG move: conditional; subscription move: conditional; region: supported; target region/SKU availability: unknown/unknown
 - Expected downtime: minutes; RTO/RPO compatibility: unknown/unknown; sequence: 16
 - Confidence: medium (0.74) — rule confidence 0.85; capped at 0.74: inventory-only evidence cannot yield high confidence
-- Rule: azure.network.virtualnetworks v1.0.0 · reason codes: RULE_MATCH, REGION_MOVE_SUPPORTED · human approval: required
+- Rule: azure.network.virtualnetworks v1.1.0 · reason codes: RULE_MATCH, REGION_MOVE_SUPPORTED · human approval: required
 
 **Dependencies**
 - child → hcw-sample-snet-app [discovered]
@@ -95,6 +95,9 @@
 **Risks**
 - Address space collisions with existing destination networks/hub
 - Peering, UDR and DNS settings are not carried by an ARM move
+- Constraint: A peered virtual network moves only after its peering is disabled; re-enable the peering after the move.
+- Constraint: A virtual network with a subnet that has a resource navigation link (for example a subnet with Azure Databricks deployed into it) can't be moved to another subscription.
+- Constraint: Moving the virtual network of an AKS cluster stops the cluster working.
 
 **Validation**
 - Address space, subnets, NSG/UDR associations, peering state, DNS servers
@@ -114,9 +117,11 @@
 - [observed-from-csv] subscriptionName = hcw-sample-prod
 - [observed-from-csv] tags = {"application":"billing","environment":"prod"}
 - [requires-authenticated-validation] Analysis is based on an exported inventory only; configuration-dependent conclusions must be validated against the live environment.
-- [general-rule] Move operation support for resources (https://learn.microsoft.com/azure/azure-resource-manager/management/move-support-resources, 2026-10-03)
+- [general-rule] Move operation support for resources (https://learn.microsoft.com/azure/azure-resource-manager/management/move-support-resources, 2026-11-22)
 - [general-rule] Azure Resource Mover overview (https://learn.microsoft.com/azure/resource-mover/overview, 2026-10-03)
 - [general-rule] Relocate Azure Virtual Network to another region (https://learn.microsoft.com/azure/operational-excellence/relocation-virtual-network, 2026-10-03)
+- [general-rule] Move networking resources to new resource group or subscription (https://learn.microsoft.com/azure/azure-resource-manager/management/move-limitations/networking-move-limitations, 2026-11-22)
+- [general-rule] Resource group and subscription moves: Learn's networking move guidance lists peering, subnet navigation links and AKS as limits (2026-11-22).
 
 **Assumptions**
 - Questionnaire field 'migrationMode' was not supplied; default used.
@@ -312,18 +317,22 @@
 - Type: `Microsoft.Network/networkInterfaces` · Region: eastus · RG: hcw-sample-rg-billing-prod-eus · Application group: billing
 - Disposition: **native-move** via **azure-resource-mover** (alternatives: terraform-redeploy)
 - Paths — infrastructure: recreate; configuration: reconstruct; identity: reconstruct; data: replicate
-- Support — RG move: supported; subscription move: supported; region: supported; target region/SKU availability: unknown/unknown
+- Support — RG move: supported; subscription move: conditional; region: supported; target region/SKU availability: unknown/unknown
 - Expected downtime: minutes; RTO/RPO compatibility: unknown/unknown; sequence: 19
 - Confidence: medium (0.74) — rule confidence 0.8; capped at 0.74: inventory-only evidence cannot yield high confidence
-- Rule: azure.network.networkinterfaces v1.0.0 · reason codes: RULE_MATCH, REGION_MOVE_SUPPORTED · human approval: required
+- Rule: azure.network.networkinterfaces v1.1.0 · reason codes: RULE_MATCH, REGION_MOVE_SUPPORTED · human approval: required
 
 **Dependencies**
 - network → hcw-sample-vnet-billing-prod-eus [inferred] — NIC lives in a subnet of the VNet (inferred from type and shared resource group; confirm with authenticated discovery)
 - network → hcw-sample-nsg-app [inferred] — NSG may be associated to the NIC or subnet (inferred from type and shared resource group; confirm with authenticated discovery)
 - network → hcw-sample-pip-lb-billing [inferred] — public IP may be bound to the NIC (inferred from type and shared resource group; confirm with authenticated discovery)
 
+**Prerequisites**
+- Subscription move: move the virtual network of the network interface and every other network interface in that virtual network in the same operation
+
 **Risks**
 - Constraint: Private IP addresses are re-allocated at the destination unless statically configured in the target subnet range
+- Constraint: A network interface associated with a Standard SKU public IP address can't be moved to another subscription until the address is disassociated.
 
 **Secondary actions**
 - Data path: replicate — plan initial copy, delta/sync, freeze, final sync, reconciliation and rollback separately from the infrastructure move.
@@ -340,8 +349,10 @@
 - [observed-from-csv] subscriptionName = hcw-sample-prod
 - [observed-from-csv] tags = {"application":"billing"}
 - [requires-authenticated-validation] Analysis is based on an exported inventory only; configuration-dependent conclusions must be validated against the live environment.
-- [general-rule] Move operation support for resources (https://learn.microsoft.com/azure/azure-resource-manager/management/move-support-resources, 2026-10-03)
+- [general-rule] Move operation support for resources (https://learn.microsoft.com/azure/azure-resource-manager/management/move-support-resources, 2026-11-22)
 - [general-rule] Support matrix for moving Azure VMs across regions (https://learn.microsoft.com/azure/resource-mover/support-matrix-move-region-azure-vm, 2026-10-03)
+- [general-rule] Move networking resources to new resource group or subscription (https://learn.microsoft.com/azure/azure-resource-manager/management/move-limitations/networking-move-limitations, 2026-11-22)
+- [general-rule] Subscription move: Learn's networking move guidance requires the whole virtual network and all its network interfaces to move together, and blocks anything associated with a Standard SKU public IP address (2026-11-22).
 
 **Assumptions**
 - Questionnaire field 'migrationMode' was not supplied; default used.
@@ -358,10 +369,10 @@
 - Type: `Microsoft.Compute/virtualMachines` · Region: eastus · RG: hcw-sample-rg-billing-prod-eus · Application group: billing
 - Disposition: **native-move** via **azure-resource-mover** (alternatives: azure-migrate, backup-and-restore, terraform-redeploy)
 - Paths — infrastructure: recreate; configuration: reconstruct; identity: reconstruct; data: replicate
-- Support — RG move: supported; subscription move: supported; region: supported; target region/SKU availability: unknown/unknown
+- Support — RG move: conditional; subscription move: conditional; region: supported; target region/SKU availability: unknown/unknown
 - Expected downtime: minutes; RTO/RPO compatibility: unknown/unknown; sequence: 26
 - Confidence: medium (0.74) — rule confidence 0.85; capped at 0.74: inventory-only evidence cannot yield high confidence
-- Rule: azure.compute.virtualmachines v1.0.0 · reason codes: RULE_MATCH, REGION_MOVE_SUPPORTED · human approval: required
+- Rule: azure.compute.virtualmachines v1.1.0 · reason codes: RULE_MATCH, REGION_MOVE_SUPPORTED · human approval: required
 
 **Dependencies**
 - hard → hcw-sample-nic-vm-billing-01 [inferred] — VMs attach NICs; the NIC must exist in the destination VNet first (inferred from type and shared resource group; confirm with authenticated discovery)
@@ -377,6 +388,11 @@
 - Extensions and boot diagnostics storage must be re-pointed
 - Constraint: VMs with Azure Site Recovery replication, Azure Backup protection, or marketplace plans need the protection removed or the plan accepted before move
 - Constraint: Resource Mover requires managed disks; unmanaged disks are not supported
+- Constraint: Low-priority virtual machines and virtual machines using scheduled patching can't be moved to another resource group or subscription.
+- Constraint: A virtual machine in an availability set can't be moved on its own; move the set with all its virtual machines.
+- Constraint: A virtual machine created from a Marketplace image with a plan can't be moved to another subscription; redeploy it there from a cloned OS disk after accepting the plan's terms.
+- Constraint: A virtual machine with Azure Disk Encryption moves to another resource group only while deallocated, and to another subscription only after encryption is disabled.
+- Constraint: A virtual machine in an existing virtual network moves to another subscription only together with the virtual network and all its dependent resources.
 
 **Mitigations**
 - Schedule within the downtime window; pre-stage DNS TTL reductions
@@ -406,11 +422,13 @@
 - [observed-from-csv] sku = Standard_D4s_v5
 - [observed-from-csv] tags = {"application":"billing","environment":"prod"}
 - [requires-authenticated-validation] Analysis is based on an exported inventory only; configuration-dependent conclusions must be validated against the live environment.
-- [general-rule] Move operation support for resources (https://learn.microsoft.com/azure/azure-resource-manager/management/move-support-resources, 2026-10-03)
+- [general-rule] Move operation support for resources (https://learn.microsoft.com/azure/azure-resource-manager/management/move-support-resources, 2026-11-22)
 - [general-rule] Support matrix for moving Azure VMs across regions (https://learn.microsoft.com/azure/resource-mover/support-matrix-move-region-azure-vm, 2026-10-03)
 - [general-rule] Azure Resource Mover overview (https://learn.microsoft.com/azure/resource-mover/overview, 2026-10-03)
 - [general-rule] Transfer an Azure subscription to a different Microsoft Entra directory (https://learn.microsoft.com/azure/role-based-access-control/transfer-subscription, 2026-10-03)
+- [general-rule] Handling special cases when moving virtual machines to resource group or subscription (https://learn.microsoft.com/azure/azure-resource-manager/management/move-limitations/virtual-machines-move-limitations, 2026-11-22)
 - [general-rule] Azure Site Recovery is listed only as the DR mechanism for the migrated VM, never as the migration tool.
+- [general-rule] Resource group and subscription moves: Learn's move-support page sends virtual machines to its special-cases guidance, which lists configurations that can't be moved or need extra steps (2026-11-22).
 
 **Assumptions**
 - Questionnaire field 'migrationMode' was not supplied; default used.

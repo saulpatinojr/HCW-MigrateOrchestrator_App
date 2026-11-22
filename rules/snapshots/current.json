@@ -1,12 +1,12 @@
 {
   "snapshotVersion": "1.1.35",
-  "createdAt": "2026-11-21T23:54:55.847Z",
+  "createdAt": "2026-11-22T02:46:24.236Z",
   "ruleCount": 35,
-  "checksum": "f8c22fdf169ba50c2bfde12c6d67f2f31b0749b7350e3f95f33891ad883674ac",
+  "checksum": "a8fa7c88b9ed0502e3f166564bdf42d95b465dfbcb319752192d09d44a7af3e2",
   "files": [
     {
       "path": "azure/compute.json",
-      "sha256": "89677f591e1b470089ce43dd9a808a1d6f6cde46f06d0e376cea84d8afc0c6fd",
+      "sha256": "32f776b89c42372b3f281d29f9e4b90112f4423f37e84e171258cb5f69b85bd4",
       "ruleIds": [
         "azure.compute.virtualmachines",
         "azure.compute.disks",
@@ -62,7 +62,7 @@
     },
     {
       "path": "azure/network.json",
-      "sha256": "113d916374826d47fcf742caf982e449ec010bc0f6cc58d35c3de70134767b88",
+      "sha256": "1b2e9c222ef6c78b23531714ec8d9c1b916b3832f969dd8d90465a4c17faf470",
       "ruleIds": [
         "azure.network.networkinterfaces",
         "azure.network.virtualnetworks",

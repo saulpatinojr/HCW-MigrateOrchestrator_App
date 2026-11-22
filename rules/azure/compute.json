@@ -1,7 +1,7 @@
 [
   {
     "ruleId": "azure.compute.virtualmachines",
-    "ruleVersion": "1.0.0",
+    "ruleVersion": "1.1.0",
     "provider": "Microsoft.Compute",
     "resourceType": "Microsoft.Compute/virtualMachines",
     "applicableApiVersions": [
@@ -16,7 +16,12 @@
     "operatingSystemConstraints": [],
     "featureConstraints": [
       "VMs with Azure Site Recovery replication, Azure Backup protection, or marketplace plans need the protection removed or the plan accepted before move",
-      "Resource Mover requires managed disks; unmanaged disks are not supported"
+      "Resource Mover requires managed disks; unmanaged disks are not supported",
+      "Low-priority virtual machines and virtual machines using scheduled patching can't be moved to another resource group or subscription.",
+      "A virtual machine in an availability set can't be moved on its own; move the set with all its virtual machines.",
+      "A virtual machine created from a Marketplace image with a plan can't be moved to another subscription; redeploy it there from a cloned OS disk after accepting the plan's terms.",
+      "A virtual machine with Azure Disk Encryption moves to another resource group only while deallocated, and to another subscription only after encryption is disabled.",
+      "A virtual machine in an existing virtual network moves to another subscription only together with the virtual network and all its dependent resources."
     ],
     "sourceScope": [
       "resource-group",
@@ -34,8 +39,8 @@
     "destinationRegion": "any",
     "tenantApplicability": "any",
     "support": {
-      "resourceGroupMove": "supported",
-      "subscriptionMove": "supported",
+      "resourceGroupMove": "conditional",
+      "subscriptionMove": "conditional",
       "regionRelocation": "supported",
       "crossTenant": "unsupported"
     },
@@ -75,7 +80,7 @@
       {
         "title": "Move operation support for resources",
         "url": "https://learn.microsoft.com/azure/azure-resource-manager/management/move-support-resources",
-        "retrievedOn": "2026-10-03"
+        "retrievedOn": "2026-11-22"
       },
       {
         "title": "Support matrix for moving Azure VMs across regions",
@@ -91,9 +96,14 @@
         "title": "Transfer an Azure subscription to a different Microsoft Entra directory",
         "url": "https://learn.microsoft.com/azure/role-based-access-control/transfer-subscription",
         "retrievedOn": "2026-10-03"
+      },
+      {
+        "title": "Handling special cases when moving virtual machines to resource group or subscription",
+        "url": "https://learn.microsoft.com/azure/azure-resource-manager/management/move-limitations/virtual-machines-move-limitations",
+        "retrievedOn": "2026-11-22"
       }
     ],
-    "reviewDate": "2027-04-03",
+    "reviewDate": "2027-05-22",
     "confidence": 0.85,
     "exceptions": [],
     "requiredEvidence": [
@@ -126,7 +136,8 @@
     ],
     "precedence": 10,
     "notes": [
-      "Azure Site Recovery is listed only as the DR mechanism for the migrated VM, never as the migration tool."
+      "Azure Site Recovery is listed only as the DR mechanism for the migrated VM, never as the migration tool.",
+      "Resource group and subscription moves: Learn's move-support page sends virtual machines to its special-cases guidance, which lists configurations that can't be moved or need extra steps (2026-11-22)."
     ]
   },
   {
@@ -433,7 +444,7 @@
   },
   {
     "ruleId": "azure.compute.virtualmachinescalesets",
-    "ruleVersion": "1.0.0",
+    "ruleVersion": "1.1.0",
     "provider": "Microsoft.Compute",
     "resourceType": "Microsoft.Compute/virtualMachineScaleSets",
     "applicableApiVersions": [
@@ -446,7 +457,10 @@
       "*"
     ],
     "operatingSystemConstraints": [],
-    "featureConstraints": [],
+    "featureConstraints": [
+      "A scale set with a Standard SKU load balancer or a Standard SKU public IP address can't be moved; redeploy it in the destination.",
+      "A low-priority scale set can't be moved to another resource group or subscription."
+    ],
     "sourceScope": [
       "resource-group",
       "subscription",
@@ -463,8 +477,8 @@
     "destinationRegion": "any",
     "tenantApplicability": "any",
     "support": {
-      "resourceGroupMove": "supported",
-      "subscriptionMove": "supported",
+      "resourceGroupMove": "conditional",
+      "subscriptionMove": "conditional",
       "regionRelocation": "unsupported",
       "crossTenant": "unsupported"
     },
@@ -503,21 +517,26 @@
       {
         "title": "Move operation support for resources",
         "url": "https://learn.microsoft.com/azure/azure-resource-manager/management/move-support-resources",
-        "retrievedOn": "2026-10-03"
+        "retrievedOn": "2026-11-22"
       },
       {
         "title": "Move resources to a new resource group or subscription",
         "url": "https://learn.microsoft.com/azure/azure-resource-manager/management/move-resource-group-and-subscription",
         "retrievedOn": "2026-10-03"
+      },
+      {
+        "title": "Handling special cases when moving virtual machines to resource group or subscription",
+        "url": "https://learn.microsoft.com/azure/azure-resource-manager/management/move-limitations/virtual-machines-move-limitations",
+        "retrievedOn": "2026-11-22"
       }
     ],
-    "reviewDate": "2027-04-03",
+    "reviewDate": "2027-05-22",
     "confidence": 0.75,
     "exceptions": [],
     "requiredEvidence": [
       "Confirm the resource's current configuration via authenticated inspection before relying on this rule."
     ],
-    "humanReviewRequired": false,
+    "humanReviewRequired": true,
     "prerequisites": [],
     "risks": [
       "Region relocation requires recreating the scale set and redeploying the image/model"
@@ -529,7 +548,10 @@
       "Direct cross-tenant move is not an ARM operation; the supported native path is transferring the whole subscription to the destination directory, after which tenant-bound objects (role assignments, managed identities, Key Vault access, Entra-integrated auth) must be rebuilt.",
       "If the subscription cannot be transferred, recreate in the destination tenant and migrate data separately."
     ],
-    "precedence": 10
+    "precedence": 10,
+    "notes": [
+      "Resource group and subscription moves: Learn's virtual machine move guidance says scale sets with a Standard SKU load balancer or Standard SKU public IP can't be moved (2026-11-22). Basic SKU load balancers and public IPs are retired, so most scale sets behind either one need a redeploy."
+    ]
   },
   {
     "ruleId": "azure.compute.virtualmachines.extensions",

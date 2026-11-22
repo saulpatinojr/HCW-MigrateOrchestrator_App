@@ -1,7 +1,7 @@
 [
   {
     "ruleId": "azure.network.networkinterfaces",
-    "ruleVersion": "1.0.0",
+    "ruleVersion": "1.1.0",
     "provider": "Microsoft.Network",
     "resourceType": "Microsoft.Network/networkInterfaces",
     "applicableApiVersions": [
@@ -15,7 +15,8 @@
     ],
     "operatingSystemConstraints": [],
     "featureConstraints": [
-      "Private IP addresses are re-allocated at the destination unless statically configured in the target subnet range"
+      "Private IP addresses are re-allocated at the destination unless statically configured in the target subnet range",
+      "A network interface associated with a Standard SKU public IP address can't be moved to another subscription until the address is disassociated."
     ],
     "sourceScope": [
       "resource-group",
@@ -34,7 +35,7 @@
     "tenantApplicability": "any",
     "support": {
       "resourceGroupMove": "supported",
-      "subscriptionMove": "supported",
+      "subscriptionMove": "conditional",
       "regionRelocation": "supported",
       "crossTenant": "unsupported"
     },
@@ -72,22 +73,29 @@
       {
         "title": "Move operation support for resources",
         "url": "https://learn.microsoft.com/azure/azure-resource-manager/management/move-support-resources",
-        "retrievedOn": "2026-10-03"
+        "retrievedOn": "2026-11-22"
       },
       {
         "title": "Support matrix for moving Azure VMs across regions",
         "url": "https://learn.microsoft.com/azure/resource-mover/support-matrix-move-region-azure-vm",
         "retrievedOn": "2026-10-03"
+      },
+      {
+        "title": "Move networking resources to new resource group or subscription",
+        "url": "https://learn.microsoft.com/azure/azure-resource-manager/management/move-limitations/networking-move-limitations",
+        "retrievedOn": "2026-11-22"
       }
     ],
-    "reviewDate": "2027-04-03",
+    "reviewDate": "2027-05-22",
     "confidence": 0.8,
     "exceptions": [],
     "requiredEvidence": [
       "Confirm the resource's current configuration via authenticated inspection before relying on this rule."
     ],
     "humanReviewRequired": false,
-    "prerequisites": [],
+    "prerequisites": [
+      "Subscription move: move the virtual network of the network interface and every other network interface in that virtual network in the same operation"
+    ],
     "risks": [],
     "mitigations": [],
     "validation": [],
@@ -96,11 +104,14 @@
       "Direct cross-tenant move is not an ARM operation; the supported native path is transferring the whole subscription to the destination directory, after which tenant-bound objects (role assignments, managed identities, Key Vault access, Entra-integrated auth) must be rebuilt.",
       "If the subscription cannot be transferred, recreate in the destination tenant and migrate data separately."
     ],
-    "precedence": 10
+    "precedence": 10,
+    "notes": [
+      "Subscription move: Learn's networking move guidance requires the whole virtual network and all its network interfaces to move together, and blocks anything associated with a Standard SKU public IP address (2026-11-22)."
+    ]
   },
   {
     "ruleId": "azure.network.virtualnetworks",
-    "ruleVersion": "1.0.0",
+    "ruleVersion": "1.1.0",
     "provider": "Microsoft.Network",
     "resourceType": "Microsoft.Network/virtualNetworks",
     "applicableApiVersions": [
@@ -113,7 +124,11 @@
       "*"
     ],
     "operatingSystemConstraints": [],
-    "featureConstraints": [],
+    "featureConstraints": [
+      "A peered virtual network moves only after its peering is disabled; re-enable the peering after the move.",
+      "A virtual network with a subnet that has a resource navigation link (for example a subnet with Azure Databricks deployed into it) can't be moved to another subscription.",
+      "Moving the virtual network of an AKS cluster stops the cluster working."
+    ],
     "sourceScope": [
       "resource-group",
       "subscription",
@@ -130,8 +145,8 @@
     "destinationRegion": "any",
     "tenantApplicability": "any",
     "support": {
-      "resourceGroupMove": "supported",
-      "subscriptionMove": "supported",
+      "resourceGroupMove": "conditional",
+      "subscriptionMove": "conditional",
       "regionRelocation": "supported",
       "crossTenant": "unsupported"
     },
@@ -169,7 +184,7 @@
       {
         "title": "Move operation support for resources",
         "url": "https://learn.microsoft.com/azure/azure-resource-manager/management/move-support-resources",
-        "retrievedOn": "2026-10-03"
+        "retrievedOn": "2026-11-22"
       },
       {
         "title": "Azure Resource Mover overview",
@@ -180,9 +195,14 @@
         "title": "Relocate Azure Virtual Network to another region",
         "url": "https://learn.microsoft.com/azure/operational-excellence/relocation-virtual-network",
         "retrievedOn": "2026-10-03"
+      },
+      {
+        "title": "Move networking resources to new resource group or subscription",
+        "url": "https://learn.microsoft.com/azure/azure-resource-manager/management/move-limitations/networking-move-limitations",
+        "retrievedOn": "2026-11-22"
       }
     ],
-    "reviewDate": "2027-04-03",
+    "reviewDate": "2027-05-22",
     "confidence": 0.85,
     "exceptions": [],
     "requiredEvidence": [
@@ -206,7 +226,10 @@
       "Direct cross-tenant move is not an ARM operation; the supported native path is transferring the whole subscription to the destination directory, after which tenant-bound objects (role assignments, managed identities, Key Vault access, Entra-integrated auth) must be rebuilt.",
       "If the subscription cannot be transferred, recreate in the destination tenant and migrate data separately."
     ],
-    "precedence": 10
+    "precedence": 10,
+    "notes": [
+      "Resource group and subscription moves: Learn's networking move guidance lists peering, subnet navigation links and AKS as limits (2026-11-22)."
+    ]
   },
   {
     "ruleId": "azure.network.virtualnetworks.subnets",

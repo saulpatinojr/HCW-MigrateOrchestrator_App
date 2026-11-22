@@ -90,6 +90,8 @@ test("per-operation confidence differs by support state", () => {
   const c = d.confidenceByOperation;
   assert.ok(c["region-relocation"].score < c["resource-group-move"].score || c["resource-group-move"].band !== "low");
   assert.equal(c["disaster-recovery"].band, "low");
-  const vm = classifyResource(res("Microsoft.Compute/virtualMachines", "vm"), ctx({}, true)); // authenticated: cap would otherwise equalise them
-  assert.ok(vm.confidenceByOperation["cross-tenant-migration"].score < vm.confidenceByOperation["resource-group-move"].score);
+  // Disks: resource group move supported, cross-tenant unsupported. (Virtual machines were the example until their resource
+  // group move became conditional on 2026-11-22; a conditional operation loses 0.1, more than an unsupported one's 0.05.)
+  const disk = classifyResource(res("Microsoft.Compute/disks", "disk"), ctx({}, true)); // authenticated: cap would otherwise equalise them
+  assert.ok(disk.confidenceByOperation["cross-tenant-migration"].score < disk.confidenceByOperation["resource-group-move"].score);
 });
