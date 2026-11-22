@@ -386,7 +386,8 @@ test("removing HTML comments takes time in proportion to the page, even with man
 
 test("a malformed or off-site link in a guidance note neither throws nor counts as guidance (found by the property tests)", () => {
   const page = (href: string) => `## Microsoft.X\n\n> [!IMPORTANT]\n> See [move guidance](${href}) to learn more.\n\n| Resource type | Resource group | Subscription | Region move |\n| --- | --- | --- | --- |\n| things | Yes | Yes | No |\n`;
-  for (const href of ["http://[", "javascript:alert(1", "//evil.example/move", "https://learn.microsoft.com.evil.example/x", "http://learn.microsoft.com/x"]) {
+  for (const href of ["http://[", "javascript:alert(1", "//evil.example/move", "https://learn.microsoft.com.evil.example/x", "http://learn.microsoft.com/x",
+    "https://user@learn.microsoft.com/x", "https://learn.microsoft.com:8443/x", "https://fakelearn.microsoft.com/x"]) {
     const [row] = parseLearnMoveSupport(page(href));
     assert.equal(row.guidance, undefined, href);
     assert.equal(row.resourceGroupMove, "supported", href);

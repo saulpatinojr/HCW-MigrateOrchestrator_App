@@ -5,20 +5,35 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import fc from "fast-check";
 import { SUPPORT_STATES } from "@amo/domain";
-import { parseLearnMoveSupport, normalizeLearnCell, learnLinkToUrl, diffRulesAgainstMatrix, loadRules, defaultRulesDir } from "./index.js";
+import { parseLearnMoveSupport, normalizeLearnCell, learnLinkToUrl, diffRulesAgainstMatrix, loadRules, defaultRulesDir, type LearnMatrixRow } from "./index.js";
+
+// fast-check's default size ("small") keeps arrays to about 10 items whatever maxLength says; pages need more than that.
+fc.configureGlobal({ baseSize: "medium" });
 
 const STATES = new Set<string>(SUPPORT_STATES);
 const LEARN = "https://learn.microsoft.com/";
+const rules = loadRules(defaultRulesDir()).rules;
 
-// Fragments the real page is made of, so random text reaches the parser's branches instead of being skipped line by line.
-const FRAGMENTS = ["\n", "> ", ">", "|", " | ", "## ", "## Microsoft.Compute", "## microsoft.aadiam", "## Next steps", "<!--", "-->",
-  "[!IMPORTANT]", "[!NOTE]", "[!div class=\"mx-tableFixed\"]", "See ", "See the corresponding ", "[move guidance]", "(./move-limitations/x.md)",
-  "(/azure/x?toc=/a)", "(../../y.md)", "(http://[)", "(javascript:alert(1))", "(//evil.example/move)", "(http://example.com/move)",
-  "(data:text/html,move)", "(https://example.com/move)", "Resource type", "| --- |", "| :--- |", "**Yes**", "No", "Pending", "Yes - with restrictions",
-  "virtualmachines", " / ", "extensions", "(label)", "<br/>", "-"];
-const pageLike = fc.array(fc.oneof(fc.constantFrom(...FRAGMENTS), fc.string({ maxLength: 8 })), { maxLength: 200 }).map((parts) => parts.join(""));
+// A page built line by line from the shapes the real page uses, each line optionally inside a quote block ("> "), so the
+// generated text reaches headings, notes, tables, rows, guidance and the diff instead of being skipped.
+const cellA = fc.constantFrom("**Yes**", "Yes", "No", "Pending", "Yes - with restrictions", "**Yes** - Full <br> No - Incremental", "No <br/> See notes", "-", "");
+const typeA = fc.oneof(fc.constantFrom("virtualmachines", "disks", "availabilitysets", "networkinterfaces", "virtualnetworks", "sites", "storageaccounts",
+  "virtualmachines (Cloud Services)", "virtualmachines / extensions", "certificates (managed)"), fc.string({ maxLength: 8 }));
+const hrefA = fc.oneof(fc.constantFrom("./move-limitations/x.md", "/azure/x?toc=/a", "../../backup/y.md", "http://[", "javascript:alert(1)", "//evil.example/move",
+  "https://user@learn.microsoft.com/x", "https://learn.microsoft.com:8443/x", "https://fakelearn.microsoft.com/x", "data:text/html,move"), fc.string({ maxLength: 12 }));
+const lineA = fc.oneof(
+  { weight: 3, arbitrary: fc.constantFrom("## Microsoft.Compute", "## Microsoft.Network", "## Microsoft.Web", "## Microsoft.Storage", "## microsoft.aadiam", "## Next steps",
+    "", "<!--", "-->", "[!IMPORTANT]", "[!NOTE]", "[!div class=\"mx-tableFixed\"]",
+    "| Resource type | Resource group | Subscription | Region move |", "| ------------- | ----------- | ---------- | ----------- |", "| :--- | :---: | ---: | --- |") },
+  { weight: 1, arbitrary: hrefA.map((h) => `See [move guidance](${h}) to learn more.`) },
+  // A whole note, as on the page: a quoted [!IMPORTANT] line followed by a quoted "See [...](...)" line.
+  { weight: 2, arbitrary: hrefA.map((h) => `> [!IMPORTANT]\n> See [move guidance](${h}) to learn more.\n`) },
+  { weight: 4, arbitrary: fc.tuple(typeA, cellA, cellA, cellA).map(([t, a, b, c]) => `| ${t} | ${a} | ${b} | ${c} |`) },
+  { weight: 1, arbitrary: fc.string({ maxLength: 20 }) },
+);
+const pageA = fc.array(fc.tuple(fc.boolean(), lineA).map(([q, l]) => (q ? `> ${l}` : l)), { maxLength: 80 }).map((ls) => ls.join("\n"));
 
-const checkRows = (rows: ReturnType<typeof parseLearnMoveSupport>): void => {
+const checkRows = (rows: LearnMatrixRow[]): void => {
   for (const r of rows) {
     assert.ok(r.resourceType.startsWith("microsoft."), r.resourceType);
     assert.equal(r.resourceType, r.resourceType.toLowerCase());
@@ -27,32 +42,36 @@ const checkRows = (rows: ReturnType<typeof parseLearnMoveSupport>): void => {
   }
 };
 
+test("the page generator reaches rows, guidance and disagreements (so the properties below are not empty)", () => {
+  const pages = fc.sample(pageA, { numRuns: 500, seed: 1 });
+  const parsed = pages.map((p) => parseLearnMoveSupport(p));
+  const withRows = parsed.filter((r) => r.length > 0).length;
+  const withGuidance = parsed.filter((r) => r.some((x) => x.guidance)).length;
+  const withDiffs = parsed.filter((r) => diffRulesAgainstMatrix(rules, r).diffs.length > 0).length;
+  assert.ok(withRows > 150 && withGuidance > 10 && withDiffs > 50, `rows ${withRows}, guidance ${withGuidance}, diffs ${withDiffs} of 500`);
+});
+
 test("property: the parser never throws on arbitrary text, and every row it returns is well formed", () => {
   fc.assert(fc.property(fc.string({ unit: "binary", maxLength: 2000 }), (text) => { checkRows(parseLearnMoveSupport(text)); }));
 });
 
-test("property: the parser never throws on text built from the page's own pieces, and every row is well formed", () => {
-  fc.assert(fc.property(pageLike, (text) => { checkRows(parseLearnMoveSupport(text)); }), { numRuns: 500 });
+test("property: the parser never throws on a page-shaped text, and every row it returns is well formed", () => {
+  fc.assert(fc.property(pageA, (text) => { checkRows(parseLearnMoveSupport(text)); }), { numRuns: 500 });
 });
 
 test("property: every Learn cell normalises to a known support state", () => {
-  fc.assert(fc.property(fc.string({ unit: "binary", maxLength: 300 }), (cell) => { assert.ok(STATES.has(normalizeLearnCell(cell))); }));
+  fc.assert(fc.property(fc.oneof(cellA, fc.string({ unit: "binary", maxLength: 300 })), (cell) => { assert.ok(STATES.has(normalizeLearnCell(cell))); }));
 });
 
 test("property: a link becomes a learn.microsoft.com address or nothing, and never throws", () => {
-  const href = fc.oneof(fc.string({ maxLength: 80 }), fc.constantFrom("javascript:alert(1)", "//evil.example/x", "http://learn.microsoft.com/x",
-    "https://learn.microsoft.com.evil.example/x", "data:text/html,x", "http://[", "./move-limitations/x.md", "/azure/x?toc=/y", "../../z.md"));
-  fc.assert(fc.property(href, (h) => {
+  fc.assert(fc.property(fc.oneof(hrefA, fc.string({ maxLength: 80 })), (h) => {
     const url = learnLinkToUrl(h);
     if (url !== undefined) assert.ok(url.startsWith(LEARN), `${h} -> ${url}`);
   }), { numRuns: 300 });
 });
 
 test("property: a guidance note with any link never breaks the parse, and only a Learn link counts as guidance", () => {
-  // Random page pieces rarely line up into "See [move guidance](link)", so this builds that sentence with random links.
-  const href = fc.oneof(fc.stringMatching(/^[^\s)]{1,40}$/), fc.constantFrom("http://[", "javascript:alert(1", "//evil.example/move", "https://learn.microsoft.com.evil.example/x",
-    "./move-limitations/x.md", "/azure/x?toc=/y", "../../backup/z.md"));
-  fc.assert(fc.property(href, (h) => {
+  fc.assert(fc.property(hrefA, (h) => {
     const rows = parseLearnMoveSupport(`## Microsoft.X\n\n> [!IMPORTANT]\n> See [move guidance](${h}) to learn more.\n\n| Resource type | Resource group | Subscription | Region move |\n| --- | --- | --- | --- |\n| things | Yes | Yes | No |\n`);
     assert.equal(rows.length, 1);
     if (rows[0].guidance) assert.ok(rows[0].guidance.url.startsWith(LEARN), rows[0].guidance.url);
@@ -61,11 +80,9 @@ test("property: a guidance note with any link never breaks the parse, and only a
 });
 
 // Well-formed tables: a provider heading and rows of plain type names and cells.
-const typeName = fc.stringMatching(/^[a-z][a-z0-9]{0,11}$/);
-const cell = fc.constantFrom("**Yes**", "Yes", "No", "Pending", "Yes - with restrictions", "No <br/> See notes", "-");
 const table = fc.record({
   provider: fc.stringMatching(/^[A-Z][A-Za-z]{1,10}$/),
-  rows: fc.array(fc.tuple(typeName, cell, cell, cell), { minLength: 1, maxLength: 12 }),
+  rows: fc.array(fc.tuple(fc.stringMatching(/^[a-z][a-z0-9]{0,11}$/), cellA, cellA, cellA), { minLength: 1, maxLength: 12 }),
 }).map(({ provider, rows }) => [
   `## Microsoft.${provider}`, "",
   "| Resource type | Resource group | Subscription | Region move |", "| ------------- | ----------- | ---------- | ----------- |",
@@ -85,17 +102,30 @@ test("property: an HTML comment hides exactly what it wraps", () => {
   }));
 });
 
-test("property: the diff never reports a field where the rule and the first Learn row agree", () => {
-  const rules = loadRules(defaultRulesDir()).rules;
-  fc.assert(fc.property(pageLike, (text) => {
+test("property: the diff reports exactly the fields where a rule and the chosen Learn row disagree", () => {
+  fc.assert(fc.property(pageA, (text) => {
     const matrix = parseLearnMoveSupport(text);
-    const first = new Map<string, (typeof matrix)[number]>();
-    for (const m of matrix) if (!first.has(m.resourceType)) first.set(m.resourceType, m);
+    // The row the diff compares with: the first for a type, except that a plain row beats a labelled one ("certificates (managed)").
+    const chosen = new Map<string, LearnMatrixRow>();
+    for (const m of matrix) {
+      const seen = chosen.get(m.resourceType);
+      if (!seen || (seen.variant !== undefined && m.variant === undefined)) chosen.set(m.resourceType, m);
+    }
+    const reported = new Set<string>();
     for (const d of diffRulesAgainstMatrix(rules, matrix).diffs) {
-      const row = first.get(d.resourceType.toLowerCase());
+      const row = chosen.get(d.resourceType.toLowerCase());
       assert.ok(row, d.resourceType);
       assert.notEqual(d.rule, d.learn);
       assert.equal(row[d.field], d.learn);
+      reported.add(`${d.ruleId}|${d.field}`);
     }
-  }), { numRuns: 200 });
+    // And nothing is missed: every disagreement on a known state is reported.
+    for (const r of rules) {
+      const row = chosen.get(r.resourceType.toLowerCase());
+      if (!row) continue;
+      for (const f of ["resourceGroupMove", "subscriptionMove", "regionRelocation"] as const) {
+        if (row[f] !== "unknown" && row[f] !== r.support[f]) assert.ok(reported.has(`${r.ruleId}|${f}`), `${r.ruleId} ${f} missed`);
+      }
+    }
+  }), { numRuns: 400 });
 });
