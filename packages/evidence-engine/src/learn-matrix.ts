@@ -6,7 +6,8 @@ import type { MigrationRule, SupportState } from "@amo/domain";
  * `## Microsoft.X` heading (some are lower-case, such as `## microsoft.aadiam`) and one or more tables:
  * | Resource type | Resource group | Subscription | Region move |
  * with cells like "Yes", "No", "Yes - with restrictions", "Pending", "Yes <br> Use Azure Resource Mover …".
- * The tables sit inside `> [!div class="mx-tableFixed"]` quote blocks, so every table line starts with "> ".
+ * The tables sit inside `> [!div class="mx-tableFixed"]` quote blocks, so every table line starts with "> ". A quote inside
+ * a quote ("> > ") and Windows line endings are read the same way; the live page has neither (checked 2026-11-23).
  */
 export interface LearnMatrixRow {
   provider: string;
@@ -52,8 +53,12 @@ export function normalizeLearnCell(cell: string): SupportState {
   return "unknown";
 }
 
-/** Removes one leading blockquote marker (">" and an optional space) so quoted tables and notes read like bare ones. */
-const unquote = (line: string): string => line.replace(/^\s*> ?/, "");
+/**
+ * Removes the leading blockquote markers (each ">" and the optional space after the last one) so quoted tables and notes read
+ * like bare ones. All of them, not only the first: a table quoted twice ("> > | disks | …") is still a table, and with one
+ * marker left the line would not start with "|" and every row would be skipped (issue 132).
+ */
+const unquote = (line: string): string => line.replace(/^(?:\s*>)+ ?/, "");
 
 const PROVIDER_HEADING = /^#+\s+(microsoft\.[a-z0-9.]+)\s*$/i;
 const ANY_HEADING = /^#+\s/;

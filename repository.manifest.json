@@ -51,6 +51,7 @@
     ".github/workflows/release-cli.yml",
     ".github/workflows/rules-refresh.yml",
     "rules/reports/README.md",
+    "rules/reports/learn-diff-reviewed.json",
     ".github/copilot-instructions.md",
     ".github/skills/code-review/SKILL.md",
     "infrastructure/docker/Dockerfile.appliance",

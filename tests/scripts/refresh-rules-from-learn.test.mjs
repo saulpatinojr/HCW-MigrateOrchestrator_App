@@ -4,16 +4,24 @@ import { spawnSync } from "node:child_process";
 import { mkdtempSync, writeFileSync, readFileSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
+import { loadRules, defaultRulesDir } from "@amo/evidence-engine";
 
 // Runs scripts/refresh-rules-from-learn.mjs offline (--from a local file), the same way the rules-refresh workflow runs
 // it against Microsoft Learn. Needs the build (`npm test` builds first) because the script imports @amo/evidence-engine.
-const run = (markdown) => {
+// `reviewed` is the text of a reviewed-decisions file for this run; without it the script reads the repository's own
+// rules/reports/learn-diff-reviewed.json, as the workflow does.
+const run = (markdown, reviewed) => {
   const dir = mkdtempSync(join(tmpdir(), "amo-learn-refresh-"));
   try {
     const from = join(dir, "page.md");
     const out = join(dir, "out");
     writeFileSync(from, markdown);
-    const res = spawnSync(process.execPath, ["scripts/refresh-rules-from-learn.mjs", "--from", from, "--out", out], { encoding: "utf8" });
+    const extra = [];
+    if (reviewed !== undefined) {
+      writeFileSync(join(dir, "reviewed.json"), reviewed);
+      extra.push("--reviewed", join(dir, "reviewed.json"));
+    }
+    const res = spawnSync(process.execPath, ["scripts/refresh-rules-from-learn.mjs", "--from", from, "--out", out, ...extra], { encoding: "utf8" });
     let report;
     let md;
     try { report = JSON.parse(readFileSync(join(out, "learn-diff.json"), "utf8")); } catch { report = undefined; }
@@ -76,4 +84,93 @@ test("the script's sources no longer include the include-file URL that answers 4
   const sources = src.match(/const SOURCES = \[([\s\S]*?)\];/)?.[1] ?? "";
   assert.ok(!/\/includes\//.test(sources));
   assert.match(sources, /\/articles\/azure-resource-manager\/management\/move-support-resources\.md/);
+});
+
+// Issue 132: the tables on the live page sit inside one quote block. If Learn ever nests them in a second one, the report
+// must still read them; before this test the parser removed one ">" only and such a page read as 0 rows.
+test("a table quoted twice still produces a report with rows", () => {
+  const { status, report } = run(`## Microsoft.Storage
+
+> > [!div class="mx-tableFixed"]
+> > | Resource type | Resource group | Subscription | Region move |
+> > | ------------- | ----------- | ---------- | ----------- |
+> > | storageaccounts | **Yes** | **Yes** | No |
+`);
+  assert.equal(status, 0);
+  assert.equal(report.matrixRows, 1);
+});
+
+// azure.compute.disks says "supported" for all three moves, so this page disagrees with it twice: once on the resource
+// group move and once on the subscription move.
+const DISKS_PAGE = `## Microsoft.Compute
+
+> [!div class="mx-tableFixed"]
+> | Resource type | Resource group | Subscription | Region move |
+> | ------------- | ----------- | ---------- | ----------- |
+> | disks | No | Yes - with restrictions | **Yes** |
+`;
+const decision = (over = {}) => JSON.stringify({ reviewed: [{ ruleId: "azure.compute.disks", field: "resourceGroupMove", rule: "supported", learn: "unsupported", reason: "Checked by hand | example reason.", decidedIn: "https://example.invalid/decision", decidedOn: "2026-01-02", ...over }] });
+
+test("a reviewed disagreement is shown with its reason, apart from the new ones", () => {
+  const { status, report, md } = run(DISKS_PAGE, decision());
+  assert.equal(status, 0);
+  assert.equal(report.diffs.length, 2, "nothing is hidden: both disagreements are in the report");
+  assert.equal(report.newDiffs, 1);
+  assert.equal(report.reviewedDiffs, 1);
+  assert.deepEqual(report.reviewedNoLongerFound, []);
+  const [fresh, kept] = md.split("### Reviewed and kept as they are (1)");
+  assert.match(fresh, /\*\*1 new disagreement needs a decision\.\*\*/);
+  assert.match(fresh, /### New, not yet reviewed \(1\)[\s\S]*\| azure\.compute\.disks \| subscriptionMove \| supported \| conditional \|/);
+  assert.doesNotMatch(fresh, /\| azure\.compute\.disks \| resourceGroupMove \|/);
+  // The pipe in the reason is escaped, so it cannot split the table row.
+  assert.match(kept, /\| azure\.compute\.disks \| resourceGroupMove \| supported \| unsupported \| No \| Checked by hand \\\| example reason\. \| 2026-01-02, https:\/\/example\.invalid\/decision \|/);
+});
+
+test("without any reviewed decision every disagreement is new", () => {
+  const { status, report, md } = run(DISKS_PAGE, JSON.stringify({ reviewed: [] }));
+  assert.equal(status, 0);
+  assert.equal(report.newDiffs, 2);
+  assert.equal(report.reviewedDiffs, 0);
+  assert.match(md, /\*\*2 new disagreements need a decision\.\*\*/);
+});
+
+test("a decision stops covering a row when the rule or Learn's value changes, and the report says the decision is unused", () => {
+  // The decision was made when Learn said "conditional"; the page now says "No" (unsupported), which nobody has reviewed.
+  const { status, report, md } = run(DISKS_PAGE, decision({ learn: "conditional" }));
+  assert.equal(status, 0);
+  assert.equal(report.newDiffs, 2);
+  assert.equal(report.reviewedDiffs, 0);
+  assert.equal(report.reviewedNoLongerFound.length, 1);
+  assert.match(md, /### Earlier decisions that no longer match a disagreement \(1\)[\s\S]*- azure\.compute\.disks resourceGroupMove/);
+});
+
+test("a reviewed-decisions file that cannot be read stops the run instead of treating every row as new or as reviewed", () => {
+  for (const [text, why] of [["{ not json", /not valid JSON/], [JSON.stringify({ decisions: [] }), /"reviewed" list/], [decision({ reason: " " }), /non-empty "reason"/], [decision({ field: "tenantMove" }), /unknown field/]]) {
+    const { status, stderr, report } = run(DISKS_PAGE, text);
+    assert.notEqual(status, 0);
+    assert.match(stderr, why);
+    assert.equal(report, undefined, "no report is written");
+  }
+});
+
+test("every decision in the repository's reviewed file names a real rule and the value that rule has today", () => {
+  // An entry whose rule has since changed would sit in the file unused; this fails in the pull request that changes the rule.
+  const { reviewed } = JSON.parse(readFileSync("rules/reports/learn-diff-reviewed.json", "utf8"));
+  const rules = new Map(loadRules(defaultRulesDir()).rules.map((r) => [r.ruleId, r]));
+  assert.ok(reviewed.length > 0);
+  for (const r of reviewed) {
+    const rule = rules.get(r.ruleId);
+    assert.ok(rule, `${r.ruleId} is not a rule`);
+    assert.equal(rule.support[r.field], r.rule, `${r.ruleId} ${r.field}`);
+    assert.notEqual(r.rule, r.learn, `${r.ruleId} ${r.field} is not a disagreement`);
+    assert.match(r.decidedIn, /^https:\/\/github\.com\/saulpatinojr\/HCW-MigrateOrchestrator_App\/(pull|issues)\/\d+/);
+    assert.match(r.decidedOn, /^\d{4}-\d{2}-\d{2}$/);
+  }
+});
+
+test("the committed report was written by this script: its counts add up and every reviewed row carries a reason", () => {
+  const report = JSON.parse(readFileSync("rules/reports/learn-diff.json", "utf8"));
+  assert.ok(report.matrixRows > 700, "the live page has more than 700 rows (issue 132)");
+  assert.equal(report.newDiffs + report.reviewedDiffs, report.diffs.length);
+  assert.equal(report.diffs.filter((d) => d.reviewed?.reason).length, report.reviewedDiffs);
 });

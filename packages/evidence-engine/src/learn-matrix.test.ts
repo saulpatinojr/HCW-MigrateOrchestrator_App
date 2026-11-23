@@ -83,6 +83,40 @@ test("a table inside a quote block parses the same as a bare table", () => {
   assert.equal(tight[0].resourceType, "microsoft.recoveryservices/vaults");
 });
 
+// Issue 132's follow-up: one quote marker was removed, so a table quoted twice lost every row. The live page does not nest
+// its quotes today; these two tests keep the parser reading the page if Learn's layout or the download's line endings change.
+const NOTED = `## Microsoft.Compute
+
+> [!IMPORTANT]
+> See [guidance for moving virtual machines](./move-limitations/virtual-machines-move-limitations.md) to learn more.
+
+> [!div class="mx-tableFixed"]
+> | Resource type | Resource group | Subscription | Region move |
+> | ------------- | ----------- | ---------- | ----------- |
+> | disks | **Yes** | **Yes** | No |
+`;
+
+test("a table inside a quote inside a quote parses the same as a bare table, guidance note included", () => {
+  const once = parseLearnMoveSupport(FIXTURE + "\n" + NOTED);
+  assert.equal(once.length, 7);
+  for (const nest of [(l: string) => `> ${l}`, (l: string) => `>${l}`, (l: string) => `>  ${l}`]) {
+    // Only the quoted lines get a second marker; headings stay bare, as they are on the page.
+    const twice = (FIXTURE + "\n" + NOTED).split("\n").map((l) => (l.startsWith(">") ? nest(l) : l)).join("\n");
+    assert.notEqual(parseLearnMoveSupport(twice).length, 0, "a doubly quoted table must not read as an empty page");
+    assert.deepEqual(parseLearnMoveSupport(twice), once);
+  }
+  assert.equal(once[6].resourceGroupMove, "conditional", "the note above the last table still counts as guidance");
+});
+
+test("Windows line endings (CRLF) parse the same as Unix ones", () => {
+  const page = FIXTURE + "\n" + NOTED;
+  const unix = parseLearnMoveSupport(page);
+  const windows = parseLearnMoveSupport(page.replace(/\n/g, "\r\n"));
+  assert.equal(windows.length, 7);
+  assert.deepEqual(windows, unix);
+  assert.ok(windows.every((r) => !/\r/.test(JSON.stringify(r))), "no carriage return leaks into a row");
+});
+
 test("provider headings match case-insensitively, so rows are not attributed to the section above", () => {
   const rows = parseLearnMoveSupport(`## Microsoft.AAD
 
