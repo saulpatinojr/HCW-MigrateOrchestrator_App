@@ -13,6 +13,10 @@ text to paste, and where the evidence is. Two rows are the owner's own statement
 
 Repository: <https://github.com/saulpatinojr/HCW-MigrateOrchestrator_App>
 
+**Status:** the project earned the **passing** badge on 2026-11-23 as
+[project 17019](https://www.bestpractices.dev/projects/17019) (100% of the passing criteria). The README shows the badge. Keep
+these answers true: when a practice described here changes, update the project's answers on bestpractices.dev too.
+
 ## Steps for the owner
 
 1. Open <https://www.bestpractices.dev/en/projects/new> and sign in with GitHub.
