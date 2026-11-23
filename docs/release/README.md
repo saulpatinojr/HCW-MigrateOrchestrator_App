@@ -112,7 +112,11 @@ These happen only on a real tag, so the first real tag was also their first test
    ```
 
    `0.3.2` is only an example: use the next version you mean to release. The command writes the version into `package.json`,
-   `package-lock.json` (both places it appears) and `repository.manifest.json`; the release check refuses a tag if they disagree. Merge the pull request; the new version is then on `main`.
+   `package-lock.json` (both places it appears) and `repository.manifest.json`; the release check refuses a tag if they disagree.
+   It also moves the entries under "Unreleased" in `CHANGELOG.md` into a new section, `## 0.3.2 — <today's date>`, with a
+   comment where the summary goes. **Replace that comment with one or two plain sentences on what the release changes.** That
+   summary opens the release page (the release notes), and `npm test` fails until it is written; the release check refuses a
+   tag whose version has no section with a summary. Merge the pull request; the new version is then on `main`.
 2. **Rehearse** (section 2). Do not skip this for the first release made with this pipeline.
 3. **Tag the exact commit the dry run built.** PowerShell:
 

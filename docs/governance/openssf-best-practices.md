@@ -7,9 +7,9 @@ security habits) looks the project up on bestpractices.dev by the repository's a
 (code scanning alert 21) stops alerting once the project reaches **passing**. Its default policy needs a score of 5, which
 is passing; a badge "in progress" scores 2 and does not close the alert.
 
-This page is the answer sheet, prepared on 2026-11-22 from the repository as it was that day. Each row gives the answer to
-choose (Met, N/A or Unmet), the text to paste, and where the evidence is. Two rows are the owner's own statement, and one
-row, **release_notes, is not met yet**: see "What stops the badge today" below. Repository links are to `main`.
+This page is the answer sheet, prepared on 2026-11-22 from the repository as it was that day and updated on 2026-11-23,
+when the release notes were brought up to the badge's standard. Each row gives the answer to choose (Met, N/A or Unmet), the
+text to paste, and where the evidence is. Two rows are the owner's own statement. Repository links are to `main`.
 
 Repository: <https://github.com/saulpatinojr/HCW-MigrateOrchestrator_App>
 
@@ -19,23 +19,17 @@ Repository: <https://github.com/saulpatinojr/HCW-MigrateOrchestrator_App>
 2. Choose this repository (`saulpatinojr/HCW-MigrateOrchestrator_App`) and submit. bestpractices.dev fills in some answers
    by itself from the repository.
 3. Go through the passing questions and give each the answer and text from the tables below. Save as you go.
-4. **When it worked:** the project page shows a percentage, and "passing" once every MUST is Met or N/A. While
-   release_notes is Unmet it will show "in progress", which is expected until that is fixed.
+4. **When it worked:** the project page shows a percentage, and "passing" once every MUST is Met or N/A (the two
+   self-assessment rows included).
 5. Scorecard picks the result up on its next run (every push to `main`, and weekly), and alert 21 closes on its own. No
    change to the README is needed for that.
 
-## What stops the badge today
+## How the release notes meet the badge
 
-**release_notes (a MUST) is Unmet.** On 2026-11-22 the GitHub Release pages of `v0.2.0`, `v0.2.1`, `v0.3.0` and `v0.3.1`
-are empty, and `v0.4.0` and `v0.4.1` link to `CHANGELOG.md` at their tag, where the changes of 0.3.x and 0.4.x sit under
-"Unreleased" rather than under a section for that version. To meet it:
-
-1. At each release, move the "Unreleased" entries of `CHANGELOG.md` into a section headed with the version and date, and
-   put a short plain summary of the main changes on the GitHub Release page.
-2. For the past releases, either write a short summary on each empty Release page or note on it that it was a
-   pre-release of the development series, and give `v0.4.1` a summary of what it changed.
-
-Once the next release is made that way, answer release_notes "Met" with the link to that release.
+Until 2026-11-23 they did not: the GitHub Release pages of `v0.2.0` to `v0.3.1` were empty, and `v0.4.0` and `v0.4.1` linked to
+a `CHANGELOG.md` whose changes were all under "Unreleased". Now every release has its own `CHANGELOG.md` section with a plain
+summary (rebuilt from the CHANGELOG as it stood at each tag), every release page opens with that summary, and the release
+process cannot publish a release without one (ADR-0034, amendment of 2026-11-23).
 
 ## Terms used below
 
@@ -80,7 +74,7 @@ Once the next release is made that way, answer release_notes "Met" with the link
 | version_unique | Met | Each release has a unique semantic version tag (`v0.4.1`). |
 | version_semver | Met | Semantic Versioning; releases are `v*` tags. |
 | version_tags | Met | Each release is a git tag, protected by the "Protect release tags" ruleset. |
-| release_notes | **Unmet (for now)** | See "What stops the badge today" above. Answer Met with the link to the next release once it has a summary and a CHANGELOG section for its version. <https://github.com/saulpatinojr/HCW-MigrateOrchestrator_App/releases> |
+| release_notes | Met | Each release page opens with a "What changed" summary taken from the version's section of `CHANGELOG.md`, which is written by people, not a git log; the release process refuses to publish a release without one. <https://github.com/saulpatinojr/HCW-MigrateOrchestrator_App/releases> |
 | release_notes_vulns | N/A | No publicly known vulnerability with a CVE has been fixed in a release. |
 
 ## Reporting

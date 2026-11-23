@@ -24,9 +24,10 @@
  */
 import { spawnSync } from "node:child_process";
 import { createHash } from "node:crypto";
-import { createReadStream, existsSync, mkdirSync, readdirSync, statSync, writeFileSync } from "node:fs";
+import { createReadStream, existsSync, mkdirSync, readdirSync, readFileSync, statSync, writeFileSync } from "node:fs";
 import { join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
+import { changelogSection } from "./check-release-version.mjs";
 
 export const PROVENANCE = "https://slsa.dev/provenance/v1";
 export const SBOM = "https://cyclonedx.org/bom";
@@ -175,9 +176,22 @@ export async function releaseProblems(release, dir, version, { draft }) {
   return problems;
 }
 
-export function releaseNotes(tag, repo, workflow) {
+/**
+ * The text of the release page. `section` is the version's CHANGELOG.md section ({ heading, summary } from
+ * changelogSection in check-release-version.mjs): its summary opens the page, so every release says what it changes.
+ */
+export function releaseNotes(tag, repo, workflow, section) {
   const version = versionOfTag(tag);
+  if (!section?.summary) throw new Error(`no CHANGELOG.md summary for ${version}: the release notes are built from it`);
   return [
+    `## What changed in ${tag}`,
+    "",
+    section.summary,
+    "",
+    `The full list is the section "${section.heading.replace(/^## /, "")}" of CHANGELOG.md: https://github.com/${repo}/blob/${tag}/CHANGELOG.md`,
+    "",
+    "## Verify a download",
+    "",
     `Release ${tag}. Every binary and package tarball below has a signed build-provenance attestation and a signed CycloneDX SBOM attestation, made by \`${workflow}\` on \`refs/tags/${tag}\`. The checksum files and the two SBOMs have a signed build-provenance attestation too.`,
     "",
     "Verify a download (GitHub CLI):",
@@ -186,8 +200,6 @@ export function releaseNotes(tag, repo, workflow) {
     `gh attestation verify hybridcloudworks-migration-core-${version}.tgz --repo ${repo} --predicate-type ${PROVENANCE} --source-ref refs/tags/${tag} --signer-workflow ${repo}/${workflow} --deny-self-hosted-runners`,
     `gh attestation verify hybridcloudworks-migration-core-${version}.tgz --repo ${repo} --predicate-type ${SBOM} --source-ref refs/tags/${tag} --signer-workflow ${repo}/${workflow} --deny-self-hosted-runners`,
     "```",
-    "",
-    `What changed: https://github.com/${repo}/blob/${tag}/CHANGELOG.md`,
     "",
     `The SBOMs are \`amo-cli-${version}.cdx.json\` (the command-line tool) and \`hybridcloudworks-migration-packages-${version}.cdx.json\` (the two package tarballs). How this release is built and checked: https://github.com/${repo}/blob/${tag}/docs/release/README.md.`,
     "",
@@ -228,10 +240,13 @@ export async function settleDraft(repo, id, dir, version, gh, pause) {
   return { release, problems };
 }
 
-export async function publish({ repo, tag, dir, workflow }, gh = realGh, pause = sleepMs) {
+export async function publish({ repo, tag, dir, workflow, changelog = "CHANGELOG.md" }, gh = realGh, pause = sleepMs) {
   const version = versionOfTag(tag);
   const files = checkFiles(dir, version);
   if (files.length) return [...files, "nothing was published"];
+  let section = null;
+  try { section = changelogSection(readFileSync(changelog, "utf8"), version); } catch (error) { return [`cannot read ${changelog}: ${error.message}`, "nothing was published"]; }
+  if (!section?.summary) return [`${changelog} has no section with a summary for ${version}; the release notes are built from it`, "nothing was published"];
 
   const { releases, reason } = releasesForTag(repo, tag, gh);
   if (reason) return [reason];
@@ -240,7 +255,7 @@ export async function publish({ repo, tag, dir, workflow }, gh = realGh, pause =
   }
 
   const notesFile = join(dir, "..", `release-notes-${tag}.md`);
-  writeFileSync(notesFile, releaseNotes(tag, repo, workflow));
+  writeFileSync(notesFile, releaseNotes(tag, repo, workflow, section));
   const created = gh(["release", "create", tag, "--repo", repo, "--draft", "--verify-tag", "--title", tag, "--notes-file", notesFile, ...allNames(version).map((n) => join(dir, n))]);
   if (created.status !== 0) return [`could not create the draft release ${tag}: ${(created.stderr || created.stdout).trim()}`];
   console.log(`draft release for ${tag} created with ${allNames(version).length} files; checking it before it becomes public`);

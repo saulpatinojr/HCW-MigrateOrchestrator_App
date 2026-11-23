@@ -127,3 +127,13 @@ clearly right follow-ups; each is reversible by reverting the workflow change.
   and `attestations: write`). The alternative of a single job with the login step conditioned was rejected because the job's
   permissions would still include `id-token: write` on a path that never needs it. `tests/release/release-workflows.test.mjs`
   pins the gate, the permissions and the absence of a login on the manual path, with mutation checks.
+
+## Amendment (2026-11-23): release notes come from CHANGELOG.md
+
+Every release page opens with "What changed": the summary of the version's `CHANGELOG.md` section (`## X.Y.Z — YYYY-MM-DD`)
+and a link to its full list. `scripts/check-release-version.mjs --set-version` starts that section by moving the "Unreleased"
+entries into it and leaving a marked place for the summary; the version check refuses a tag (and the dry run) whose version has
+no section with a summary, before anything is built; and `scripts/release-publish.mjs publish` refuses to create the release
+without it. Reason: the releases up to `v0.4.1` had empty pages or linked to a CHANGELOG whose changes were all under
+"Unreleased", which does not meet the OpenSSF Best Practices `release_notes` criterion. The past sections were rebuilt from the
+CHANGELOG as it stood at each tag. Rejected: GitHub's generated release notes (a list of pull request titles, not a summary).

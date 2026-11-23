@@ -11,8 +11,13 @@
  *   ... --ancestor-of origin/main                                ... and the tagged commit is already on that branch, and is
  *                                                                its tip or leaves .github/workflows as the tip has it
  *   ... --require-npm 11.5.1                                     ... and `npm --version` is at least that (trusted publishing)
- *   node scripts/check-release-version.mjs --set-version 0.3.2   write that version into all of the places below (the same
- *                                                                command in bash and PowerShell; then run npm test)
+ *   node scripts/check-release-version.mjs --set-version 0.3.2   write that version into all of the places below, and move
+ *                                                                the "Unreleased" entries of CHANGELOG.md into a new section
+ *                                                                for it (the same command in bash and PowerShell; then write
+ *                                                                the section's summary and run npm test)
+ *
+ * With a tag or --rehearse, CHANGELOG.md must also have a section "## X.Y.Z — YYYY-MM-DD" for the version with a summary
+ * paragraph: the release notes are built from it (scripts/release-publish.mjs), so a release never goes out without them.
  *
  * The versions compared are `version` in package.json, in repository.manifest.json and in package-lock.json (both places
  * it appears). The workspace packages under apps/ and packages/ carry their own internal versions and are not published.
@@ -49,6 +54,51 @@ export function readVersions(root) {
   return { found, problems };
 }
 
+const SECTION_HEADING = /^## (\d+\.\d+\.\d+) — (\d{4}-\d{2}-\d{2})\b.*$/;
+const SUMMARY_PLACEHOLDER = "<!-- summary: one or two plain sentences on what this release changes, for its release page -->";
+
+/**
+ * The CHANGELOG.md section for `version`: { heading, date, summary, body }, or null when there is none. The section runs from
+ * its "## X.Y.Z — YYYY-MM-DD" heading to the next "## " heading. Its summary is its first paragraph that is not a list item
+ * and not an HTML comment.
+ */
+export function changelogSection(text, version) {
+  const lines = text.split(/\r?\n/);
+  const start = lines.findIndex((l) => SECTION_HEADING.exec(l)?.[1] === version);
+  if (start === -1) return null;
+  let end = lines.findIndex((l, i) => i > start && /^## /.test(l));
+  if (end === -1) end = lines.length;
+  const body = lines.slice(start + 1, end).join("\n").trim();
+  const summary = body.split(/\n\s*\n/).map((p) => p.trim()).find((p) => p && !p.startsWith("- ") && !p.startsWith("<!--")) ?? "";
+  return { heading: lines[start], date: SECTION_HEADING.exec(lines[start])[2], summary, body };
+}
+
+/** Problems with the CHANGELOG.md section that the release notes of `version` are built from; empty when it is usable. */
+export function changelogProblems(root, version) {
+  let text;
+  try {
+    text = readFileSync(join(root, "CHANGELOG.md"), "utf8");
+  } catch (error) {
+    return [`cannot read CHANGELOG.md: ${error.message}`];
+  }
+  const section = changelogSection(text, version);
+  if (!section) return [`CHANGELOG.md has no section "## ${version} — YYYY-MM-DD" for this version: the release notes are built from it. Run --set-version ${version}, or add the heading above that version's entries`];
+  if (!section.summary) return [`the CHANGELOG.md section for ${version} has no summary paragraph: write one or two plain sentences under its heading, in place of the comment that marks the spot; the release page shows them`];
+  return [];
+}
+
+/**
+ * Start a section for `version` dated `date`: the entries under "## Unreleased" move into it, "## Unreleased" stays empty
+ * above it, and a comment marks where the summary goes. Refuses a version that already has a section.
+ */
+export function startChangelogSection(text, version, date) {
+  if (changelogSection(text, version)) throw new Error(`CHANGELOG.md already has a section for ${version}`);
+  const marker = text.match(/^## Unreleased[ \t]*\r?\n/m);
+  if (!marker) throw new Error('CHANGELOG.md has no "## Unreleased" heading to take the entries from');
+  const at = marker.index + marker[0].length;
+  return `${text.slice(0, at)}\n## ${version} — ${date}\n\n${SUMMARY_PLACEHOLDER}\n${text.slice(at)}`;
+}
+
 /** Compare two dotted versions (numbers only). */
 export function atLeast(actual, minimum) {
   const a = actual.split(".").map(Number);
@@ -59,8 +109,11 @@ export function atLeast(actual, minimum) {
   return true;
 }
 
-/** Write `version` into every place readVersions reads, keeping each file's formatting (two-space JSON, final newline). */
-export function setVersion(root, version) {
+/**
+ * Write `version` into every place readVersions reads, keeping each file's formatting (two-space JSON, final newline), and
+ * start its CHANGELOG.md section (dated `date`, UTC today by default) when that file exists.
+ */
+export function setVersion(root, version, date = new Date().toISOString().slice(0, 10)) {
   if (!PLAIN_VERSION.test(version)) throw new Error(`${JSON.stringify(version)} is not a plain X.Y.Z`);
   const edit = (file, change) => {
     const json = readJson(root, file);
@@ -71,6 +124,10 @@ export function setVersion(root, version) {
   edit("package.json", (j) => { j.version = version; });
   edit("repository.manifest.json", (j) => { j.version = version; });
   edit("package-lock.json", (j) => { j.version = version; if (j.packages?.[""]) j.packages[""].version = version; });
+  const changelog = join(root, "CHANGELOG.md");
+  let text = null;
+  try { text = readFileSync(changelog, "utf8"); } catch { text = null; }
+  if (text !== null) writeFileSync(changelog, startChangelogSection(text, version, date));
 }
 
 const git = (root, ...args) => spawnSync("git", args, { cwd: root, encoding: "utf8" });
@@ -128,6 +185,7 @@ export function check(root, { tag = null, rehearse = false, ancestorOf = null, s
       warnings.push(`dry run: the tag ${wanted} already exists, so a real tag run for this version would be refused (publish refuses a release that exists, and the ruleset blocks moving a tag); raise the version in a pull request before tagging`);
     }
   }
+  if (version !== null && (tag !== null || rehearse)) problems.push(...changelogProblems(root, version));
   if (ancestorOf !== null && (tag !== null || rehearse)) {
     const commit = sha || git(root, "rev-parse", "HEAD").stdout.trim();
     const reason = notOnBranch(root, commit, ancestorOf);
@@ -165,7 +223,7 @@ function main(argv) {
   const args = parseArgs(argv);
   if (args.setVersion) {
     setVersion(args.root, args.setVersion);
-    console.log(`version set to ${args.setVersion} in package.json, repository.manifest.json and package-lock.json`);
+    console.log(`version set to ${args.setVersion} in package.json, repository.manifest.json and package-lock.json; CHANGELOG.md has a new section for it: write its summary where the comment is, then run npm test`);
     return 0;
   }
   const { problems, warnings, version, tag } = check(args.root, { ...args, sha: process.env.GITHUB_SHA || null });
