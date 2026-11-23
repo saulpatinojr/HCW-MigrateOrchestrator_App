@@ -10,6 +10,7 @@
 [![live](https://img.shields.io/website?url=https%3A%2F%2Fmigration.lab.hybridcloudworks.com%2Fapi%2Fhealth&label=try%20it%20at%20%2Ftools%2Fmigration&up_message=live&down_message=down)](https://hybridcloudworks.com/tools/migration)
 [![docker hub](https://img.shields.io/badge/docker.io-hybridcloudworks%2Fimg--mo--appliance--app-2496ED?logo=docker&logoColor=white)](https://hub.docker.com/r/hybridcloudworks/img-mo-appliance-app)
 [![license](https://img.shields.io/github/license/saulpatinojr/HCW-MigrateOrchestrator_App)](LICENSE)
+[![OpenSSF Best Practices](https://www.bestpractices.dev/projects/17019/badge)](https://www.bestpractices.dev/projects/17019)
 [![downstream](https://img.shields.io/badge/downstream-HCW--MigrateOrchestrator__AddOn-6f42c1?logo=github)](https://github.com/saulpatinojr/HCW-MigrateOrchestrator_AddOn)
 
 **New here?** Give it an inventory of an Azure environment and it tells you, resource by resource, how each one can be
