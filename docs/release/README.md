@@ -119,8 +119,10 @@ These happen only on a real tag, so the first real tag was also their first test
       `## 0.3.2 — <today's date in UTC>`, with a comment where the summary goes. **When it worked**, it prints "version set to
       0.3.2 …; CHANGELOG.md has a new section for it".
    2. **Write the release notes.** Open `CHANGELOG.md`, find the new section, and replace the comment with one or two plain
-      sentences on what the release changes. That summary opens the release page. If the tag will go out on a later day,
-      change the date in the heading to that day.
+      sentences on what the release changes. That summary opens the release page, on its own: the page does not show the rest
+      of `CHANGELOG.md`, so write it to stand alone, with no "above", "below" or "see that section" (the v0.4.3 page's "see that
+      section below" pointed at nothing). If it must point elsewhere, name the file, for example "the 0.4.2 section of
+      `CHANGELOG.md`". If the tag will go out on a later day, change the date in the heading to that day.
    3. Run `npm test`. **When it worked**, it ends with `fail 0`. If it says the section "still has the comment" or "has no
       summary", step 2 is not done yet.
    4. Open the pull request and merge it; the new version is then on `main`.
