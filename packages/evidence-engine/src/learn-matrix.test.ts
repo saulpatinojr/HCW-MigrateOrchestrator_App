@@ -395,3 +395,54 @@ test("a malformed or off-site link in a guidance note neither throws nor counts 
   const [learn] = parseLearnMoveSupport(page("./move-limitations/x.md"));
   assert.equal(learn.guidance?.url, "https://learn.microsoft.com/en-us/azure/azure-resource-manager/management/move-limitations/x");
 });
+
+// Two rows on the live page name a product, not a resource type (read 2026-11-23): "Cognitive Search" under
+// Microsoft.CognitiveServices (the real type has its own row, Microsoft.Search searchservices) and "AKS cluster" under
+// Microsoft.DevSpaces. A resource type never contains a space.
+const PRODUCT_NAMES = `## Microsoft.CognitiveServices
+
+> [!div class="mx-tableFixed"]
+> | Resource type | Resource group | Subscription | Region move |
+> | ------------- | ----------- | ---------- | ----------- |
+> | accounts | **Yes** | **Yes** | No |
+> | Cognitive Search | **Yes** | **Yes** | Manual steps support this.<br/><br/> See [Move your Azure AI Search service to another Azure region](/azure/search/search-howto-move-across-regions) to learn more. |
+> | Cognitive Search | **Yes** | **Yes** | No |
+
+## Microsoft.DevSpaces
+
+> [!div class="mx-tableFixed"]
+> | Resource type | Resource group | Subscription | Region move |
+> | ------------- | ----------- | ---------- | ----------- |
+> | controllers | **Yes** | **Yes** | No |
+> | AKS cluster | **pending** | **pending** | No<br/><br/> [Learn more](/previous-versions/azure/dev-spaces/) about moving to another region.
+`;
+
+test("a first cell that names a product rather than a resource type is flagged, not passed off as a type", () => {
+  const rows = parseLearnMoveSupport(PRODUCT_NAMES);
+  assert.deepEqual(rows.map((r) => [r.resourceType, r.notAResourceType]), [
+    ["microsoft.cognitiveservices/accounts", undefined],
+    ["microsoft.cognitiveservices/cognitive search", true],
+    ["microsoft.cognitiveservices/cognitive search", true],
+    ["microsoft.devspaces/controllers", undefined],
+    ["microsoft.devspaces/aks cluster", true],
+  ]);
+  assert.ok(!("notAResourceType" in rows[0]), "a real type has no notAResourceType key, so its JSON shape is unchanged");
+});
+
+test("the diff leaves product-name rows out of the comparison and out of the types without a rule, and lists them apart", () => {
+  const [base] = loadRules(defaultRulesDir()).rules;
+  const rule: MigrationRule = { ...base, ruleId: "test.cognitive", resourceType: "Microsoft.CognitiveServices/Cognitive Search", support: { ...base.support, resourceGroupMove: "unsupported" } };
+  const { diffs, uncovered, notInMatrix, notTypes } = diffRulesAgainstMatrix([rule], parseLearnMoveSupport(PRODUCT_NAMES));
+  assert.deepEqual(diffs, [], "a product-name row is never compared with a rule");
+  assert.deepEqual(notInMatrix, ["Microsoft.CognitiveServices/Cognitive Search"]);
+  assert.deepEqual(uncovered, ["microsoft.cognitiveservices/accounts", "microsoft.devspaces/controllers"]);
+  assert.deepEqual(notTypes, ["microsoft.cognitiveservices/cognitive search", "microsoft.devspaces/aks cluster"], "each listed once, though Learn repeats one");
+});
+
+test("the diff also leaves out a row whose type has a space when the flag is missing, as in a row built by hand", () => {
+  const [row] = parseLearnMoveSupport(PRODUCT_NAMES).filter((r) => r.notAResourceType);
+  const { notAResourceType: _dropped, ...unflagged } = row;
+  const { uncovered, notTypes } = diffRulesAgainstMatrix([], [unflagged]);
+  assert.deepEqual(uncovered, []);
+  assert.deepEqual(notTypes, ["microsoft.cognitiveservices/cognitive search"]);
+});
