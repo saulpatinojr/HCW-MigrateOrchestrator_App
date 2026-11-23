@@ -1,4 +1,5 @@
 import { test } from "node:test";
+import { fileURLToPath } from "node:url";
 import assert from "node:assert/strict";
 import { createHash } from "node:crypto";
 import { copyFileSync, existsSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, rmSync, writeFileSync } from "node:fs";
@@ -6,7 +7,7 @@ import { tmpdir } from "node:os";
 import { basename, join } from "node:path";
 import { spawnSync } from "node:child_process";
 import { allNames, attestedNames, attestationChecks, provenanceOnlyNames, checkFiles, decodeJsonValues, publish, releaseProblems, releaseNotes, verifyAttestations, verifyCommand, verifyRelease, versionOfTag, PROVENANCE, SBOM } from "../../scripts/release-publish.mjs";
-import { atLeast, check, notOnBranch, setVersion, workflowParity } from "../../scripts/check-release-version.mjs";
+import { atLeast, changelogProblems, changelogSection, check, notOnBranch, setVersion, startChangelogSection, workflowParity } from "../../scripts/check-release-version.mjs";
 import { addComponent, assertBom, retitle } from "../../scripts/generate-sbom.mjs";
 
 /**
@@ -19,6 +20,8 @@ const REPO = "owner/repo";
 const WORKFLOW = ".github/workflows/release-cli.yml";
 const sha = (path) => createHash("sha256").update(readFileSync(path)).digest("hex");
 const scratch = () => mkdtempSync(join(tmpdir(), "amo-release-test-"));
+const CHANGELOG_TEXT = "# Changelog\n\n## Unreleased\n\n- a change not released yet\n\n## 1.2.3 — 2026-11-23\n\nWhat 1.2.3 changes, in plain words.\n\n- the entry for 1.2.3\n\n## 1.2.2 — 2026-11-01\n\nOlder.\n";
+const changelogFile = () => { const f = join(scratch(), "CHANGELOG.md"); writeFileSync(f, CHANGELOG_TEXT); return f; };
 const noPause = () => {};
 const ok = (stdout = "") => ({ status: 0, stdout, stderr: "" });
 const bad = (stderr) => ({ status: 1, stdout: "", stderr });
@@ -146,7 +149,7 @@ test("a failed attestation check is retried, then reported with the file, the pr
 test("publish: draft first, every file attached, checked, and only then made public", async () => {
   const dir = releaseDir();
   const { gh, calls } = fakeGh();
-  assert.deepEqual(await publish({ repo: REPO, tag: TAG, dir, workflow: WORKFLOW }, gh, noPause), []);
+  assert.deepEqual(await publish({ repo: REPO, tag: TAG, dir, workflow: WORKFLOW, changelog: changelogFile() }, gh, noPause), []);
   const order = calls.map((c) => (c[0] === "release" ? `release ${c[1]}` : c[1] === "--method" ? "publish" : c[1] === "--paginate" ? "list" : "read"));
   assert.deepEqual(order, ["list", "release create", "list", "read", "publish", "read"], "the draft is re-read by id before it is made public");
   const create = callsOf(calls, "release", "create")[0];
@@ -163,7 +166,7 @@ test("publish refuses a release that already exists (draft or public) and change
   for (const draft of [true, false]) {
     const dir = releaseDir();
     const { gh, calls } = fakeGh({ existing: [{ id: 3, tag_name: TAG, draft, assets: [] }] });
-    const problems = await publish({ repo: REPO, tag: TAG, dir, workflow: WORKFLOW }, gh, noPause);
+    const problems = await publish({ repo: REPO, tag: TAG, dir, workflow: WORKFLOW, changelog: changelogFile() }, gh, noPause);
     assert.match(problems[0], new RegExp(`already has ${draft ? "a draft" : "a public release"}.*never replaced`));
     assert.equal(callsOf(calls, "release", "create").length, 0);
     assert.equal(callsOf(calls, "api", "--method").length, 0);
@@ -179,7 +182,7 @@ test("publish never makes the release public when the draft is wrong", async () 
   ];
   for (const [corrupt, expected] of cases) {
     const { gh, calls } = fakeGh({ corrupt });
-    const problems = await publish({ repo: REPO, tag: TAG, dir: releaseDir(), workflow: WORKFLOW }, gh, noPause);
+    const problems = await publish({ repo: REPO, tag: TAG, dir: releaseDir(), workflow: WORKFLOW, changelog: changelogFile() }, gh, noPause);
     assert.match(problems.join("\n"), expected);
     assert.match(problems.at(-1), /draft stays unpublished/);
     assert.equal(callsOf(calls, "api", "--method").length, 0, "no PATCH, so the release stays a draft");
@@ -189,7 +192,7 @@ test("publish never makes the release public when the draft is wrong", async () 
 test("publish: a draft asset with no sha256 digest is a problem, never a skipped check (review F2)", async () => {
   for (const nullDigest of ["amo-linux-x64", "hybridcloudworks-migration-ui-1.2.3.tgz"]) {
     const { gh, calls } = fakeGh({ corrupt: { nullDigest } });
-    const problems = await publish({ repo: REPO, tag: TAG, dir: releaseDir(), workflow: WORKFLOW }, gh, noPause);
+    const problems = await publish({ repo: REPO, tag: TAG, dir: releaseDir(), workflow: WORKFLOW, changelog: changelogFile() }, gh, noPause);
     assert.ok(problems.some((p) => p.startsWith(`asset ${nullDigest} has no sha256 digest`)), problems.join("\n"));
     assert.match(problems.at(-1), /draft stays unpublished/);
     assert.equal(callsOf(calls, "api", "--method").length, 0, "never made public");
@@ -203,13 +206,13 @@ test("publish: a draft asset with no sha256 digest is a problem, never a skipped
 test("publish: the draft is judged from GET /releases/{id}, retried while GitHub is still processing, not from the list (review F2)", async () => {
   // the list lags (it shows the draft without assets) and the first by-id reads show assets not yet uploaded, no digests
   const { gh, calls } = fakeGh({ lagReads: 3, staleList: true });
-  assert.deepEqual(await publish({ repo: REPO, tag: TAG, dir: releaseDir(), workflow: WORKFLOW }, gh, noPause), []);
+  assert.deepEqual(await publish({ repo: REPO, tag: TAG, dir: releaseDir(), workflow: WORKFLOW, changelog: changelogFile() }, gh, noPause), []);
   const byId = calls.filter((c) => c[0] === "api" && /releases\/7$/.test(c[1]));
   assert.equal(byId.length, 3 + 1 + 1, "three lagging reads, one good read, then the read-back after publishing");
   assert.equal(callsOf(calls, "api", "--method").length, 1);
   // the same lag that never ends is bounded and never publishes
   const never = fakeGh({ lagReads: 1000, staleList: true });
-  const problems = await publish({ repo: REPO, tag: TAG, dir: releaseDir(), workflow: WORKFLOW }, never.gh, noPause);
+  const problems = await publish({ repo: REPO, tag: TAG, dir: releaseDir(), workflow: WORKFLOW, changelog: changelogFile() }, never.gh, noPause);
   assert.match(problems.join("\n"), /in state "starter"/);
   assert.equal(callsOf(never.calls, "api", "--method").length, 0);
   assert.equal(never.calls.filter((c) => c[0] === "api" && /releases\/7$/.test(c[1])).length, 10);
@@ -217,13 +220,13 @@ test("publish: the draft is judged from GET /releases/{id}, retried while GitHub
 
 test("publish reports a failed create, a failed publish and incomplete input without publishing", async () => {
   const dir = releaseDir();
-  assert.match((await publish({ repo: REPO, tag: TAG, dir, workflow: WORKFLOW }, fakeGh({ failCreate: true }).gh, noPause))[0], /could not create the draft release/);
-  const patchFail = await publish({ repo: REPO, tag: TAG, dir, workflow: WORKFLOW }, fakeGh({ failPatch: true }).gh, noPause);
+  assert.match((await publish({ repo: REPO, tag: TAG, dir, workflow: WORKFLOW, changelog: changelogFile() }, fakeGh({ failCreate: true }).gh, noPause))[0], /could not create the draft release/);
+  const patchFail = await publish({ repo: REPO, tag: TAG, dir, workflow: WORKFLOW, changelog: changelogFile() }, fakeGh({ failPatch: true }).gh, noPause);
   assert.match(patchFail[0], /could not make release v1\.2\.3 public/);
   assert.match(patchFail[1], /draft stays unpublished/);
   rmSync(join(dir, "amo-windows-x64.exe"));
   const { gh, calls } = fakeGh();
-  const missing = await publish({ repo: REPO, tag: TAG, dir, workflow: WORKFLOW }, gh, noPause);
+  const missing = await publish({ repo: REPO, tag: TAG, dir, workflow: WORKFLOW, changelog: changelogFile() }, gh, noPause);
   assert.match(missing.join("\n"), /amo-windows-x64\.exe is missing[\s\S]*nothing was published/);
   assert.equal(calls.length, 0, "no call to GitHub at all");
 });
@@ -247,7 +250,7 @@ test("verify-release: downloads the public release, compares files and digests, 
 });
 
 test("release notes say how to verify a download and name the SBOMs", () => {
-  const notes = releaseNotes(TAG, REPO, WORKFLOW);
+  const notes = releaseNotes(TAG, REPO, WORKFLOW, changelogSection(CHANGELOG_TEXT, "1.2.3"));
   for (const predicate of [PROVENANCE, SBOM]) {
     const example = `gh attestation verify hybridcloudworks-migration-core-1.2.3.tgz --repo owner/repo --predicate-type ${predicate} --source-ref refs/tags/v1.2.3 --signer-workflow owner/repo/${WORKFLOW} --deny-self-hosted-runners`;
     assert.ok(notes.includes(example), `both examples use the strict flags of the pipeline: ${predicate}`);
@@ -255,6 +258,21 @@ test("release notes say how to verify a download and name the SBOMs", () => {
   assert.ok(notes.includes("https://github.com/owner/repo/blob/v1.2.3/docs/release/README.md"), "a link, not a bare path");
   assert.match(notes, /amo-cli-1\.2\.3\.cdx\.json/);
   assert.match(notes, /https:\/\/github\.com\/owner\/repo\/blob\/v1\.2\.3\/CHANGELOG\.md/);
+  assert.ok(notes.startsWith("## What changed in v1.2.3\n\nWhat 1.2.3 changes, in plain words."), "the page opens with the version's summary");
+  assert.ok(!notes.includes("a change not released yet") && !notes.includes("Older."), "only this version's section");
+  assert.throws(() => releaseNotes(TAG, REPO, WORKFLOW, null), /no CHANGELOG\.md summary/);
+});
+
+test("publish refuses a release whose CHANGELOG has no section or no summary for the version, and creates nothing", async () => {
+  for (const text of ["# Changelog\n\n## Unreleased\n\n- x\n", "# Changelog\n\n## 1.2.3 — 2026-11-23\n\n<!-- summary -->\n\n- only entries\n"]) {
+    const f = join(scratch(), "CHANGELOG.md");
+    writeFileSync(f, text);
+    const never = fakeGh();
+    const problems = await publish({ repo: REPO, tag: TAG, dir: releaseDir(), workflow: WORKFLOW, changelog: f }, never.gh, noPause);
+    assert.match(problems.join("\n"), /no section with a summary for 1\.2\.3/);
+    assert.ok(problems.includes("nothing was published"));
+    assert.equal(never.calls.length, 0, "gh was never called");
+  }
 });
 
 test("gh api --paginate output (one array per page, back to back) is decoded", () => {
@@ -268,6 +286,7 @@ test("gh api --paginate output (one array per page, back to back) is decoded", (
 function fixture(versions = {}) {
   const root = scratch();
   const v = { pkg: "1.2.3", manifest: "1.2.3", lock: "1.2.3", lockRoot: "1.2.3", ...versions };
+  writeFileSync(join(root, "CHANGELOG.md"), CHANGELOG_TEXT);
   writeFileSync(join(root, "package.json"), JSON.stringify({ name: "x", version: v.pkg }));
   writeFileSync(join(root, "repository.manifest.json"), JSON.stringify({ version: v.manifest }));
   writeFileSync(join(root, "package-lock.json"), JSON.stringify({ version: v.lock, packages: { "": { version: v.lockRoot } } }));
@@ -439,4 +458,72 @@ test("the clean-consumer gate and the SBOM install the React peers at the exact 
     for (const line of text.split("\n").filter((l) => /"install"/.test(l))) assert.doesNotMatch(line, /["'`](react|react-dom|@types\/react[\w-]*)["'`]/, `${file}: a bare package name in an install (it would take the newest)`);
     assert.match(text, /lockedSpecs\(/, `${file}: installs from the lockfile`);
   }
+});
+
+test("a release run needs a CHANGELOG section with a summary for its version; a plain check does not", () => {
+  const root = fixture({ pkg: "1.2.4", manifest: "1.2.4", lock: "1.2.4", lockRoot: "1.2.4" });
+  assert.deepEqual(check(root).problems, [], "without a tag or --rehearse the CHANGELOG is not read");
+  assert.match(check(root, { tag: "v1.2.4" }).problems.join(), /no section "## 1\.2\.4 — YYYY-MM-DD"/);
+  assert.match(check(root, { rehearse: true }).problems.join(), /no section "## 1\.2\.4/);
+  assert.deepEqual(check(fixture(), { tag: "v1.2.3" }).problems, []);
+  assert.match(changelogProblems(scratch(), "1.2.3").join(), /cannot read CHANGELOG\.md/);
+});
+
+test("changelogSection finds a version's section by its heading and ignores look-alikes", () => {
+  const text = "## 1.2.3 — 2026-11-23 (title)\n\nThe summary.\n\n- entry\n\n### sub\n\n## Before\n\n### Monorepo 1.0.0 — 2026-10-03\n";
+  const s = changelogSection(text, "1.2.3");
+  assert.equal(s.date, "2026-11-23");
+  assert.equal(s.summary, "The summary.", "the first paragraph under the heading");
+  assert.ok(s.body.includes("### sub") && !s.body.includes("Before"), "runs to the next level-2 heading");
+  assert.equal(changelogSection(text, "1.0.0"), null, "a level-3 'Monorepo' heading is not a release");
+  assert.equal(changelogSection("## 1.2.30 — 2026-11-23\n\nx\n", "1.2.3"), null, "1.2.3 is not 1.2.30");
+});
+
+test("--set-version moves the Unreleased entries into a new dated section and leaves the summary to write", () => {
+  const root = fixture();
+  setVersion(root, "1.3.0", "2026-12-01");
+  const text = readFileSync(join(root, "CHANGELOG.md"), "utf8");
+  assert.match(text, /## Unreleased\n\n## 1\.3\.0 — 2026-12-01\n\n<!-- summary:[^\n]*-->\n\n- a change not released yet\n/);
+  assert.match(changelogProblems(root, "1.3.0").join(), /still has the comment/, "a release cannot go out until the summary is written");
+  assert.throws(() => startChangelogSection(text, "1.3.0", "2026-12-02"), /already has a section for 1\.3\.0/);
+  assert.throws(() => startChangelogSection("# Changelog\n", "1.3.0", "2026-12-02"), /no "## Unreleased" heading/);
+});
+
+test("this repository's CHANGELOG has a section with a summary for the version in package.json", () => {
+  const root = fileURLToPath(new URL("../..", import.meta.url)); // a real path on Windows too, and with spaces in folder names
+  const { version } = JSON.parse(readFileSync(join(root, "package.json"), "utf8"));
+  assert.deepEqual(changelogProblems(root, version), []);
+});
+
+test("a CHANGELOG problem stops --set-version before any file is written", () => {
+  const root = fixture();
+  writeFileSync(join(root, "CHANGELOG.md"), "# Changelog\n\n## 1.2.3 — 2026-11-23\n\nSummary.\n");
+  assert.throws(() => setVersion(root, "1.3.0", "2026-12-01"), /no "## Unreleased" heading/);
+  assert.equal(JSON.parse(readFileSync(join(root, "package.json"), "utf8")).version, "1.2.3", "package.json is untouched");
+});
+
+test("the summary is the first plain paragraph under the heading, and the placeholder comment is never accepted", () => {
+  const sec = (body) => changelogSection(`## 1.2.3 — 2026-11-23\n\n${body}\n`, "1.2.3");
+  assert.equal(sec("What changed.\n\n- entry").summary, "What changed.");
+  assert.equal(sec("<!-- note -->\nWhat changed, under a comment.\n\n- entry").summary, "What changed, under a comment.");
+  for (const body of ["- entry\n\nLater paragraph.", "### Added\n\n- x", "* x", "1. x", "---", "> quoted", "   "]) assert.equal(sec(body).summary, "", JSON.stringify(body));
+  // A paragraph moved in from Unreleased does not count while the placeholder is still there.
+  const root = fixture();
+  writeFileSync(join(root, "CHANGELOG.md"), "# Changelog\n\n## Unreleased\n\nReported by someone.\n\n- entry\n");
+  setVersion(root, "1.3.0", "2026-12-01");
+  assert.match(changelogProblems(root, "1.3.0").join(), /still has the comment/);
+});
+
+test("--set-version keeps Windows line endings", () => {
+  const text = startChangelogSection("# Changelog\r\n\r\n## Unreleased\r\n\r\n- x\r\n", "1.3.0", "2026-12-01");
+  assert.ok(!/[^\r]\n/.test(text), "no bare \\n line ending was added");
+  assert.equal(changelogSection(text, "1.3.0").date, "2026-12-01");
+});
+
+test("comments are removed in one pass: an unclosed <!-- hides the rest, and many openings stay fast (CodeQL alert 29)", () => {
+  assert.equal(changelogSection("## 1.2.3 — 2026-11-23\n\n<!-- never closed\nLooks like a summary.\n", "1.2.3").summary, "");
+  assert.equal(changelogSection("## 1.2.3 — 2026-11-23\n\n<!-- a --><!-- b -->\nSummary.\n", "1.2.3").summary, "Summary.");
+  const started = performance.now();
+  changelogSection(`## 1.2.3 — 2026-11-23\n\n${"<!--".repeat(200_000)}\n`, "1.2.3");
+  assert.ok(performance.now() - started < 2000, "200,000 unclosed openings are read in well under two seconds");
 });
