@@ -1,4 +1,4 @@
-# Learn move-support diff — 2026-11-22
+# Learn move-support diff — 2026-11-23
 
 Source: https://raw.githubusercontent.com/MicrosoftDocs/azure-docs/main/articles/azure-resource-manager/management/move-support-resources.md · matrix rows: 757 · rules checked: 35
 
