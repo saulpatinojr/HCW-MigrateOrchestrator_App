@@ -64,7 +64,8 @@ It can never create a release: only a pushed tag does.
    This signs the files and checks the signatures with the same strict command a real tag uses. It writes four permanent entries
    to the public signing log, naming `refs/heads/main`. That is harmless but cannot be undone, which is why it is off by default.
 
-What the green dry run tells you: the version check passes, all three binaries build and pass their smoke test, the two tarballs
+What the green dry run tells you: the version check passes (including that `CHANGELOG.md` has a section with a summary for this
+version), all three binaries build and pass their smoke test, the two tarballs
 pass the clean-consumer gate, both SBOMs are generated, and exactly the ten expected files exist. If `main` still has the version
 of the last release, the run prints a warning that the tag already exists: a real tag would be refused until the version is raised.
 
@@ -106,17 +107,26 @@ These happen only on a real tag, so the first real tag was also their first test
 1. **Raise the version in a pull request** (the version check refuses anything else). From a clean, up-to-date clone, on a new
    branch. bash or PowerShell:
 
-   ```bash
-   node scripts/check-release-version.mjs --set-version 0.3.2
-   npm test
-   ```
+   1. Raise the version:
 
-   `0.3.2` is only an example: use the next version you mean to release. The command writes the version into `package.json`,
-   `package-lock.json` (both places it appears) and `repository.manifest.json`; the release check refuses a tag if they disagree.
-   It also moves the entries under "Unreleased" in `CHANGELOG.md` into a new section, `## 0.3.2 — <today's date>`, with a
-   comment where the summary goes. **Replace that comment with one or two plain sentences on what the release changes.** That
-   summary opens the release page (the release notes), and `npm test` fails until it is written; the release check refuses a
-   tag whose version has no section with a summary. Merge the pull request; the new version is then on `main`.
+      ```bash
+      node scripts/check-release-version.mjs --set-version 0.3.2
+      ```
+
+      `0.3.2` is only an example: use the next version you mean to release. The command writes the version into
+      `package.json`, `package-lock.json` (both places it appears) and `repository.manifest.json`; the release check refuses a
+      tag if they disagree. It also moves the entries under "Unreleased" in `CHANGELOG.md` into a new section,
+      `## 0.3.2 — <today's date in UTC>`, with a comment where the summary goes. **When it worked**, it prints "version set to
+      0.3.2 …; CHANGELOG.md has a new section for it".
+   2. **Write the release notes.** Open `CHANGELOG.md`, find the new section, and replace the comment with one or two plain
+      sentences on what the release changes. That summary opens the release page. If the tag will go out on a later day,
+      change the date in the heading to that day.
+   3. Run `npm test`. **When it worked**, it ends with `fail 0`. If it says the section "still has the comment" or "has no
+      summary", step 2 is not done yet.
+   4. Open the pull request and merge it; the new version is then on `main`.
+
+   The release check (in `release-cli.yml`, and the same check in `publish-images.yml` and `publish-npm.yml`) refuses a tag or
+   a dry run whose version has no `CHANGELOG.md` section with a summary.
 2. **Rehearse** (section 2). Do not skip this for the first release made with this pipeline.
 3. **Tag the exact commit the dry run built.** PowerShell:
 
@@ -176,7 +186,7 @@ These happen only on a real tag, so the first real tag was also their first test
 
 4. **Watch the tag run** in [Actions](https://github.com/saulpatinojr/HCW-MigrateOrchestrator_App/actions/workflows/release-cli.yml).
    When all eight jobs are green, open the [release page](https://github.com/saulpatinojr/HCW-MigrateOrchestrator_App/releases) and
-   check it lists the ten files from section 1.
+   check it opens with "What changed in v<version>" and your summary, and lists the ten files from section 1.
 5. **Verify one download yourself** (optional but quick), with the same strict flags the pipeline uses. After downloading
    `hybridcloudworks-migration-core-<version>.tgz` from the release page into the current folder, bash:
 

@@ -133,7 +133,8 @@ clearly right follow-ups; each is reversible by reverting the workflow change.
 Every release page opens with "What changed": the summary of the version's `CHANGELOG.md` section (`## X.Y.Z — YYYY-MM-DD`)
 and a link to its full list. `scripts/check-release-version.mjs --set-version` starts that section by moving the "Unreleased"
 entries into it and leaving a marked place for the summary; the version check refuses a tag (and the dry run) whose version has
-no section with a summary, before anything is built; and `scripts/release-publish.mjs publish` refuses to create the release
+no section with a summary, before anything is built (the same check runs first in `release-cli.yml`, `publish-images.yml` and
+`publish-npm.yml`, so an image push and an npm publish need it too); and `scripts/release-publish.mjs publish` refuses to create the release
 without it. Reason: the releases up to `v0.4.1` had empty pages or linked to a CHANGELOG whose changes were all under
 "Unreleased", which does not meet the OpenSSF Best Practices `release_notes` criterion. The past sections were rebuilt from the
 CHANGELOG as it stood at each tag. Rejected: GitHub's generated release notes (a list of pull request titles, not a summary).

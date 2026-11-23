@@ -28,8 +28,9 @@ Repository: <https://github.com/saulpatinojr/HCW-MigrateOrchestrator_App>
 
 Until 2026-11-23 they did not: the GitHub Release pages of `v0.2.0` to `v0.3.1` were empty, and `v0.4.0` and `v0.4.1` linked to
 a `CHANGELOG.md` whose changes were all under "Unreleased". Now every release has its own `CHANGELOG.md` section with a plain
-summary (rebuilt from the CHANGELOG as it stood at each tag), every release page opens with that summary, and the release
-process cannot publish a release without one (ADR-0034, amendment of 2026-11-23).
+summary (rebuilt from the CHANGELOG as it stood at each tag), the pages of `v0.2.0` to `v0.4.1` were given those summaries
+through the GitHub API once the change merged, and the release process cannot publish a release without one (ADR-0034,
+amendment of 2026-11-23). Answer release_notes "Met" once those pages show "What changed in …" at the top.
 
 ## Terms used below
 

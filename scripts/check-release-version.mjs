@@ -57,10 +57,14 @@ export function readVersions(root) {
 const SECTION_HEADING = /^## (\d+\.\d+\.\d+) — (\d{4}-\d{2}-\d{2})\b.*$/;
 const SUMMARY_PLACEHOLDER = "<!-- summary: one or two plain sentences on what this release changes, for its release page -->";
 
+/** A paragraph that is a list item, a heading, a quote, a rule or empty is not a summary. */
+const NOT_A_SUMMARY = /^(?:[-*+]\s|\d+[.)]\s|#|>|---|\*\*\*|___|$)/;
+
 /**
- * The CHANGELOG.md section for `version`: { heading, date, summary, body }, or null when there is none. The section runs from
- * its "## X.Y.Z — YYYY-MM-DD" heading to the next "## " heading. Its summary is its first paragraph that is not a list item
- * and not an HTML comment.
+ * The CHANGELOG.md section for `version`: { heading, date, summary, body, placeholder }, or null when there is none. The
+ * section runs from its "## X.Y.Z — YYYY-MM-DD" heading to the next "## " heading. Its summary is its first paragraph after
+ * the heading, once HTML comments are left out, and only when that paragraph is plain text (not a list item, heading,
+ * quote or rule). `placeholder` is true while the comment --set-version leaves is still there.
  */
 export function changelogSection(text, version) {
   const lines = text.split(/\r?\n/);
@@ -69,8 +73,9 @@ export function changelogSection(text, version) {
   let end = lines.findIndex((l, i) => i > start && /^## /.test(l));
   if (end === -1) end = lines.length;
   const body = lines.slice(start + 1, end).join("\n").trim();
-  const summary = body.split(/\n\s*\n/).map((p) => p.trim()).find((p) => p && !p.startsWith("- ") && !p.startsWith("<!--")) ?? "";
-  return { heading: lines[start], date: SECTION_HEADING.exec(lines[start])[2], summary, body };
+  const first = body.replace(/<!--[\s\S]*?-->/g, "").trim().split(/\n\s*\n/)[0]?.trim() ?? "";
+  const summary = NOT_A_SUMMARY.test(first) ? "" : first;
+  return { heading: lines[start], date: SECTION_HEADING.exec(lines[start])[2], summary, body, placeholder: body.includes(SUMMARY_PLACEHOLDER) };
 }
 
 /** Problems with the CHANGELOG.md section that the release notes of `version` are built from; empty when it is usable. */
@@ -83,7 +88,8 @@ export function changelogProblems(root, version) {
   }
   const section = changelogSection(text, version);
   if (!section) return [`CHANGELOG.md has no section "## ${version} — YYYY-MM-DD" for this version: the release notes are built from it. Run --set-version ${version}, or add the heading above that version's entries`];
-  if (!section.summary) return [`the CHANGELOG.md section for ${version} has no summary paragraph: write one or two plain sentences under its heading, in place of the comment that marks the spot; the release page shows them`];
+  if (section.placeholder) return [`the CHANGELOG.md section for ${version} still has the comment that marks where its summary goes: replace the comment with one or two plain sentences on what the release changes; the release page opens with them`];
+  if (!section.summary) return [`the CHANGELOG.md section for ${version} has no summary: its first paragraph under the heading must be one or two plain sentences (not a list item or a heading); the release page opens with them`];
   return [];
 }
 
@@ -96,7 +102,8 @@ export function startChangelogSection(text, version, date) {
   const marker = text.match(/^## Unreleased[ \t]*\r?\n/m);
   if (!marker) throw new Error('CHANGELOG.md has no "## Unreleased" heading to take the entries from');
   const at = marker.index + marker[0].length;
-  return `${text.slice(0, at)}\n## ${version} — ${date}\n\n${SUMMARY_PLACEHOLDER}\n${text.slice(at)}`;
+  const eol = marker[0].endsWith("\r\n") ? "\r\n" : "\n"; // keep the file's own line endings
+  return `${text.slice(0, at)}${eol}## ${version} — ${date}${eol}${eol}${SUMMARY_PLACEHOLDER}${eol}${text.slice(at)}`;
 }
 
 /** Compare two dotted versions (numbers only). */
@@ -115,6 +122,11 @@ export function atLeast(actual, minimum) {
  */
 export function setVersion(root, version, date = new Date().toISOString().slice(0, 10)) {
   if (!PLAIN_VERSION.test(version)) throw new Error(`${JSON.stringify(version)} is not a plain X.Y.Z`);
+  // Work out the new CHANGELOG.md first, so a CHANGELOG problem stops the command before any file is written.
+  const changelog = join(root, "CHANGELOG.md");
+  let changelogText = null;
+  try { changelogText = readFileSync(changelog, "utf8"); } catch { changelogText = null; }
+  const newChangelog = changelogText === null ? null : startChangelogSection(changelogText, version, date);
   const edit = (file, change) => {
     const json = readJson(root, file);
     change(json);
@@ -124,10 +136,7 @@ export function setVersion(root, version, date = new Date().toISOString().slice(
   edit("package.json", (j) => { j.version = version; });
   edit("repository.manifest.json", (j) => { j.version = version; });
   edit("package-lock.json", (j) => { j.version = version; if (j.packages?.[""]) j.packages[""].version = version; });
-  const changelog = join(root, "CHANGELOG.md");
-  let text = null;
-  try { text = readFileSync(changelog, "utf8"); } catch { text = null; }
-  if (text !== null) writeFileSync(changelog, startChangelogSection(text, version, date));
+  if (newChangelog !== null) writeFileSync(changelog, newChangelog);
 }
 
 const git = (root, ...args) => spawnSync("git", args, { cwd: root, encoding: "utf8" });

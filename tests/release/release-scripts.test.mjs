@@ -1,4 +1,5 @@
 import { test } from "node:test";
+import { fileURLToPath } from "node:url";
 import assert from "node:assert/strict";
 import { createHash } from "node:crypto";
 import { copyFileSync, existsSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, rmSync, writeFileSync } from "node:fs";
@@ -469,10 +470,10 @@ test("a release run needs a CHANGELOG section with a summary for its version; a 
 });
 
 test("changelogSection finds a version's section by its heading and ignores look-alikes", () => {
-  const text = "## 1.2.3 — 2026-11-23 (title)\n\n- entry first\n\nThe summary.\n\n### sub\n\n## Before\n\n### Monorepo 1.0.0 — 2026-10-03\n";
+  const text = "## 1.2.3 — 2026-11-23 (title)\n\nThe summary.\n\n- entry\n\n### sub\n\n## Before\n\n### Monorepo 1.0.0 — 2026-10-03\n";
   const s = changelogSection(text, "1.2.3");
   assert.equal(s.date, "2026-11-23");
-  assert.equal(s.summary, "The summary.", "the first paragraph that is not a list item");
+  assert.equal(s.summary, "The summary.", "the first paragraph under the heading");
   assert.ok(s.body.includes("### sub") && !s.body.includes("Before"), "runs to the next level-2 heading");
   assert.equal(changelogSection(text, "1.0.0"), null, "a level-3 'Monorepo' heading is not a release");
   assert.equal(changelogSection("## 1.2.30 — 2026-11-23\n\nx\n", "1.2.3"), null, "1.2.3 is not 1.2.30");
@@ -483,13 +484,38 @@ test("--set-version moves the Unreleased entries into a new dated section and le
   setVersion(root, "1.3.0", "2026-12-01");
   const text = readFileSync(join(root, "CHANGELOG.md"), "utf8");
   assert.match(text, /## Unreleased\n\n## 1\.3\.0 — 2026-12-01\n\n<!-- summary:[^\n]*-->\n\n- a change not released yet\n/);
-  assert.match(changelogProblems(root, "1.3.0").join(), /no summary paragraph/, "a release cannot go out until the summary is written");
+  assert.match(changelogProblems(root, "1.3.0").join(), /still has the comment/, "a release cannot go out until the summary is written");
   assert.throws(() => startChangelogSection(text, "1.3.0", "2026-12-02"), /already has a section for 1\.3\.0/);
   assert.throws(() => startChangelogSection("# Changelog\n", "1.3.0", "2026-12-02"), /no "## Unreleased" heading/);
 });
 
 test("this repository's CHANGELOG has a section with a summary for the version in package.json", () => {
-  const root = new URL("../..", import.meta.url).pathname;
+  const root = fileURLToPath(new URL("../..", import.meta.url)); // a real path on Windows too, and with spaces in folder names
   const { version } = JSON.parse(readFileSync(join(root, "package.json"), "utf8"));
   assert.deepEqual(changelogProblems(root, version), []);
+});
+
+test("a CHANGELOG problem stops --set-version before any file is written", () => {
+  const root = fixture();
+  writeFileSync(join(root, "CHANGELOG.md"), "# Changelog\n\n## 1.2.3 — 2026-11-23\n\nSummary.\n");
+  assert.throws(() => setVersion(root, "1.3.0", "2026-12-01"), /no "## Unreleased" heading/);
+  assert.equal(JSON.parse(readFileSync(join(root, "package.json"), "utf8")).version, "1.2.3", "package.json is untouched");
+});
+
+test("the summary is the first plain paragraph under the heading, and the placeholder comment is never accepted", () => {
+  const sec = (body) => changelogSection(`## 1.2.3 — 2026-11-23\n\n${body}\n`, "1.2.3");
+  assert.equal(sec("What changed.\n\n- entry").summary, "What changed.");
+  assert.equal(sec("<!-- note -->\nWhat changed, under a comment.\n\n- entry").summary, "What changed, under a comment.");
+  for (const body of ["- entry\n\nLater paragraph.", "### Added\n\n- x", "* x", "1. x", "---", "> quoted", "   "]) assert.equal(sec(body).summary, "", JSON.stringify(body));
+  // A paragraph moved in from Unreleased does not count while the placeholder is still there.
+  const root = fixture();
+  writeFileSync(join(root, "CHANGELOG.md"), "# Changelog\n\n## Unreleased\n\nReported by someone.\n\n- entry\n");
+  setVersion(root, "1.3.0", "2026-12-01");
+  assert.match(changelogProblems(root, "1.3.0").join(), /still has the comment/);
+});
+
+test("--set-version keeps Windows line endings", () => {
+  const text = startChangelogSection("# Changelog\r\n\r\n## Unreleased\r\n\r\n- x\r\n", "1.3.0", "2026-12-01");
+  assert.ok(!/[^\r]\n/.test(text), "no bare \\n line ending was added");
+  assert.equal(changelogSection(text, "1.3.0").date, "2026-12-01");
 });
