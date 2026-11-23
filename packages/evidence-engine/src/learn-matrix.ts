@@ -13,6 +13,12 @@ export interface LearnMatrixRow {
   resourceType: string; // fully qualified, lowercased, without Learn's bracketed label
   /** Learn's label in brackets after the type, e.g. "managed" in "certificates (managed)"; absent on a plain row. */
   variant?: string;
+  /**
+   * Set when the first cell names a product rather than a resource type: "Cognitive Search" under Microsoft.CognitiveServices
+   * (the real type has its own row, Microsoft.Search searchservices) or "AKS cluster" under Microsoft.DevSpaces. A resource
+   * type never contains a space. Absent on a real type. The diff leaves such a row out and lists it in `notTypes`.
+   */
+  notAResourceType?: true;
   resourceGroupMove: SupportState;
   subscriptionMove: SupportState;
   regionRelocation: SupportState;
@@ -173,6 +179,7 @@ export function parseLearnMoveSupport(markdown: string): LearnMatrixRow[] {
       provider: fq.split("/")[0],
       resourceType: fq.toLowerCase(),
       ...(variant ? { variant } : {}),
+      ...(/\s/.test(fq) ? { notAResourceType: true as const } : {}),
       resourceGroupMove: withGuidance(normalizeLearnCell(rg)),
       subscriptionMove: withGuidance(normalizeLearnCell(sub)),
       regionRelocation: normalizeLearnCell(region),
@@ -202,8 +209,14 @@ export interface MatrixDiff {
  * Learn's column describes Resource Mover, while rules also encode service-native relocation paths.
  * When a type appears in more than one row (a later table in the same section repeats it), the first row is used, except
  * that a plain row is preferred to a labelled one: "certificates" over "certificates (managed)" under Microsoft.Web.
+ * A row whose first cell names a product rather than a resource type (`notAResourceType`) is never compared and is not
+ * counted as a type without a rule; it is listed in `notTypes` so the report still shows it.
  */
-export function diffRulesAgainstMatrix(rules: MigrationRule[], matrix: LearnMatrixRow[]): { diffs: MatrixDiff[]; uncovered: string[]; notInMatrix: string[] } {
+export function diffRulesAgainstMatrix(rules: MigrationRule[], matrix: LearnMatrixRow[]): { diffs: MatrixDiff[]; uncovered: string[]; notInMatrix: string[]; notTypes: string[] } {
+  // The flag is set by the parser; the space test also covers rows built elsewhere, such as an older saved report.
+  const isNotType = (m: LearnMatrixRow): boolean => m.notAResourceType === true || /\s/.test(m.resourceType);
+  const notTypes = [...new Set(matrix.filter(isNotType).map((m) => m.resourceType))];
+  matrix = matrix.filter((m) => !isNotType(m));
   const byType = new Map<string, LearnMatrixRow>();
   for (const m of matrix) {
     const seen = byType.get(m.resourceType);
@@ -223,5 +236,5 @@ export function diffRulesAgainstMatrix(rules: MigrationRule[], matrix: LearnMatr
     }
   }
   const uncovered = [...byType.values()].filter((m) => !ruleTypes.has(m.resourceType) && m.resourceGroupMove !== "unknown").map((m) => m.resourceType);
-  return { diffs, uncovered, notInMatrix };
+  return { diffs, uncovered, notInMatrix, notTypes };
 }

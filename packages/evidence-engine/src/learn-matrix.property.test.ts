@@ -18,7 +18,7 @@ const rules = loadRules(defaultRulesDir()).rules;
 // generated text reaches headings, notes, tables, rows, guidance and the diff instead of being skipped.
 const cellA = fc.constantFrom("**Yes**", "Yes", "No", "Pending", "Yes - with restrictions", "**Yes** - Full <br> No - Incremental", "No <br/> See notes", "-", "");
 const typeA = fc.oneof(fc.constantFrom("virtualmachines", "disks", "availabilitysets", "networkinterfaces", "virtualnetworks", "sites", "storageaccounts",
-  "virtualmachines (Cloud Services)", "virtualmachines / extensions", "certificates (managed)"), fc.string({ maxLength: 8 }));
+  "virtualmachines (Cloud Services)", "virtualmachines / extensions", "certificates (managed)", "Cognitive Search"), fc.string({ maxLength: 8 }));
 const hrefA = fc.oneof(fc.constantFrom("./move-limitations/x.md", "/azure/x?toc=/a", "../../backup/y.md", "http://[", "javascript:alert(1)", "//evil.example/move",
   "https://user@learn.microsoft.com/x", "https://learn.microsoft.com:8443/x", "https://fakelearn.microsoft.com/x", "data:text/html,move"), fc.string({ maxLength: 12 }));
 const lineA = fc.oneof(
@@ -39,6 +39,8 @@ const checkRows = (rows: LearnMatrixRow[]): void => {
     assert.equal(r.resourceType, r.resourceType.toLowerCase());
     for (const s of [r.resourceGroupMove, r.subscriptionMove, r.regionRelocation]) assert.ok(STATES.has(s), s);
     if (r.guidance) assert.ok(r.guidance.url.startsWith(LEARN), r.guidance.url);
+    // A resource type never contains a space; a first cell that does is flagged instead of being passed off as one.
+    assert.equal(/\s/.test(r.resourceType), r.notAResourceType === true, r.resourceType);
   }
 };
 
