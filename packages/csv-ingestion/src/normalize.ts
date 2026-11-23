@@ -107,7 +107,14 @@ const CANONICAL_TYPES: Record<string, string> = Object.fromEntries(
 
 export function canonicalType(t: string): string {
   const trimmed = t.trim().replace(/\s+/g, "");
-  return CANONICAL_TYPES[trimmed.toLowerCase()] ?? trimmed;
+  const key = trimmed.toLowerCase();
+  // Own entries only: a plain-object lookup of "__proto__" or "constructor" would return a member of Object.prototype.
+  return Object.hasOwn(CANONICAL_TYPES, key) ? CANONICAL_TYPES[key] : trimmed;
+}
+
+/** Sets a tag as a plain data property, so a key such as "__proto__" is stored as a tag rather than changing the prototype. */
+function setTag(tags: Record<string, string>, k: string, v: string): void {
+  Object.defineProperty(tags, k, { value: v, enumerable: true, writable: true, configurable: true });
 }
 
 /** Portal exports write tags as `key: value; key2: value2` or JSON. */
@@ -118,7 +125,7 @@ export function parseTags(raw: string | undefined | null): { tags: Record<string
     try {
       const o = JSON.parse(s) as Record<string, unknown>;
       const tags: Record<string, string> = {};
-      for (const [k, v] of Object.entries(o)) tags[k] = String(v ?? "");
+      for (const [k, v] of Object.entries(o)) setTag(tags, k, String(v ?? ""));
       return { tags, transformation: "json" };
     } catch {
       return { tags: {}, transformation: "json-parse-failed" };
@@ -132,7 +139,7 @@ export function parseTags(raw: string | undefined | null): { tags: Record<string
     if (sep === -1) continue;
     const k = part.slice(0, sep).trim();
     const v = part.slice(sep + 1).trim();
-    if (k) tags[k] = v;
+    if (k) setTag(tags, k, v);
   }
   return { tags, transformation: "key-value-list" };
 }

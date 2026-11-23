@@ -95,3 +95,12 @@ test("per-operation confidence differs by support state", () => {
   const disk = classifyResource(res("Microsoft.Compute/disks", "disk"), ctx({}, true)); // authenticated: cap would otherwise equalise them
   assert.ok(disk.confidenceByOperation["cross-tenant-migration"].score < disk.confidenceByOperation["resource-group-move"].score);
 });
+
+test("an application-group tag key named like a built-in object member reads only the resource's own tags", () => {
+  const plain = classifyResource(res("Microsoft.Storage/storageAccounts", "st1"), ctx({ applicationGroupTagKey: "constructor" }));
+  assert.equal(plain.applicationGroup, null, "no tag called constructor: no application group");
+  const tags: Record<string, string> = {};
+  Object.defineProperty(tags, "constructor", { value: "billing", enumerable: true, writable: true, configurable: true });
+  const tagged = classifyResource(res("Microsoft.Storage/storageAccounts", "st2", { tags }), ctx({ applicationGroupTagKey: "constructor" }));
+  assert.equal(tagged.applicationGroup, "billing");
+});

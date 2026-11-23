@@ -85,7 +85,8 @@ export function classifyResource(r: NormalizedResource, ctx: ClassifyContext): R
     sku: r.sku,
     kind: r.kind,
     tags: r.tags,
-    applicationGroup: intent.applicationGroupTagKey ? r.tags[intent.applicationGroupTagKey] ?? null : null,
+    // Own tags only: a key such as "constructor" must not read a member of Object.prototype.
+    applicationGroup: intent.applicationGroupTagKey && Object.hasOwn(r.tags, intent.applicationGroupTagKey) ? r.tags[intent.applicationGroupTagKey] : null,
     dependencyGroup: r.resourceGroup,
     sourceScope: r.subscriptionId ? `/subscriptions/${r.subscriptionId}/resourceGroups/${r.resourceGroup ?? "?"}` : null,
     destinationScope: intent.destinationRegion ? `region:${intent.destinationRegion}` : null,

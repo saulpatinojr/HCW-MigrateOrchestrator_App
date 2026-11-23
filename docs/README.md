@@ -14,7 +14,7 @@ Canonical documentation for both repositories lives here (ADR-0028). Start with 
 | [`deployment/`](deployment/) | Azure appliance deployment (Container Apps, managed identity, Entra); lab deployment is documented downstream |
 | [`release/README.md`](release/README.md) | Owner runbook for cutting a release: what a release contains, the dry run that publishes nothing, what it cannot prove, and what to do when a step fails |
 | [`release/npm-publishing.md`](release/npm-publishing.md) | Owner runbook for the one-time npm bootstrap; after it, every `v*` tag publishes with trusted publishing |
-| [`governance/`](governance/) | Review-pack provenance and authoring standard |
+| [`governance/`](governance/) | Review-pack provenance and authoring standard; the answers for the OpenSSF Best Practices badge (`openssf-best-practices.md`) |
 | [`repository-existing-files-review.md`](repository-existing-files-review.md) | Historical intake review of the supplied governance pack (2026-10-03) |
 | [`../VALIDATION.md`](../VALIDATION.md) | What was executed and what was not, per change; limitations |
 

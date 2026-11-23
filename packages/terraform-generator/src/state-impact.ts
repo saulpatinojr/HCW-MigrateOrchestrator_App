@@ -60,7 +60,7 @@ export interface StateImpactEntry {
 function terraformTypeFor(d: ResourceDecisionRecord): string | null {
   const t = d.resourceType.toLowerCase();
   if (t === "microsoft.web/sites" && /functionapp/i.test(d.kind ?? "")) return "azurerm_linux_function_app";
-  return AZURERM_TYPE[t] ?? null;
+  return Object.hasOwn(AZURERM_TYPE, t) ? AZURERM_TYPE[t] : null; // own entries only: "constructor" is not a type
 }
 
 export function computeNewId(oldId: string | null, a: Assessment): { id: string | null; template: boolean } {

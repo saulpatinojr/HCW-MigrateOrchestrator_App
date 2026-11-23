@@ -63,10 +63,20 @@ const ABOUT_MOVING = /\bmov(e|ed|es|ing)\b|\brelocat|\bsubscription\b/i;
 /** The folder of the move-support article on Learn; the page's relative links resolve against it. */
 const ARTICLE_BASE = "https://learn.microsoft.com/en-us/azure/azure-resource-manager/management/";
 
-/** A link on the page as an absolute Learn address: "/azure/…" is site-relative, "./x.md" and "../../x.md" article-relative. */
-export function learnLinkToUrl(href: string): string {
+/**
+ * A link on the page as an absolute Learn address: "/azure/…" is site-relative, "./x.md" and "../../x.md" article-relative.
+ * Returns undefined for a link that is malformed or leads anywhere but https://learn.microsoft.com (another site, a
+ * javascript: or data: address), so a broken or hostile link on the fetched page neither throws nor counts as guidance.
+ */
+export function learnLinkToUrl(href: string): string | undefined {
   const target = href.startsWith("/azure/") ? `https://learn.microsoft.com/en-us${href}` : href;
-  const url = new URL(target, ARTICLE_BASE);
+  let url: URL;
+  try {
+    url = new URL(target, ARTICLE_BASE);
+  } catch {
+    return undefined;
+  }
+  if (url.protocol !== "https:" || url.hostname !== "learn.microsoft.com" || url.username || url.password || url.port) return undefined;
   url.searchParams.delete("toc");
   url.pathname = url.pathname.replace(/\.md$/, "");
   return url.toString();
@@ -76,7 +86,8 @@ const guidanceIn = (notes: string[][]): LearnMatrixRow["guidance"] => {
   for (const lines of notes) {
     const text = lines.map((l) => l.replace(/^-\s*/, "")).filter(Boolean).join(" ");
     for (const [, title, href] of text.matchAll(GUIDANCE_LINK)) {
-      if (ABOUT_MOVING.test(`${title} ${href}`)) return { text: stripMarkdown(text), url: learnLinkToUrl(href) };
+      const url = ABOUT_MOVING.test(`${title} ${href}`) ? learnLinkToUrl(href) : undefined;
+      if (url) return { text: stripMarkdown(text), url };
     }
   }
   return undefined;

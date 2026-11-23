@@ -97,3 +97,17 @@ test("resourceIdFromPortalLink reads both portal link shapes and rejects anythin
   assert.equal(resourceIdFromPortalLink(""), null);
   assert.equal(resourceIdFromPortalLink(null), null);
 });
+
+test("a type or tag key named like a built-in object member is read as plain text (found by the property tests)", () => {
+  // __proto__ and constructor used to find members of Object.prototype in a plain-object lookup and crash the import.
+  for (const t of ["__proto__", "constructor", "Constructor", "toString", "hasOwnProperty"]) {
+    const r = ingestResourcesCsv(`Name,Type,Resource group,Location\nvm1,${t},rg,eastus\n`);
+    assert.equal(r.resources.length, 1, t);
+    assert.equal(r.resources[0].type, t);
+  }
+  const tagged = ingestResourcesCsv("Name,Type,Tags\nvm1,Microsoft.Compute/virtualMachines,__proto__=x;env=prod\n").resources[0];
+  assert.deepEqual(Object.entries(tagged.tags), [["__proto__", "x"], ["env", "prod"]]);
+  assert.equal(Object.getPrototypeOf(tagged.tags), Object.prototype, "the tags object's prototype is untouched");
+  const json = ingestResourcesCsv('Name,Type,Tags\nvm1,Microsoft.Compute/virtualMachines,"{""__proto__"":""y""}"\n').resources[0];
+  assert.deepEqual(Object.entries(json.tags), [["__proto__", "y"]]);
+});

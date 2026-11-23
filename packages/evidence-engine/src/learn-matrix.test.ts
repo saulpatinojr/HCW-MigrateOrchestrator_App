@@ -383,3 +383,15 @@ test("removing HTML comments takes time in proportion to the page, even with man
   assert.deepEqual(parseLearnMoveSupport("<!--".repeat(200_000)), []);
   assert.ok(performance.now() - started < 2000, "200,000 unclosed openings are read in well under two seconds");
 });
+
+test("a malformed or off-site link in a guidance note neither throws nor counts as guidance (found by the property tests)", () => {
+  const page = (href: string) => `## Microsoft.X\n\n> [!IMPORTANT]\n> See [move guidance](${href}) to learn more.\n\n| Resource type | Resource group | Subscription | Region move |\n| --- | --- | --- | --- |\n| things | Yes | Yes | No |\n`;
+  for (const href of ["http://[", "javascript:alert(1", "//evil.example/move", "https://learn.microsoft.com.evil.example/x", "http://learn.microsoft.com/x",
+    "https://user@learn.microsoft.com/x", "https://learn.microsoft.com:8443/x", "https://fakelearn.microsoft.com/x"]) {
+    const [row] = parseLearnMoveSupport(page(href));
+    assert.equal(row.guidance, undefined, href);
+    assert.equal(row.resourceGroupMove, "supported", href);
+  }
+  const [learn] = parseLearnMoveSupport(page("./move-limitations/x.md"));
+  assert.equal(learn.guidance?.url, "https://learn.microsoft.com/en-us/azure/azure-resource-manager/management/move-limitations/x");
+});

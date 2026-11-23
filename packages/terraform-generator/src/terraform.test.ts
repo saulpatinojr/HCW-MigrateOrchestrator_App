@@ -52,3 +52,11 @@ test("argument manifest + schema check find an unknown argument", async () => {
   assert.equal((await checkArguments(manifest, mcp)).length, 1);
   assert.equal((await checkArguments({ ...manifest, resources: { azurerm_nope: ["a"] } }, mcp))[0].problem, "unknown-resource-type");
 });
+
+test("a resource type named like a built-in object member has no Terraform type (found by the property tests' bug class)", () => {
+  // AZURERM_TYPE["constructor"] used to return Object, which was written into state-impact files as "function Object …".
+  const a = asm({ destinationResourceGroup: "rg-b" }, ["constructor", "__proto__", "toString"].map((t) => dec({ displayName: t, resourceType: t })));
+  for (const e of stateImpactEntries(a)) assert.ok(e.suggestedAddress.startsWith("azurerm_UNKNOWN."), e.suggestedAddress);
+  const files = Object.values(generateStateImpact(a)).join("\n");
+  assert.ok(!/function Object|\[object Object\]/.test(files), "no built-in member leaks into the generated files");
+});
