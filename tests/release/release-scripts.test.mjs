@@ -519,3 +519,11 @@ test("--set-version keeps Windows line endings", () => {
   assert.ok(!/[^\r]\n/.test(text), "no bare \\n line ending was added");
   assert.equal(changelogSection(text, "1.3.0").date, "2026-12-01");
 });
+
+test("comments are removed in one pass: an unclosed <!-- hides the rest, and many openings stay fast (CodeQL alert 29)", () => {
+  assert.equal(changelogSection("## 1.2.3 — 2026-11-23\n\n<!-- never closed\nLooks like a summary.\n", "1.2.3").summary, "");
+  assert.equal(changelogSection("## 1.2.3 — 2026-11-23\n\n<!-- a --><!-- b -->\nSummary.\n", "1.2.3").summary, "Summary.");
+  const started = performance.now();
+  changelogSection(`## 1.2.3 — 2026-11-23\n\n${"<!--".repeat(200_000)}\n`, "1.2.3");
+  assert.ok(performance.now() - started < 2000, "200,000 unclosed openings are read in well under two seconds");
+});

@@ -57,6 +57,23 @@ export function readVersions(root) {
 const SECTION_HEADING = /^## (\d+\.\d+\.\d+) — (\d{4}-\d{2}-\d{2})\b.*$/;
 const SUMMARY_PLACEHOLDER = "<!-- summary: one or two plain sentences on what this release changes, for its release page -->";
 
+/**
+ * Drops `<!-- … -->` comments in one pass from left to right; an unclosed `<!--` hides the rest, as in a browser. A scan rather
+ * than a regular expression, so no "<!--" can be left behind and many unclosed openings cost no more time (CodeQL alert 29).
+ */
+function withoutComments(text) {
+  let out = "";
+  let from = 0;
+  for (;;) {
+    const open = text.indexOf("<!--", from);
+    if (open < 0) return out + text.slice(from);
+    out += text.slice(from, open);
+    const close = text.indexOf("-->", open + 4);
+    if (close < 0) return out;
+    from = close + 3;
+  }
+}
+
 /** A paragraph that is a list item, a heading, a quote, a rule or empty is not a summary. */
 const NOT_A_SUMMARY = /^(?:[-*+]\s|\d+[.)]\s|#|>|---|\*\*\*|___|$)/;
 
@@ -73,7 +90,7 @@ export function changelogSection(text, version) {
   let end = lines.findIndex((l, i) => i > start && /^## /.test(l));
   if (end === -1) end = lines.length;
   const body = lines.slice(start + 1, end).join("\n").trim();
-  const first = body.replace(/<!--[\s\S]*?-->/g, "").trim().split(/\n\s*\n/)[0]?.trim() ?? "";
+  const first = withoutComments(body).trim().split(/\n\s*\n/)[0]?.trim() ?? "";
   const summary = NOT_A_SUMMARY.test(first) ? "" : first;
   return { heading: lines[start], date: SECTION_HEADING.exec(lines[start])[2], summary, body, placeholder: body.includes(SUMMARY_PLACEHOLDER) };
 }
