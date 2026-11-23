@@ -1,39 +1,49 @@
-# Learn move-support diff — 2026-11-22
+# Learn move-support diff — 2026-11-23
 
 Source: https://raw.githubusercontent.com/MicrosoftDocs/azure-docs/main/articles/azure-resource-manager/management/move-support-resources.md · matrix rows: 757 · rules checked: 35
 
+**Nothing new to decide.** All 26 disagreements were reviewed earlier and kept, with the reason beside each.
+
 ## Disagreements (26)
 
-| Rule | Field | Rule says | Learn says | Learn cell |
-|---|---|---|---|---|
-| azure.compute.virtualmachines | regionRelocation | supported | conditional | **Yes** <br/><br/> Use [Azure Resource Mover](../../resource-mover/tutorial-move |
-| azure.compute.disks | resourceGroupMove | supported | conditional | Yes, with guidance (https://learn.microsoft.com/en-us/azure/azure-resource-manager/management/move-limitations/virtual-machines-move-limitations) |
-| azure.compute.disks | subscriptionMove | supported | conditional | Yes, with guidance (https://learn.microsoft.com/en-us/azure/azure-resource-manager/management/move-limitations/virtual-machines-move-limitations) |
-| azure.compute.disks | regionRelocation | supported | conditional | **Yes** <br/><br/> Use [Azure Resource Mover](../../resource-mover/tutorial-move |
-| azure.compute.snapshots | regionRelocation | conditional | unsupported | No - Full <br> No - Incremental |
-| azure.compute.availabilitysets | resourceGroupMove | supported | conditional | Yes, with guidance (https://learn.microsoft.com/en-us/azure/azure-resource-manager/management/move-limitations/virtual-machines-move-limitations) |
-| azure.compute.availabilitysets | subscriptionMove | supported | conditional | Yes, with guidance (https://learn.microsoft.com/en-us/azure/azure-resource-manager/management/move-limitations/virtual-machines-move-limitations) |
-| azure.compute.availabilitysets | regionRelocation | supported | conditional | **Yes** <br/><br/> Use [Azure Resource Mover](../../resource-mover/tutorial-move |
-| azure.compute.virtualmachines.extensions | resourceGroupMove | supported | conditional | Yes, with guidance (https://learn.microsoft.com/en-us/azure/azure-resource-manager/management/move-limitations/virtual-machines-move-limitations) |
-| azure.compute.virtualmachines.extensions | subscriptionMove | supported | conditional | Yes, with guidance (https://learn.microsoft.com/en-us/azure/azure-resource-manager/management/move-limitations/virtual-machines-move-limitations) |
-| azure.documentdb.databaseaccounts | regionRelocation | conditional | unsupported | No |
-| azure.insights.actiongroups | regionRelocation | supported | unsupported | No |
-| azure.network.networkinterfaces | resourceGroupMove | supported | conditional | Yes, with guidance (https://learn.microsoft.com/en-us/azure/azure-resource-manager/management/move-limitations/networking-move-limitations) |
-| azure.network.networkinterfaces | regionRelocation | supported | conditional | **Yes** <br/><br/> Use [Azure Resource Mover](../../resource-mover/tutorial-move |
-| azure.network.networksecuritygroups | resourceGroupMove | supported | conditional | Yes, with guidance (https://learn.microsoft.com/en-us/azure/azure-resource-manager/management/move-limitations/networking-move-limitations) |
-| azure.network.networksecuritygroups | subscriptionMove | supported | conditional | Yes, with guidance (https://learn.microsoft.com/en-us/azure/azure-resource-manager/management/move-limitations/networking-move-limitations) |
-| azure.network.networksecuritygroups | regionRelocation | supported | conditional | **Yes** <br/><br/> Use [Azure Resource Mover](../../resource-mover/tutorial-move |
-| azure.network.publicipaddresses | resourceGroupMove | supported | conditional | Yes, with guidance (https://learn.microsoft.com/en-us/azure/azure-resource-manager/management/move-limitations/networking-move-limitations) |
-| azure.network.publicipaddresses | regionRelocation | conditional | unsupported | **No**<br/><br/> Use [Azure Resource Mover](../../resource-mover/tutorial-move-r |
-| azure.network.loadbalancers | resourceGroupMove | supported | conditional | **Yes** - Basic SKU<br> **Yes** - Standard SKU |
-| azure.network.routetables | resourceGroupMove | supported | conditional | Yes, with guidance (https://learn.microsoft.com/en-us/azure/azure-resource-manager/management/move-limitations/networking-move-limitations) |
-| azure.network.routetables | subscriptionMove | supported | conditional | Yes, with guidance (https://learn.microsoft.com/en-us/azure/azure-resource-manager/management/move-limitations/networking-move-limitations) |
-| azure.network.privatednszones | resourceGroupMove | supported | conditional | Yes, with guidance (https://learn.microsoft.com/en-us/azure/azure-resource-manager/management/move-limitations/networking-move-limitations) |
-| azure.network.privatednszones | subscriptionMove | supported | conditional | Yes, with guidance (https://learn.microsoft.com/en-us/azure/azure-resource-manager/management/move-limitations/networking-move-limitations) |
-| azure.network.privatednszones | regionRelocation | supported | unsupported | No |
-| azure.sql.servers | regionRelocation | unsupported | supported | **Yes** |
+### New, not yet reviewed (0)
 
-## Resource types in the matrix without a rule (719)
+None.
+
+### Reviewed and kept as they are (26)
+
+A person compared each of these with Learn and decided the rule stays. The decisions are in `rules/reports/learn-diff-reviewed.json`; a row comes back as new when the rule or Learn's cell changes.
+
+| Rule | Field | Rule says | Learn says | Learn cell | Why the rule stays | Decided |
+|---|---|---|---|---|---|---|
+| azure.compute.virtualmachines | regionRelocation | supported | conditional | **Yes** <br/><br/> Use [Azure Resource Mover](../../resource-mover/tutorial-move | Learn's cell says Yes and only names the tool (Azure Resource Mover); the rule's region path is already Resource Mover. | 2026-11-16, https://github.com/saulpatinojr/HCW-MigrateOrchestrator_App/pull/131 (row 1 of its per-row table) |
+| azure.compute.disks | resourceGroupMove | supported | conditional | Yes, with guidance (https://learn.microsoft.com/en-us/azure/azure-resource-manager/management/move-limitations/virtual-machines-move-limitations) | The virtual machine move guidance names no limit for managed disks themselves; an attached disk moves with its virtual machine, whose rule carries the limits. | 2026-11-22, https://github.com/saulpatinojr/HCW-MigrateOrchestrator_App/pull/136 (row 3 of its per-row table) |
+| azure.compute.disks | subscriptionMove | supported | conditional | Yes, with guidance (https://learn.microsoft.com/en-us/azure/azure-resource-manager/management/move-limitations/virtual-machines-move-limitations) | The virtual machine move guidance names no limit for managed disks themselves; an attached disk moves with its virtual machine, whose rule carries the limits. | 2026-11-22, https://github.com/saulpatinojr/HCW-MigrateOrchestrator_App/pull/136 (row 4 of its per-row table) |
+| azure.compute.disks | regionRelocation | supported | conditional | **Yes** <br/><br/> Use [Azure Resource Mover](../../resource-mover/tutorial-move | Learn's cell says Yes and only names the tool (Azure Resource Mover); the rule's region path is already Resource Mover. | 2026-11-16, https://github.com/saulpatinojr/HCW-MigrateOrchestrator_App/pull/131 (row 2 of its per-row table) |
+| azure.compute.snapshots | regionRelocation | conditional | unsupported | No - Full <br> No - Incremental | There is no Resource Manager region move, but the rule's region path is the service's own copy of an incremental snapshot to another region. | 2026-11-16, https://github.com/saulpatinojr/HCW-MigrateOrchestrator_App/pull/131 (row 5 of its per-row table) |
+| azure.compute.availabilitysets | resourceGroupMove | supported | conditional | Yes, with guidance (https://learn.microsoft.com/en-us/azure/azure-resource-manager/management/move-limitations/virtual-machines-move-limitations) | The limit in the guidance is on the virtual machine (it cannot be moved on its own out of an availability set), not on the set; the set moves with its machines. | 2026-11-22, https://github.com/saulpatinojr/HCW-MigrateOrchestrator_App/pull/136 (row 5 of its per-row table) |
+| azure.compute.availabilitysets | subscriptionMove | supported | conditional | Yes, with guidance (https://learn.microsoft.com/en-us/azure/azure-resource-manager/management/move-limitations/virtual-machines-move-limitations) | The limit in the guidance is on the virtual machine (it cannot be moved on its own out of an availability set), not on the set; the set moves with its machines. | 2026-11-22, https://github.com/saulpatinojr/HCW-MigrateOrchestrator_App/pull/136 (row 6 of its per-row table) |
+| azure.compute.availabilitysets | regionRelocation | supported | conditional | **Yes** <br/><br/> Use [Azure Resource Mover](../../resource-mover/tutorial-move | Learn's cell says Yes and only names the tool (Azure Resource Mover); the rule's region path is already Resource Mover. | 2026-11-16, https://github.com/saulpatinojr/HCW-MigrateOrchestrator_App/pull/131 (row 6 of its per-row table) |
+| azure.compute.virtualmachines.extensions | resourceGroupMove | supported | conditional | Yes, with guidance (https://learn.microsoft.com/en-us/azure/azure-resource-manager/management/move-limitations/virtual-machines-move-limitations) | A child resource: an extension moves with its virtual machine, as the rule's note already says. | 2026-11-22, https://github.com/saulpatinojr/HCW-MigrateOrchestrator_App/pull/136 (row 9 of its per-row table) |
+| azure.compute.virtualmachines.extensions | subscriptionMove | supported | conditional | Yes, with guidance (https://learn.microsoft.com/en-us/azure/azure-resource-manager/management/move-limitations/virtual-machines-move-limitations) | A child resource: an extension moves with its virtual machine, as the rule's note already says. | 2026-11-22, https://github.com/saulpatinojr/HCW-MigrateOrchestrator_App/pull/136 (row 10 of its per-row table) |
+| azure.documentdb.databaseaccounts | regionRelocation | conditional | unsupported | No | The rule encodes Azure Cosmos DB's own path (add a region, fail over, remove the old region), not a Resource Manager move. | 2026-11-16, https://github.com/saulpatinojr/HCW-MigrateOrchestrator_App/pull/131 (row 8 of its per-row table) |
+| azure.insights.actiongroups | regionRelocation | supported | unsupported | No | A global resource: it stays where it is, and the rule's region pattern is "retain". | 2026-11-16, https://github.com/saulpatinojr/HCW-MigrateOrchestrator_App/pull/131 (row 9 of its per-row table) |
+| azure.network.networkinterfaces | resourceGroupMove | supported | conditional | Yes, with guidance (https://learn.microsoft.com/en-us/azure/azure-resource-manager/management/move-limitations/networking-move-limitations) | The limits in the networking guidance (Standard SKU public IP, move the whole virtual network) are about moves across subscriptions, not across resource groups. | 2026-11-22, https://github.com/saulpatinojr/HCW-MigrateOrchestrator_App/pull/136 (row 11 of its per-row table) |
+| azure.network.networkinterfaces | regionRelocation | supported | conditional | **Yes** <br/><br/> Use [Azure Resource Mover](../../resource-mover/tutorial-move | Learn's cell says Yes and only names the tool (Azure Resource Mover); the rule's region path is already Resource Mover. | 2026-11-16, https://github.com/saulpatinojr/HCW-MigrateOrchestrator_App/pull/131 (row 15 of its per-row table) |
+| azure.network.networksecuritygroups | resourceGroupMove | supported | conditional | Yes, with guidance (https://learn.microsoft.com/en-us/azure/azure-resource-manager/management/move-limitations/networking-move-limitations) | The networking guidance names nothing specific to network security groups; the general "move dependent resources together" is already a prerequisite of the virtual machine rule. | 2026-11-22, https://github.com/saulpatinojr/HCW-MigrateOrchestrator_App/pull/136 (row 15 of its per-row table) |
+| azure.network.networksecuritygroups | subscriptionMove | supported | conditional | Yes, with guidance (https://learn.microsoft.com/en-us/azure/azure-resource-manager/management/move-limitations/networking-move-limitations) | The networking guidance names nothing specific to network security groups; the general "move dependent resources together" is already a prerequisite of the virtual machine rule. | 2026-11-22, https://github.com/saulpatinojr/HCW-MigrateOrchestrator_App/pull/136 (row 16 of its per-row table) |
+| azure.network.networksecuritygroups | regionRelocation | supported | conditional | **Yes** <br/><br/> Use [Azure Resource Mover](../../resource-mover/tutorial-move | Learn's cell says Yes and only names the tool (Azure Resource Mover); the rule's region path is already Resource Mover. | 2026-11-16, https://github.com/saulpatinojr/HCW-MigrateOrchestrator_App/pull/131 (row 16 of its per-row table) |
+| azure.network.publicipaddresses | resourceGroupMove | supported | conditional | Yes, with guidance (https://learn.microsoft.com/en-us/azure/azure-resource-manager/management/move-limitations/networking-move-limitations) | The Standard SKU limit applies across subscriptions only; the subscription move is already conditional. | 2026-11-22, https://github.com/saulpatinojr/HCW-MigrateOrchestrator_App/pull/136 (row 17 of its per-row table) |
+| azure.network.publicipaddresses | regionRelocation | conditional | unsupported | **No**<br/><br/> Use [Azure Resource Mover](../../resource-mover/tutorial-move-r | "Conditional" with a recreate pattern is what Learn's cell describes: the configuration moves with Resource Mover, the address itself is not kept. | 2026-11-16, https://github.com/saulpatinojr/HCW-MigrateOrchestrator_App/pull/131 (row 18 of its per-row table) |
+| azure.network.loadbalancers | resourceGroupMove | supported | conditional | **Yes** - Basic SKU<br> **Yes** - Standard SKU | Learn's cell says Yes for both SKUs (Basic and Standard); the report reads any qualifier after Yes as conditional. | 2026-11-16, https://github.com/saulpatinojr/HCW-MigrateOrchestrator_App/pull/131 (row 19 of its per-row table) |
+| azure.network.routetables | resourceGroupMove | supported | conditional | Yes, with guidance (https://learn.microsoft.com/en-us/azure/azure-resource-manager/management/move-limitations/networking-move-limitations) | The networking guidance names nothing specific to route tables. | 2026-11-22, https://github.com/saulpatinojr/HCW-MigrateOrchestrator_App/pull/136 (row 18 of its per-row table) |
+| azure.network.routetables | subscriptionMove | supported | conditional | Yes, with guidance (https://learn.microsoft.com/en-us/azure/azure-resource-manager/management/move-limitations/networking-move-limitations) | The networking guidance names nothing specific to route tables. | 2026-11-22, https://github.com/saulpatinojr/HCW-MigrateOrchestrator_App/pull/136 (row 19 of its per-row table) |
+| azure.network.privatednszones | resourceGroupMove | supported | conditional | Yes, with guidance (https://learn.microsoft.com/en-us/azure/azure-resource-manager/management/move-limitations/networking-move-limitations) | The networking guidance names nothing specific to private DNS zones. | 2026-11-22, https://github.com/saulpatinojr/HCW-MigrateOrchestrator_App/pull/136 (row 20 of its per-row table) |
+| azure.network.privatednszones | subscriptionMove | supported | conditional | Yes, with guidance (https://learn.microsoft.com/en-us/azure/azure-resource-manager/management/move-limitations/networking-move-limitations) | The networking guidance names nothing specific to private DNS zones. | 2026-11-22, https://github.com/saulpatinojr/HCW-MigrateOrchestrator_App/pull/136 (row 21 of its per-row table) |
+| azure.network.privatednszones | regionRelocation | supported | unsupported | No | A global resource: it stays where it is, and the rule's region pattern is "retain". | 2026-11-16, https://github.com/saulpatinojr/HCW-MigrateOrchestrator_App/pull/131 (row 27 of its per-row table) |
+| azure.sql.servers | regionRelocation | unsupported | supported | **Yes** | Resource Mover's own tutorial says it does not move a SQL server across regions (a target server must exist first); the rule's failover-group path stays. | 2026-11-16, https://github.com/saulpatinojr/HCW-MigrateOrchestrator_App/pull/131 (row 30 of its per-row table) |
+
+## Resource types in the matrix without a rule (718)
 
 - microsoft.aad/domainservices
 - microsoft.aadiam/diagnosticsettings
@@ -174,7 +184,6 @@ Source: https://raw.githubusercontent.com/MicrosoftDocs/azure-docs/main/articles
 - microsoft.classicstorage/vmimages
 - microsoft.classicsubscription/operations
 - microsoft.cognitiveservices/accounts
-- microsoft.cognitiveservices/cognitive search
 - microsoft.commerce/ratecard
 - microsoft.commerce/usageaggregates
 - microsoft.communication/communicationservices
@@ -235,9 +244,17 @@ Source: https://raw.githubusercontent.com/MicrosoftDocs/azure-docs/main/articles
 - microsoft.costmanagement/alerts
 - microsoft.costmanagement/billingaccounts
 - microsoft.costmanagement/budgets
+- microsoft.costmanagement/cloudconnectors
 
 ## Rule types not found in the matrix (1)
 
 - Microsoft.Network/virtualNetworks/subnets
 
-Region-move disagreements are expected where a rule encodes a service-native relocation path rather than Resource Mover support. Review each row; update `scripts/author-rules.mjs`, bump `ruleVersion`, set `retrievedOn`, regenerate and re-snapshot.
+## Learn rows that name a product, not a resource type (2)
+
+These rows are left out of the comparison above; a resource type never contains a space.
+
+- microsoft.cognitiveservices/cognitive search
+- microsoft.devspaces/aks cluster
+
+Region-move disagreements are expected where a rule encodes a service-native relocation path rather than Resource Mover support. Review each new row. To accept it: update `scripts/author-rules.mjs`, bump `ruleVersion`, set `retrievedOn`, regenerate and re-snapshot. To keep the rule: add the row to `rules/reports/learn-diff-reviewed.json` with the reason and a link to where it was decided.

@@ -21,3 +21,10 @@ answered 404 and was removed, so the path is no longer marked [VERIFY]. The arti
 the parser now reads. A run that parses 0 rows exits with an error and writes no report, because an empty matrix otherwise
 reads as agreement. A plain "Yes" for resource group or subscription move under a section note that links move guidance is
 treated as `conditional`, matching the rule that any qualifier makes a Learn cell conditional.
+
+## Amendment (2026-11-23)
+A disagreement that a person has reviewed and decided to keep is recorded in `rules/reports/learn-diff-reviewed.json` with
+its reason and a link to the decision (issue 132). The report still lists every disagreement, but new ones come first and
+reviewed ones carry their reason, so a new row is not lost among rows that were already decided. A decision is keyed on the
+rule, the field and both values, so it never covers a difference that appeared later. Rules are still never changed
+automatically, and the file is edited by a person only.

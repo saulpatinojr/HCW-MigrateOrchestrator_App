@@ -1,8 +1,10 @@
 {
-  "retrievedOn": "2026-11-22",
+  "retrievedOn": "2026-11-23",
   "source": "https://raw.githubusercontent.com/MicrosoftDocs/azure-docs/main/articles/azure-resource-manager/management/move-support-resources.md",
   "matrixRows": 757,
   "rulesChecked": 35,
+  "newDiffs": 0,
+  "reviewedDiffs": 26,
   "diffs": [
     {
       "ruleId": "azure.compute.virtualmachines",
@@ -10,7 +12,12 @@
       "field": "regionRelocation",
       "rule": "supported",
       "learn": "conditional",
-      "learnRaw": "**Yes** <br/><br/> Use [Azure Resource Mover](../../resource-mover/tutorial-move-region-virtual-machines.md) to move Azure Virtual Machines."
+      "learnRaw": "**Yes** <br/><br/> Use [Azure Resource Mover](../../resource-mover/tutorial-move-region-virtual-machines.md) to move Azure Virtual Machines.",
+      "reviewed": {
+        "reason": "Learn's cell says Yes and only names the tool (Azure Resource Mover); the rule's region path is already Resource Mover.",
+        "decidedIn": "https://github.com/saulpatinojr/HCW-MigrateOrchestrator_App/pull/131 (row 1 of its per-row table)",
+        "decidedOn": "2026-11-16"
+      }
     },
     {
       "ruleId": "azure.compute.disks",
@@ -19,7 +26,12 @@
       "rule": "supported",
       "learn": "conditional",
       "learnRaw": "**Yes**",
-      "learnGuidance": "https://learn.microsoft.com/en-us/azure/azure-resource-manager/management/move-limitations/virtual-machines-move-limitations"
+      "learnGuidance": "https://learn.microsoft.com/en-us/azure/azure-resource-manager/management/move-limitations/virtual-machines-move-limitations",
+      "reviewed": {
+        "reason": "The virtual machine move guidance names no limit for managed disks themselves; an attached disk moves with its virtual machine, whose rule carries the limits.",
+        "decidedIn": "https://github.com/saulpatinojr/HCW-MigrateOrchestrator_App/pull/136 (row 3 of its per-row table)",
+        "decidedOn": "2026-11-22"
+      }
     },
     {
       "ruleId": "azure.compute.disks",
@@ -28,7 +40,12 @@
       "rule": "supported",
       "learn": "conditional",
       "learnRaw": "**Yes**",
-      "learnGuidance": "https://learn.microsoft.com/en-us/azure/azure-resource-manager/management/move-limitations/virtual-machines-move-limitations"
+      "learnGuidance": "https://learn.microsoft.com/en-us/azure/azure-resource-manager/management/move-limitations/virtual-machines-move-limitations",
+      "reviewed": {
+        "reason": "The virtual machine move guidance names no limit for managed disks themselves; an attached disk moves with its virtual machine, whose rule carries the limits.",
+        "decidedIn": "https://github.com/saulpatinojr/HCW-MigrateOrchestrator_App/pull/136 (row 4 of its per-row table)",
+        "decidedOn": "2026-11-22"
+      }
     },
     {
       "ruleId": "azure.compute.disks",
@@ -36,7 +53,12 @@
       "field": "regionRelocation",
       "rule": "supported",
       "learn": "conditional",
-      "learnRaw": "**Yes** <br/><br/> Use [Azure Resource Mover](../../resource-mover/tutorial-move-region-virtual-machines.md) to move Azure VMs and related disks."
+      "learnRaw": "**Yes** <br/><br/> Use [Azure Resource Mover](../../resource-mover/tutorial-move-region-virtual-machines.md) to move Azure VMs and related disks.",
+      "reviewed": {
+        "reason": "Learn's cell says Yes and only names the tool (Azure Resource Mover); the rule's region path is already Resource Mover.",
+        "decidedIn": "https://github.com/saulpatinojr/HCW-MigrateOrchestrator_App/pull/131 (row 2 of its per-row table)",
+        "decidedOn": "2026-11-16"
+      }
     },
     {
       "ruleId": "azure.compute.snapshots",
@@ -44,7 +66,12 @@
       "field": "regionRelocation",
       "rule": "conditional",
       "learn": "unsupported",
-      "learnRaw": "No - Full <br> No - Incremental"
+      "learnRaw": "No - Full <br> No - Incremental",
+      "reviewed": {
+        "reason": "There is no Resource Manager region move, but the rule's region path is the service's own copy of an incremental snapshot to another region.",
+        "decidedIn": "https://github.com/saulpatinojr/HCW-MigrateOrchestrator_App/pull/131 (row 5 of its per-row table)",
+        "decidedOn": "2026-11-16"
+      }
     },
     {
       "ruleId": "azure.compute.availabilitysets",
@@ -53,7 +80,12 @@
       "rule": "supported",
       "learn": "conditional",
       "learnRaw": "**Yes**",
-      "learnGuidance": "https://learn.microsoft.com/en-us/azure/azure-resource-manager/management/move-limitations/virtual-machines-move-limitations"
+      "learnGuidance": "https://learn.microsoft.com/en-us/azure/azure-resource-manager/management/move-limitations/virtual-machines-move-limitations",
+      "reviewed": {
+        "reason": "The limit in the guidance is on the virtual machine (it cannot be moved on its own out of an availability set), not on the set; the set moves with its machines.",
+        "decidedIn": "https://github.com/saulpatinojr/HCW-MigrateOrchestrator_App/pull/136 (row 5 of its per-row table)",
+        "decidedOn": "2026-11-22"
+      }
     },
     {
       "ruleId": "azure.compute.availabilitysets",
@@ -62,7 +94,12 @@
       "rule": "supported",
       "learn": "conditional",
       "learnRaw": "**Yes**",
-      "learnGuidance": "https://learn.microsoft.com/en-us/azure/azure-resource-manager/management/move-limitations/virtual-machines-move-limitations"
+      "learnGuidance": "https://learn.microsoft.com/en-us/azure/azure-resource-manager/management/move-limitations/virtual-machines-move-limitations",
+      "reviewed": {
+        "reason": "The limit in the guidance is on the virtual machine (it cannot be moved on its own out of an availability set), not on the set; the set moves with its machines.",
+        "decidedIn": "https://github.com/saulpatinojr/HCW-MigrateOrchestrator_App/pull/136 (row 6 of its per-row table)",
+        "decidedOn": "2026-11-22"
+      }
     },
     {
       "ruleId": "azure.compute.availabilitysets",
@@ -70,7 +107,12 @@
       "field": "regionRelocation",
       "rule": "supported",
       "learn": "conditional",
-      "learnRaw": "**Yes** <br/><br/> Use [Azure Resource Mover](../../resource-mover/tutorial-move-region-virtual-machines.md) to move availability sets."
+      "learnRaw": "**Yes** <br/><br/> Use [Azure Resource Mover](../../resource-mover/tutorial-move-region-virtual-machines.md) to move availability sets.",
+      "reviewed": {
+        "reason": "Learn's cell says Yes and only names the tool (Azure Resource Mover); the rule's region path is already Resource Mover.",
+        "decidedIn": "https://github.com/saulpatinojr/HCW-MigrateOrchestrator_App/pull/131 (row 6 of its per-row table)",
+        "decidedOn": "2026-11-16"
+      }
     },
     {
       "ruleId": "azure.compute.virtualmachines.extensions",
@@ -79,7 +121,12 @@
       "rule": "supported",
       "learn": "conditional",
       "learnRaw": "**Yes**",
-      "learnGuidance": "https://learn.microsoft.com/en-us/azure/azure-resource-manager/management/move-limitations/virtual-machines-move-limitations"
+      "learnGuidance": "https://learn.microsoft.com/en-us/azure/azure-resource-manager/management/move-limitations/virtual-machines-move-limitations",
+      "reviewed": {
+        "reason": "A child resource: an extension moves with its virtual machine, as the rule's note already says.",
+        "decidedIn": "https://github.com/saulpatinojr/HCW-MigrateOrchestrator_App/pull/136 (row 9 of its per-row table)",
+        "decidedOn": "2026-11-22"
+      }
     },
     {
       "ruleId": "azure.compute.virtualmachines.extensions",
@@ -88,7 +135,12 @@
       "rule": "supported",
       "learn": "conditional",
       "learnRaw": "**Yes**",
-      "learnGuidance": "https://learn.microsoft.com/en-us/azure/azure-resource-manager/management/move-limitations/virtual-machines-move-limitations"
+      "learnGuidance": "https://learn.microsoft.com/en-us/azure/azure-resource-manager/management/move-limitations/virtual-machines-move-limitations",
+      "reviewed": {
+        "reason": "A child resource: an extension moves with its virtual machine, as the rule's note already says.",
+        "decidedIn": "https://github.com/saulpatinojr/HCW-MigrateOrchestrator_App/pull/136 (row 10 of its per-row table)",
+        "decidedOn": "2026-11-22"
+      }
     },
     {
       "ruleId": "azure.documentdb.databaseaccounts",
@@ -96,7 +148,12 @@
       "field": "regionRelocation",
       "rule": "conditional",
       "learn": "unsupported",
-      "learnRaw": "No"
+      "learnRaw": "No",
+      "reviewed": {
+        "reason": "The rule encodes Azure Cosmos DB's own path (add a region, fail over, remove the old region), not a Resource Manager move.",
+        "decidedIn": "https://github.com/saulpatinojr/HCW-MigrateOrchestrator_App/pull/131 (row 8 of its per-row table)",
+        "decidedOn": "2026-11-16"
+      }
     },
     {
       "ruleId": "azure.insights.actiongroups",
@@ -104,7 +161,12 @@
       "field": "regionRelocation",
       "rule": "supported",
       "learn": "unsupported",
-      "learnRaw": "No"
+      "learnRaw": "No",
+      "reviewed": {
+        "reason": "A global resource: it stays where it is, and the rule's region pattern is \"retain\".",
+        "decidedIn": "https://github.com/saulpatinojr/HCW-MigrateOrchestrator_App/pull/131 (row 9 of its per-row table)",
+        "decidedOn": "2026-11-16"
+      }
     },
     {
       "ruleId": "azure.network.networkinterfaces",
@@ -113,7 +175,12 @@
       "rule": "supported",
       "learn": "conditional",
       "learnRaw": "**Yes**",
-      "learnGuidance": "https://learn.microsoft.com/en-us/azure/azure-resource-manager/management/move-limitations/networking-move-limitations"
+      "learnGuidance": "https://learn.microsoft.com/en-us/azure/azure-resource-manager/management/move-limitations/networking-move-limitations",
+      "reviewed": {
+        "reason": "The limits in the networking guidance (Standard SKU public IP, move the whole virtual network) are about moves across subscriptions, not across resource groups.",
+        "decidedIn": "https://github.com/saulpatinojr/HCW-MigrateOrchestrator_App/pull/136 (row 11 of its per-row table)",
+        "decidedOn": "2026-11-22"
+      }
     },
     {
       "ruleId": "azure.network.networkinterfaces",
@@ -121,7 +188,12 @@
       "field": "regionRelocation",
       "rule": "supported",
       "learn": "conditional",
-      "learnRaw": "**Yes** <br/><br/> Use [Azure Resource Mover](../../resource-mover/tutorial-move-region-virtual-machines.md) to move NICs."
+      "learnRaw": "**Yes** <br/><br/> Use [Azure Resource Mover](../../resource-mover/tutorial-move-region-virtual-machines.md) to move NICs.",
+      "reviewed": {
+        "reason": "Learn's cell says Yes and only names the tool (Azure Resource Mover); the rule's region path is already Resource Mover.",
+        "decidedIn": "https://github.com/saulpatinojr/HCW-MigrateOrchestrator_App/pull/131 (row 15 of its per-row table)",
+        "decidedOn": "2026-11-16"
+      }
     },
     {
       "ruleId": "azure.network.networksecuritygroups",
@@ -130,7 +202,12 @@
       "rule": "supported",
       "learn": "conditional",
       "learnRaw": "**Yes**",
-      "learnGuidance": "https://learn.microsoft.com/en-us/azure/azure-resource-manager/management/move-limitations/networking-move-limitations"
+      "learnGuidance": "https://learn.microsoft.com/en-us/azure/azure-resource-manager/management/move-limitations/networking-move-limitations",
+      "reviewed": {
+        "reason": "The networking guidance names nothing specific to network security groups; the general \"move dependent resources together\" is already a prerequisite of the virtual machine rule.",
+        "decidedIn": "https://github.com/saulpatinojr/HCW-MigrateOrchestrator_App/pull/136 (row 15 of its per-row table)",
+        "decidedOn": "2026-11-22"
+      }
     },
     {
       "ruleId": "azure.network.networksecuritygroups",
@@ -139,7 +216,12 @@
       "rule": "supported",
       "learn": "conditional",
       "learnRaw": "**Yes**",
-      "learnGuidance": "https://learn.microsoft.com/en-us/azure/azure-resource-manager/management/move-limitations/networking-move-limitations"
+      "learnGuidance": "https://learn.microsoft.com/en-us/azure/azure-resource-manager/management/move-limitations/networking-move-limitations",
+      "reviewed": {
+        "reason": "The networking guidance names nothing specific to network security groups; the general \"move dependent resources together\" is already a prerequisite of the virtual machine rule.",
+        "decidedIn": "https://github.com/saulpatinojr/HCW-MigrateOrchestrator_App/pull/136 (row 16 of its per-row table)",
+        "decidedOn": "2026-11-22"
+      }
     },
     {
       "ruleId": "azure.network.networksecuritygroups",
@@ -147,7 +229,12 @@
       "field": "regionRelocation",
       "rule": "supported",
       "learn": "conditional",
-      "learnRaw": "**Yes** <br/><br/> Use [Azure Resource Mover](../../resource-mover/tutorial-move-region-virtual-machines.md) to move network security groups."
+      "learnRaw": "**Yes** <br/><br/> Use [Azure Resource Mover](../../resource-mover/tutorial-move-region-virtual-machines.md) to move network security groups.",
+      "reviewed": {
+        "reason": "Learn's cell says Yes and only names the tool (Azure Resource Mover); the rule's region path is already Resource Mover.",
+        "decidedIn": "https://github.com/saulpatinojr/HCW-MigrateOrchestrator_App/pull/131 (row 16 of its per-row table)",
+        "decidedOn": "2026-11-16"
+      }
     },
     {
       "ruleId": "azure.network.publicipaddresses",
@@ -156,7 +243,12 @@
       "rule": "supported",
       "learn": "conditional",
       "learnRaw": "**Yes**",
-      "learnGuidance": "https://learn.microsoft.com/en-us/azure/azure-resource-manager/management/move-limitations/networking-move-limitations"
+      "learnGuidance": "https://learn.microsoft.com/en-us/azure/azure-resource-manager/management/move-limitations/networking-move-limitations",
+      "reviewed": {
+        "reason": "The Standard SKU limit applies across subscriptions only; the subscription move is already conditional.",
+        "decidedIn": "https://github.com/saulpatinojr/HCW-MigrateOrchestrator_App/pull/136 (row 17 of its per-row table)",
+        "decidedOn": "2026-11-22"
+      }
     },
     {
       "ruleId": "azure.network.publicipaddresses",
@@ -164,7 +256,12 @@
       "field": "regionRelocation",
       "rule": "conditional",
       "learn": "unsupported",
-      "learnRaw": "**No**<br/><br/> Use [Azure Resource Mover](../../resource-mover/tutorial-move-region-virtual-machines.md) to move public IP address configurations (IP addresses are not retained)."
+      "learnRaw": "**No**<br/><br/> Use [Azure Resource Mover](../../resource-mover/tutorial-move-region-virtual-machines.md) to move public IP address configurations (IP addresses are not retained).",
+      "reviewed": {
+        "reason": "\"Conditional\" with a recreate pattern is what Learn's cell describes: the configuration moves with Resource Mover, the address itself is not kept.",
+        "decidedIn": "https://github.com/saulpatinojr/HCW-MigrateOrchestrator_App/pull/131 (row 18 of its per-row table)",
+        "decidedOn": "2026-11-16"
+      }
     },
     {
       "ruleId": "azure.network.loadbalancers",
@@ -172,7 +269,12 @@
       "field": "resourceGroupMove",
       "rule": "supported",
       "learn": "conditional",
-      "learnRaw": "**Yes** - Basic SKU<br> **Yes** - Standard SKU"
+      "learnRaw": "**Yes** - Basic SKU<br> **Yes** - Standard SKU",
+      "reviewed": {
+        "reason": "Learn's cell says Yes for both SKUs (Basic and Standard); the report reads any qualifier after Yes as conditional.",
+        "decidedIn": "https://github.com/saulpatinojr/HCW-MigrateOrchestrator_App/pull/131 (row 19 of its per-row table)",
+        "decidedOn": "2026-11-16"
+      }
     },
     {
       "ruleId": "azure.network.routetables",
@@ -181,7 +283,12 @@
       "rule": "supported",
       "learn": "conditional",
       "learnRaw": "**Yes**",
-      "learnGuidance": "https://learn.microsoft.com/en-us/azure/azure-resource-manager/management/move-limitations/networking-move-limitations"
+      "learnGuidance": "https://learn.microsoft.com/en-us/azure/azure-resource-manager/management/move-limitations/networking-move-limitations",
+      "reviewed": {
+        "reason": "The networking guidance names nothing specific to route tables.",
+        "decidedIn": "https://github.com/saulpatinojr/HCW-MigrateOrchestrator_App/pull/136 (row 18 of its per-row table)",
+        "decidedOn": "2026-11-22"
+      }
     },
     {
       "ruleId": "azure.network.routetables",
@@ -190,7 +297,12 @@
       "rule": "supported",
       "learn": "conditional",
       "learnRaw": "**Yes**",
-      "learnGuidance": "https://learn.microsoft.com/en-us/azure/azure-resource-manager/management/move-limitations/networking-move-limitations"
+      "learnGuidance": "https://learn.microsoft.com/en-us/azure/azure-resource-manager/management/move-limitations/networking-move-limitations",
+      "reviewed": {
+        "reason": "The networking guidance names nothing specific to route tables.",
+        "decidedIn": "https://github.com/saulpatinojr/HCW-MigrateOrchestrator_App/pull/136 (row 19 of its per-row table)",
+        "decidedOn": "2026-11-22"
+      }
     },
     {
       "ruleId": "azure.network.privatednszones",
@@ -199,7 +311,12 @@
       "rule": "supported",
       "learn": "conditional",
       "learnRaw": "**Yes**",
-      "learnGuidance": "https://learn.microsoft.com/en-us/azure/azure-resource-manager/management/move-limitations/networking-move-limitations"
+      "learnGuidance": "https://learn.microsoft.com/en-us/azure/azure-resource-manager/management/move-limitations/networking-move-limitations",
+      "reviewed": {
+        "reason": "The networking guidance names nothing specific to private DNS zones.",
+        "decidedIn": "https://github.com/saulpatinojr/HCW-MigrateOrchestrator_App/pull/136 (row 20 of its per-row table)",
+        "decidedOn": "2026-11-22"
+      }
     },
     {
       "ruleId": "azure.network.privatednszones",
@@ -208,7 +325,12 @@
       "rule": "supported",
       "learn": "conditional",
       "learnRaw": "**Yes**",
-      "learnGuidance": "https://learn.microsoft.com/en-us/azure/azure-resource-manager/management/move-limitations/networking-move-limitations"
+      "learnGuidance": "https://learn.microsoft.com/en-us/azure/azure-resource-manager/management/move-limitations/networking-move-limitations",
+      "reviewed": {
+        "reason": "The networking guidance names nothing specific to private DNS zones.",
+        "decidedIn": "https://github.com/saulpatinojr/HCW-MigrateOrchestrator_App/pull/136 (row 21 of its per-row table)",
+        "decidedOn": "2026-11-22"
+      }
     },
     {
       "ruleId": "azure.network.privatednszones",
@@ -216,7 +338,12 @@
       "field": "regionRelocation",
       "rule": "supported",
       "learn": "unsupported",
-      "learnRaw": "No"
+      "learnRaw": "No",
+      "reviewed": {
+        "reason": "A global resource: it stays where it is, and the rule's region pattern is \"retain\".",
+        "decidedIn": "https://github.com/saulpatinojr/HCW-MigrateOrchestrator_App/pull/131 (row 27 of its per-row table)",
+        "decidedOn": "2026-11-16"
+      }
     },
     {
       "ruleId": "azure.sql.servers",
@@ -224,9 +351,15 @@
       "field": "regionRelocation",
       "rule": "unsupported",
       "learn": "supported",
-      "learnRaw": "**Yes**"
+      "learnRaw": "**Yes**",
+      "reviewed": {
+        "reason": "Resource Mover's own tutorial says it does not move a SQL server across regions (a target server must exist first); the rule's failover-group path stays.",
+        "decidedIn": "https://github.com/saulpatinojr/HCW-MigrateOrchestrator_App/pull/131 (row 30 of its per-row table)",
+        "decidedOn": "2026-11-16"
+      }
     }
   ],
+  "reviewedNoLongerFound": [],
   "uncoveredTypesInMatrix": [
     "microsoft.aad/domainservices",
     "microsoft.aadiam/diagnosticsettings",
@@ -367,7 +500,6 @@
     "microsoft.classicstorage/vmimages",
     "microsoft.classicsubscription/operations",
     "microsoft.cognitiveservices/accounts",
-    "microsoft.cognitiveservices/cognitive search",
     "microsoft.commerce/ratecard",
     "microsoft.commerce/usageaggregates",
     "microsoft.communication/communicationservices",
@@ -950,5 +1082,9 @@
   ],
   "ruleTypesNotInMatrix": [
     "Microsoft.Network/virtualNetworks/subnets"
+  ],
+  "learnRowsNotAType": [
+    "microsoft.cognitiveservices/cognitive search",
+    "microsoft.devspaces/aks cluster"
   ]
 }

@@ -1,0 +1,239 @@
+{
+  "about": "Disagreements between a rule and Microsoft Learn's move-support page that a person reviewed and decided to keep. scripts/refresh-rules-from-learn.mjs reads this file and shows each one in the weekly report with its reason, apart from new disagreements. An entry matches one rule field with one pair of values (what the rule says, what Learn says); when either changes, the entry stops matching and the row is reported as new. Add an entry only after checking the row against Learn, and link where it was decided.",
+  "reviewed": [
+    {
+      "ruleId": "azure.compute.virtualmachines",
+      "field": "regionRelocation",
+      "rule": "supported",
+      "learn": "conditional",
+      "reason": "Learn's cell says Yes and only names the tool (Azure Resource Mover); the rule's region path is already Resource Mover.",
+      "decidedIn": "https://github.com/saulpatinojr/HCW-MigrateOrchestrator_App/pull/131 (row 1 of its per-row table)",
+      "decidedOn": "2026-11-16"
+    },
+    {
+      "ruleId": "azure.compute.disks",
+      "field": "resourceGroupMove",
+      "rule": "supported",
+      "learn": "conditional",
+      "reason": "The virtual machine move guidance names no limit for managed disks themselves; an attached disk moves with its virtual machine, whose rule carries the limits.",
+      "decidedIn": "https://github.com/saulpatinojr/HCW-MigrateOrchestrator_App/pull/136 (row 3 of its per-row table)",
+      "decidedOn": "2026-11-22"
+    },
+    {
+      "ruleId": "azure.compute.disks",
+      "field": "subscriptionMove",
+      "rule": "supported",
+      "learn": "conditional",
+      "reason": "The virtual machine move guidance names no limit for managed disks themselves; an attached disk moves with its virtual machine, whose rule carries the limits.",
+      "decidedIn": "https://github.com/saulpatinojr/HCW-MigrateOrchestrator_App/pull/136 (row 4 of its per-row table)",
+      "decidedOn": "2026-11-22"
+    },
+    {
+      "ruleId": "azure.compute.disks",
+      "field": "regionRelocation",
+      "rule": "supported",
+      "learn": "conditional",
+      "reason": "Learn's cell says Yes and only names the tool (Azure Resource Mover); the rule's region path is already Resource Mover.",
+      "decidedIn": "https://github.com/saulpatinojr/HCW-MigrateOrchestrator_App/pull/131 (row 2 of its per-row table)",
+      "decidedOn": "2026-11-16"
+    },
+    {
+      "ruleId": "azure.compute.snapshots",
+      "field": "regionRelocation",
+      "rule": "conditional",
+      "learn": "unsupported",
+      "reason": "There is no Resource Manager region move, but the rule's region path is the service's own copy of an incremental snapshot to another region.",
+      "decidedIn": "https://github.com/saulpatinojr/HCW-MigrateOrchestrator_App/pull/131 (row 5 of its per-row table)",
+      "decidedOn": "2026-11-16"
+    },
+    {
+      "ruleId": "azure.compute.availabilitysets",
+      "field": "resourceGroupMove",
+      "rule": "supported",
+      "learn": "conditional",
+      "reason": "The limit in the guidance is on the virtual machine (it cannot be moved on its own out of an availability set), not on the set; the set moves with its machines.",
+      "decidedIn": "https://github.com/saulpatinojr/HCW-MigrateOrchestrator_App/pull/136 (row 5 of its per-row table)",
+      "decidedOn": "2026-11-22"
+    },
+    {
+      "ruleId": "azure.compute.availabilitysets",
+      "field": "subscriptionMove",
+      "rule": "supported",
+      "learn": "conditional",
+      "reason": "The limit in the guidance is on the virtual machine (it cannot be moved on its own out of an availability set), not on the set; the set moves with its machines.",
+      "decidedIn": "https://github.com/saulpatinojr/HCW-MigrateOrchestrator_App/pull/136 (row 6 of its per-row table)",
+      "decidedOn": "2026-11-22"
+    },
+    {
+      "ruleId": "azure.compute.availabilitysets",
+      "field": "regionRelocation",
+      "rule": "supported",
+      "learn": "conditional",
+      "reason": "Learn's cell says Yes and only names the tool (Azure Resource Mover); the rule's region path is already Resource Mover.",
+      "decidedIn": "https://github.com/saulpatinojr/HCW-MigrateOrchestrator_App/pull/131 (row 6 of its per-row table)",
+      "decidedOn": "2026-11-16"
+    },
+    {
+      "ruleId": "azure.compute.virtualmachines.extensions",
+      "field": "resourceGroupMove",
+      "rule": "supported",
+      "learn": "conditional",
+      "reason": "A child resource: an extension moves with its virtual machine, as the rule's note already says.",
+      "decidedIn": "https://github.com/saulpatinojr/HCW-MigrateOrchestrator_App/pull/136 (row 9 of its per-row table)",
+      "decidedOn": "2026-11-22"
+    },
+    {
+      "ruleId": "azure.compute.virtualmachines.extensions",
+      "field": "subscriptionMove",
+      "rule": "supported",
+      "learn": "conditional",
+      "reason": "A child resource: an extension moves with its virtual machine, as the rule's note already says.",
+      "decidedIn": "https://github.com/saulpatinojr/HCW-MigrateOrchestrator_App/pull/136 (row 10 of its per-row table)",
+      "decidedOn": "2026-11-22"
+    },
+    {
+      "ruleId": "azure.documentdb.databaseaccounts",
+      "field": "regionRelocation",
+      "rule": "conditional",
+      "learn": "unsupported",
+      "reason": "The rule encodes Azure Cosmos DB's own path (add a region, fail over, remove the old region), not a Resource Manager move.",
+      "decidedIn": "https://github.com/saulpatinojr/HCW-MigrateOrchestrator_App/pull/131 (row 8 of its per-row table)",
+      "decidedOn": "2026-11-16"
+    },
+    {
+      "ruleId": "azure.insights.actiongroups",
+      "field": "regionRelocation",
+      "rule": "supported",
+      "learn": "unsupported",
+      "reason": "A global resource: it stays where it is, and the rule's region pattern is \"retain\".",
+      "decidedIn": "https://github.com/saulpatinojr/HCW-MigrateOrchestrator_App/pull/131 (row 9 of its per-row table)",
+      "decidedOn": "2026-11-16"
+    },
+    {
+      "ruleId": "azure.network.networkinterfaces",
+      "field": "resourceGroupMove",
+      "rule": "supported",
+      "learn": "conditional",
+      "reason": "The limits in the networking guidance (Standard SKU public IP, move the whole virtual network) are about moves across subscriptions, not across resource groups.",
+      "decidedIn": "https://github.com/saulpatinojr/HCW-MigrateOrchestrator_App/pull/136 (row 11 of its per-row table)",
+      "decidedOn": "2026-11-22"
+    },
+    {
+      "ruleId": "azure.network.networkinterfaces",
+      "field": "regionRelocation",
+      "rule": "supported",
+      "learn": "conditional",
+      "reason": "Learn's cell says Yes and only names the tool (Azure Resource Mover); the rule's region path is already Resource Mover.",
+      "decidedIn": "https://github.com/saulpatinojr/HCW-MigrateOrchestrator_App/pull/131 (row 15 of its per-row table)",
+      "decidedOn": "2026-11-16"
+    },
+    {
+      "ruleId": "azure.network.networksecuritygroups",
+      "field": "resourceGroupMove",
+      "rule": "supported",
+      "learn": "conditional",
+      "reason": "The networking guidance names nothing specific to network security groups; the general \"move dependent resources together\" is already a prerequisite of the virtual machine rule.",
+      "decidedIn": "https://github.com/saulpatinojr/HCW-MigrateOrchestrator_App/pull/136 (row 15 of its per-row table)",
+      "decidedOn": "2026-11-22"
+    },
+    {
+      "ruleId": "azure.network.networksecuritygroups",
+      "field": "subscriptionMove",
+      "rule": "supported",
+      "learn": "conditional",
+      "reason": "The networking guidance names nothing specific to network security groups; the general \"move dependent resources together\" is already a prerequisite of the virtual machine rule.",
+      "decidedIn": "https://github.com/saulpatinojr/HCW-MigrateOrchestrator_App/pull/136 (row 16 of its per-row table)",
+      "decidedOn": "2026-11-22"
+    },
+    {
+      "ruleId": "azure.network.networksecuritygroups",
+      "field": "regionRelocation",
+      "rule": "supported",
+      "learn": "conditional",
+      "reason": "Learn's cell says Yes and only names the tool (Azure Resource Mover); the rule's region path is already Resource Mover.",
+      "decidedIn": "https://github.com/saulpatinojr/HCW-MigrateOrchestrator_App/pull/131 (row 16 of its per-row table)",
+      "decidedOn": "2026-11-16"
+    },
+    {
+      "ruleId": "azure.network.publicipaddresses",
+      "field": "resourceGroupMove",
+      "rule": "supported",
+      "learn": "conditional",
+      "reason": "The Standard SKU limit applies across subscriptions only; the subscription move is already conditional.",
+      "decidedIn": "https://github.com/saulpatinojr/HCW-MigrateOrchestrator_App/pull/136 (row 17 of its per-row table)",
+      "decidedOn": "2026-11-22"
+    },
+    {
+      "ruleId": "azure.network.publicipaddresses",
+      "field": "regionRelocation",
+      "rule": "conditional",
+      "learn": "unsupported",
+      "reason": "\"Conditional\" with a recreate pattern is what Learn's cell describes: the configuration moves with Resource Mover, the address itself is not kept.",
+      "decidedIn": "https://github.com/saulpatinojr/HCW-MigrateOrchestrator_App/pull/131 (row 18 of its per-row table)",
+      "decidedOn": "2026-11-16"
+    },
+    {
+      "ruleId": "azure.network.loadbalancers",
+      "field": "resourceGroupMove",
+      "rule": "supported",
+      "learn": "conditional",
+      "reason": "Learn's cell says Yes for both SKUs (Basic and Standard); the report reads any qualifier after Yes as conditional.",
+      "decidedIn": "https://github.com/saulpatinojr/HCW-MigrateOrchestrator_App/pull/131 (row 19 of its per-row table)",
+      "decidedOn": "2026-11-16"
+    },
+    {
+      "ruleId": "azure.network.routetables",
+      "field": "resourceGroupMove",
+      "rule": "supported",
+      "learn": "conditional",
+      "reason": "The networking guidance names nothing specific to route tables.",
+      "decidedIn": "https://github.com/saulpatinojr/HCW-MigrateOrchestrator_App/pull/136 (row 18 of its per-row table)",
+      "decidedOn": "2026-11-22"
+    },
+    {
+      "ruleId": "azure.network.routetables",
+      "field": "subscriptionMove",
+      "rule": "supported",
+      "learn": "conditional",
+      "reason": "The networking guidance names nothing specific to route tables.",
+      "decidedIn": "https://github.com/saulpatinojr/HCW-MigrateOrchestrator_App/pull/136 (row 19 of its per-row table)",
+      "decidedOn": "2026-11-22"
+    },
+    {
+      "ruleId": "azure.network.privatednszones",
+      "field": "resourceGroupMove",
+      "rule": "supported",
+      "learn": "conditional",
+      "reason": "The networking guidance names nothing specific to private DNS zones.",
+      "decidedIn": "https://github.com/saulpatinojr/HCW-MigrateOrchestrator_App/pull/136 (row 20 of its per-row table)",
+      "decidedOn": "2026-11-22"
+    },
+    {
+      "ruleId": "azure.network.privatednszones",
+      "field": "subscriptionMove",
+      "rule": "supported",
+      "learn": "conditional",
+      "reason": "The networking guidance names nothing specific to private DNS zones.",
+      "decidedIn": "https://github.com/saulpatinojr/HCW-MigrateOrchestrator_App/pull/136 (row 21 of its per-row table)",
+      "decidedOn": "2026-11-22"
+    },
+    {
+      "ruleId": "azure.network.privatednszones",
+      "field": "regionRelocation",
+      "rule": "supported",
+      "learn": "unsupported",
+      "reason": "A global resource: it stays where it is, and the rule's region pattern is \"retain\".",
+      "decidedIn": "https://github.com/saulpatinojr/HCW-MigrateOrchestrator_App/pull/131 (row 27 of its per-row table)",
+      "decidedOn": "2026-11-16"
+    },
+    {
+      "ruleId": "azure.sql.servers",
+      "field": "regionRelocation",
+      "rule": "unsupported",
+      "learn": "supported",
+      "reason": "Resource Mover's own tutorial says it does not move a SQL server across regions (a target server must exist first); the rule's failover-group path stays.",
+      "decidedIn": "https://github.com/saulpatinojr/HCW-MigrateOrchestrator_App/pull/131 (row 30 of its per-row table)",
+      "decidedOn": "2026-11-16"
+    }
+  ]
+}

@@ -59,3 +59,6 @@ jobs:
             Automated report from `scripts/refresh-rules-from-learn.mjs`. **No rule was changed automatically.**
             Review `rules/reports/learn-diff.md`; for each accepted change: edit `scripts/author-rules.mjs`, bump `ruleVersion`,
             update `retrievedOn`, run `node scripts/author-rules.mjs && npm run build && npm run rules:validate`, then `amo rules snapshot`.
+            The report's first line says whether anything is new. Rows under "Reviewed and kept as they are" were decided earlier
+            and need nothing. To keep a rule after reviewing a new row, add the row and the reason to
+            `rules/reports/learn-diff-reviewed.json` (see `rules/reports/README.md`). If only the date changed, this can be closed.
