@@ -5,19 +5,27 @@
  * the attested ones, and whether a release becomes public, must not be untested shell inside a workflow. Node standard
  * library only; it calls the GitHub CLI (`gh`), authenticated by GH_TOKEN in the workflow.
  *
- *   check-files           the directory holds exactly the files a release carries, none empty
+ *   check-files           the directory holds exactly the files a release carries, none empty (`--stage built` for the
+ *                         ten files the build makes, before the provenance file exists; the default is all eleven)
  *   verify-attestations   `gh attestation verify` the provenance and the CycloneDX SBOM of every binary and tarball, and the
  *                         provenance of the checksum files and the two SBOMs (so all ten files are bound, not only five),
  *                         and insist that each came from THIS workflow file, on THIS ref, at THIS commit. Without those three,
  *                         "some attestation for this file exists in this repository" would be enough, and a dry-run
  *                         attestation of the same bytes would satisfy a real release.
+ *   assemble-provenance   write amo-<version>.intoto.jsonl from the three build-provenance bundles the attest job saved (one
+ *                         signed bundle per line), and refuse it unless it names every one of the ten files by sha256 and
+ *                         nothing else (ADR-0035). It is a copy of what GitHub's attestation store already holds, attached
+ *                         to the release so that the proof travels with the download.
+ *   verify-provenance     `gh attestation verify --bundle` each of the ten files against that file alone, with the same
+ *                         strict flags, after checking the file's content.
  *   publish               create the GitHub Release as a DRAFT with every file, check that the draft holds exactly those
  *                         files (names, upload state and the sha256 GitHub reports), and only then make it public. A
  *                         release that already exists for the tag (draft or public) is never touched and no file is ever
  *                         replaced. Until the last step succeeds nobody but the repository's writers can see a release, so
  *                         a failure never leaves a public, half-filled release next to the permanent tag.
  *   verify-release        after publication: download the public release, check it holds exactly those files with the
- *                         digests GitHub reports, and verify the attestations of what was downloaded. The workflow then
+ *                         digests GitHub reports, and verify the attestations of what was downloaded, from GitHub's store
+ *                         and from the downloaded provenance file. The workflow then
  *                         runs `npm run packages:verify` against the downloaded tarballs.
  *
  * Exit 0 on success, 1 with one line per problem (GitHub `::error::` annotations under Actions).
@@ -25,7 +33,7 @@
 import { spawnSync } from "node:child_process";
 import { createHash } from "node:crypto";
 import { createReadStream, existsSync, mkdirSync, readdirSync, readFileSync, statSync, writeFileSync } from "node:fs";
-import { join, resolve } from "node:path";
+import { basename, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { changelogSection } from "./check-release-version.mjs";
 
@@ -33,6 +41,15 @@ export const PROVENANCE = "https://slsa.dev/provenance/v1";
 export const SBOM = "https://cyclonedx.org/bom";
 export const BINARIES = ["amo-linux-x64", "amo-darwin-arm64", "amo-windows-x64.exe"];
 export const CHECKSUM_FILES = ["SHA256SUMS-linux-x64.txt", "SHA256SUMS-darwin-arm64.txt", "SHA256SUMS-windows-x64.txt"];
+/** What a line of the provenance file must be: a Sigstore bundle around an in-toto statement (ADR-0035). */
+export const BUNDLE_MEDIA_TYPE = /^application\/vnd\.dev\.sigstore\.bundle/;
+export const IN_TOTO_PAYLOAD = "application/vnd.in-toto+json";
+export const IN_TOTO_STATEMENT = "https://in-toto.io/Statement/v1";
+/**
+ * The build provenance of a release as one file: one signed bundle per line (JSON lines). The ending `.intoto.jsonl` is the
+ * name tools that grade a release look for, and the file `gh attestation verify --bundle` reads (ADR-0035).
+ */
+export const provenanceName = (version) => `amo-${version}.intoto.jsonl`;
 const LOOKUP_TRIES = 10;
 const LOOKUP_PAUSE_MS = 3000;
 // a new attestation can take a moment to be readable; a wrong one still fails after the last try
@@ -46,12 +63,16 @@ export function expectedAssets(version) {
     checksums: CHECKSUM_FILES,
     tarballs: [`hybridcloudworks-migration-core-${version}.tgz`, `hybridcloudworks-migration-ui-${version}.tgz`],
     sboms: { cli: `amo-cli-${version}.cdx.json`, packages: `hybridcloudworks-migration-packages-${version}.cdx.json` },
+    provenance: provenanceName(version),
   };
 }
-export const allNames = (version) => {
+/** The ten files the build makes. Each one is attested, and the provenance file must name each one. */
+export const builtNames = (version) => {
   const a = expectedAssets(version);
   return [...a.binaries, ...a.checksums, ...a.tarballs, a.sboms.cli, a.sboms.packages];
 };
+/** Every file a release carries: the ten built files and the provenance file, which exists only after they are attested. */
+export const allNames = (version) => [...builtNames(version), expectedAssets(version).provenance];
 /** Binaries and tarballs: build provenance AND a CycloneDX SBOM attestation each. */
 export const attestedNames = (version) => [...BINARIES, ...expectedAssets(version).tarballs];
 /** Checksum files and the two SBOMs: build provenance only (they are the files a consumer reads, not software; follow-up F7 of issue 83). */
@@ -85,12 +106,12 @@ export function sha256Of(path) {
   });
 }
 
-export function checkFiles(dir, version) {
+/** `expected` is every release file by default; the inventory job passes builtNames, because the provenance file comes later. */
+export function checkFiles(dir, version, expected = allNames(version)) {
   const problems = [];
-  const expected = allNames(version);
   const present = existsSync(dir) ? readdirSync(dir).filter((n) => statSync(join(dir, n)).isFile()) : [];
   for (const n of expected.filter((x) => !present.includes(x))) problems.push(`${dir}/${n} is missing`);
-  for (const n of present.filter((x) => !expected.includes(x))) problems.push(`${dir}/${n} is not one of the ${expected.length} files a release carries`);
+  for (const n of present.filter((x) => !expected.includes(x))) problems.push(`${dir}/${n} is not one of the ${expected.length} files expected here`);
   for (const n of present.filter((x) => expected.includes(x) && statSync(join(dir, x)).size === 0)) problems.push(`${dir}/${n} is empty`);
   return problems;
 }
@@ -114,6 +135,110 @@ export function verifyAttestations({ dir, version, repo, workflow, sourceRef, so
       } else {
         console.log(`verified ${predicate} for ${name} (${workflow}, ${sourceRef}, ${sourceDigest.slice(0, 12)})`);
       }
+    }
+  }
+  return problems;
+}
+
+/** The same strict check, read from the provenance file instead of GitHub's attestation store. */
+export function bundleVerifyCommand(path, bundle, repo, workflow, sourceRef, sourceDigest) {
+  const [, , , ...flags] = verifyCommand(path, repo, PROVENANCE, workflow, sourceRef, sourceDigest);
+  return ["attestation", "verify", path, "--bundle", bundle, ...flags];
+}
+
+/**
+ * Read the text of a provenance file. Returns { problems, bundles, subjects }: `subjects` is every { name, sha256 } the
+ * signed statements name. Nothing here checks a signature (that is `gh attestation verify --bundle`); this checks that
+ * the file is what its name says, so an empty or unrelated file can never be attached under that name.
+ */
+export function readProvenance(text, label = "the provenance file") {
+  const problems = [];
+  const subjects = [];
+  const lines = text.split("\n").filter((l) => l.trim());
+  if (!lines.length) problems.push(`${label} holds no bundle`);
+  lines.forEach((line, i) => {
+    const where = `${label}, line ${i + 1}`;
+    let bundle = null;
+    try { bundle = JSON.parse(line); } catch { bundle = null; }
+    if (!bundle || typeof bundle !== "object" || Array.isArray(bundle)) { problems.push(`${where} is not a JSON object`); return; }
+    if (!BUNDLE_MEDIA_TYPE.test(String(bundle.mediaType ?? ""))) { problems.push(`${where} is not a Sigstore bundle (mediaType ${JSON.stringify(bundle.mediaType ?? null)})`); return; }
+    const envelope = bundle.dsseEnvelope;
+    if (!envelope || envelope.payloadType !== IN_TOTO_PAYLOAD || typeof envelope.payload !== "string") { problems.push(`${where} has no signed in-toto statement`); return; }
+    if (!Array.isArray(envelope.signatures) || !envelope.signatures.length || !bundle.verificationMaterial) { problems.push(`${where} has no signature or no certificate`); return; }
+    let statement = null;
+    try { statement = JSON.parse(Buffer.from(envelope.payload, "base64").toString("utf8")); } catch { statement = null; }
+    if (!statement || statement._type !== IN_TOTO_STATEMENT) { problems.push(`${where} does not hold an in-toto statement`); return; }
+    if (statement.predicateType !== PROVENANCE) { problems.push(`${where} is a ${JSON.stringify(statement.predicateType ?? null)} statement, not build provenance (${PROVENANCE})`); return; }
+    if (!Array.isArray(statement.subject) || !statement.subject.length) { problems.push(`${where} names no file`); return; }
+    for (const s of statement.subject) {
+      const sha256 = s?.digest?.sha256;
+      if (typeof s?.name !== "string" || !/^[0-9a-f]{64}$/.test(String(sha256 ?? ""))) problems.push(`${where} names a file without a name or a sha256`);
+      else subjects.push({ name: basename(s.name), sha256 });
+    }
+  });
+  return { problems, bundles: lines.length, subjects };
+}
+
+/** What is wrong with the provenance file in `dir`: it must name each of the ten built files there by sha256, and no other file. */
+export async function provenanceProblems(dir, version) {
+  const name = provenanceName(version);
+  const path = join(dir, name);
+  if (!existsSync(path)) return [`${path} is missing`];
+  const { problems, subjects } = readProvenance(readFileSync(path, "utf8"), name);
+  if (problems.length) return problems;
+  const built = builtNames(version);
+  for (const n of built) {
+    const local = join(dir, n);
+    if (!existsSync(local)) { problems.push(`${local} is missing, so ${name} cannot be compared with it`); continue; }
+    const want = await sha256Of(local);
+    const mine = subjects.filter((s) => s.name === n);
+    if (!mine.length) problems.push(`${name} does not name ${n}`);
+    else if (!mine.some((s) => s.sha256 === want)) problems.push(`${name} names ${n} with sha256 ${mine[0].sha256}, but the file here has ${want}`);
+  }
+  for (const n of [...new Set(subjects.map((s) => s.name))].filter((x) => !built.includes(x))) problems.push(`${name} names ${n}, which is not one of the ${built.length} built files of this release`);
+  return problems;
+}
+
+const filesUnder = (dir) => readdirSync(dir, { withFileTypes: true }).sort((a, b) => (a.name < b.name ? -1 : 1)).flatMap((e) => (e.isDirectory() ? filesUnder(join(dir, e.name)) : [join(dir, e.name)]));
+
+/**
+ * Write the provenance file into `dir` from the bundle files under `bundles` (what the attest job saved: one file per
+ * build-provenance step), one bundle per line, then check it against the files in `dir`. Never replaces an existing file.
+ */
+export async function assembleProvenance({ bundles, dir, version }) {
+  const name = provenanceName(version);
+  const target = join(dir, name);
+  if (existsSync(target)) return [`${target} already exists; it is never replaced`];
+  if (!existsSync(bundles) || !statSync(bundles).isDirectory()) return [`${bundles} is not a directory of saved bundles`];
+  const lines = [];
+  const problems = [];
+  for (const file of filesUnder(bundles)) {
+    const read = readProvenance(readFileSync(file, "utf8"), file);
+    problems.push(...read.problems);
+    if (!read.problems.length) for (const line of readFileSync(file, "utf8").split("\n").filter((l) => l.trim())) lines.push(JSON.stringify(JSON.parse(line)));
+  }
+  if (!lines.length && !problems.length) problems.push(`${bundles} holds no bundle`);
+  if (problems.length) return [...problems, `${name} was not written`];
+  writeFileSync(target, `${lines.join("\n")}\n`);
+  const after = await provenanceProblems(dir, version);
+  if (!after.length) console.log(`${target} written: ${lines.length} signed bundles naming the ${builtNames(version).length} built files`);
+  return after;
+}
+
+/** `gh attestation verify --bundle` for each of the ten built files: the attached file alone proves each one, with the strict flags. */
+export async function verifyProvenanceFile({ dir, version, repo, workflow, sourceRef, sourceDigest }, gh = realGh, pause = sleepMs) {
+  const problems = await provenanceProblems(dir, version);
+  if (problems.length) return problems;
+  const name = provenanceName(version);
+  for (const n of builtNames(version)) {
+    const command = bundleVerifyCommand(join(dir, n), join(dir, name), repo, workflow, sourceRef, sourceDigest);
+    let result = gh(command);
+    for (let i = 1; i < VERIFY_TRIES && result.status !== 0; i++) { pause(VERIFY_PAUSE_MS); result = gh(command); }
+    if (result.status !== 0) {
+      const last = (result.stderr || result.stdout).trim().split("\n").pop() || "gh failed";
+      problems.push(`${name} does not prove ${n} came from ${workflow} on ${sourceRef} at ${sourceDigest.slice(0, 12)}: ${last}`);
+    } else {
+      console.log(`verified ${n} against ${name} (${workflow}, ${sourceRef}, ${sourceDigest.slice(0, 12)})`);
     }
   }
   return problems;
@@ -201,6 +326,12 @@ export function releaseNotes(tag, repo, workflow, section) {
     `gh attestation verify hybridcloudworks-migration-core-${version}.tgz --repo ${repo} --predicate-type ${SBOM} --source-ref refs/tags/${tag} --signer-workflow ${repo}/${workflow} --deny-self-hosted-runners`,
     "```",
     "",
+    `The same build provenance is attached to this release as \`${provenanceName(version)}\` (one signed bundle per line), so a download can be checked from the files of the release alone:`,
+    "",
+    "```bash",
+    `gh attestation verify hybridcloudworks-migration-core-${version}.tgz --repo ${repo} --bundle ${provenanceName(version)} --source-ref refs/tags/${tag} --signer-workflow ${repo}/${workflow} --deny-self-hosted-runners`,
+    "```",
+    "",
     `The SBOMs are \`amo-cli-${version}.cdx.json\` (the command-line tool) and \`hybridcloudworks-migration-packages-${version}.cdx.json\` (the two package tarballs). How this release is built and checked: https://github.com/${repo}/blob/${tag}/docs/release/README.md.`,
     "",
   ].join("\n");
@@ -244,6 +375,8 @@ export async function publish({ repo, tag, dir, workflow, changelog = "CHANGELOG
   const version = versionOfTag(tag);
   const files = checkFiles(dir, version);
   if (files.length) return [...files, "nothing was published"];
+  const provenance = await provenanceProblems(dir, version);
+  if (provenance.length) return [...provenance, "nothing was published"];
   let section = null;
   try { section = changelogSection(readFileSync(changelog, "utf8"), version); } catch (error) { return [`cannot read ${changelog}: ${error.message}`, "nothing was published"]; }
   if (!section?.summary) return [`${changelog} has no section with a summary for ${version}; the release notes are built from it`, "nothing was published"];
@@ -291,7 +424,9 @@ export async function verifyRelease({ repo, tag, out, workflow, sourceRef, sourc
   if (got.status !== 0) return [`could not download the files of release ${tag}: ${(got.stderr || got.stdout).trim()}`];
   const problems = [...checkFiles(out, version), ...(await releaseProblems(releases[0], out, version, { draft: false }))];
   if (problems.length) return problems;
-  return verifyAttestations({ dir: out, version, repo, workflow, sourceRef, sourceDigest }, gh, pause);
+  const args = { dir: out, version, repo, workflow, sourceRef, sourceDigest };
+  const store = verifyAttestations(args, gh, pause);
+  return store.length ? store : verifyProvenanceFile(args, gh, pause);
 }
 
 function parseArgs(argv) {
@@ -309,14 +444,20 @@ const need = (args, ...names) => { for (const n of names) if (!args[n]) throw ne
 export async function main(argv) {
   const args = parseArgs(argv);
   let problems;
-  if (args.command === "check-files") { need(args, "dir", "version"); problems = checkFiles(args.dir, args.version); }
+  if (args.command === "check-files") {
+    need(args, "dir", "version");
+    if (args.stage !== undefined && args.stage !== "built" && args.stage !== "release") throw new Error("check-files --stage is built (the ten files the build makes) or release (those and the provenance file)");
+    problems = checkFiles(args.dir, args.version, args.stage === "built" ? builtNames(args.version) : allNames(args.version));
+  }
   else if (args.command === "verify-attestations") { need(args, "dir", "version", "repo", "workflow", "sourceRef", "sourceDigest"); problems = verifyAttestations(args); }
+  else if (args.command === "verify-provenance") { need(args, "dir", "version", "repo", "workflow", "sourceRef", "sourceDigest"); problems = await verifyProvenanceFile(args); }
+  else if (args.command === "assemble-provenance") { need(args, "bundles", "dir", "version"); problems = await assembleProvenance(args); }
   else if (args.command === "publish") { need(args, "dir", "tag", "repo", "workflow"); problems = await publish(args); }
   else if (args.command === "verify-release") { need(args, "out", "tag", "repo", "workflow", "sourceRef", "sourceDigest"); problems = await verifyRelease(args); }
-  else throw new Error("usage: release-publish.mjs check-files|verify-attestations|publish|verify-release --option value ...");
+  else throw new Error("usage: release-publish.mjs check-files|verify-attestations|assemble-provenance|verify-provenance|publish|verify-release --option value ...");
   const github = process.env.GITHUB_ACTIONS === "true";
   for (const p of problems) console.log(github ? `::error::${p}` : `error: ${p}`);
-  if (!problems.length && args.command === "check-files") console.log(`all ${allNames(args.version).length} release files are present`);
+  if (!problems.length && args.command === "check-files") console.log(`all ${(args.stage === "built" ? builtNames : allNames)(args.version).length} files are present`);
   return problems.length ? 1 : 0;
 }
 

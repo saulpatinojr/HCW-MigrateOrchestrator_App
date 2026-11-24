@@ -6,7 +6,7 @@ import { copyFileSync, existsSync, mkdirSync, mkdtempSync, readFileSync, readdir
 import { tmpdir } from "node:os";
 import { basename, join } from "node:path";
 import { spawnSync } from "node:child_process";
-import { allNames, attestedNames, attestationChecks, provenanceOnlyNames, checkFiles, decodeJsonValues, publish, releaseProblems, releaseNotes, verifyAttestations, verifyCommand, verifyRelease, versionOfTag, PROVENANCE, SBOM } from "../../scripts/release-publish.mjs";
+import { allNames, assembleProvenance, attestedNames, attestationChecks, builtNames, bundleVerifyCommand, expectedAssets, main, provenanceName, provenanceOnlyNames, provenanceProblems, readProvenance, verifyProvenanceFile, checkFiles, decodeJsonValues, publish, releaseProblems, releaseNotes, verifyAttestations, verifyCommand, verifyRelease, versionOfTag, PROVENANCE, SBOM } from "../../scripts/release-publish.mjs";
 import { atLeast, changelogProblems, changelogSection, check, notOnBranch, setVersion, startChangelogSection, workflowParity } from "../../scripts/check-release-version.mjs";
 import { addComponent, assertBom, retitle } from "../../scripts/generate-sbom.mjs";
 
@@ -26,11 +26,38 @@ const noPause = () => {};
 const ok = (stdout = "") => ({ status: 0, stdout, stderr: "" });
 const bad = (stderr) => ({ status: 1, stdout: "", stderr });
 
-function releaseDir(version = VERSION) {
+/**
+ * One line of a provenance file, in the shape actions/attest writes (read from the bundles GitHub holds for v0.4.3): a
+ * Sigstore bundle around a signed in-toto statement. The signature here is a dummy: these tests never check one.
+ */
+function bundleLine(subjects, { predicateType = PROVENANCE, mediaType = "application/vnd.dev.sigstore.bundle.v0.3+json", type = "https://in-toto.io/Statement/v1" } = {}) {
+  const statement = { _type: type, subject: subjects.map(([name, sha256]) => ({ name, digest: { sha256 } })), predicateType, predicate: {} };
+  return JSON.stringify({ mediaType, verificationMaterial: { certificate: { rawBytes: "AA==" } }, dsseEnvelope: { payload: Buffer.from(JSON.stringify(statement)).toString("base64"), payloadType: "application/vnd.in-toto+json", signatures: [{ sig: "AA==" }] } });
+}
+/** The three bundles the attest job saves (binaries, packages, checksum files and SBOMs), for the files in `dir`. */
+function bundleLines(dir, version = VERSION) {
+  const a = expectedAssets(version);
+  return [a.binaries, a.tarballs, [...a.checksums, a.sboms.cli, a.sboms.packages]].map((names) => bundleLine(names.map((n) => [n, sha(join(dir, n))])));
+}
+const writeProvenance = (dir, version = VERSION) => writeFileSync(join(dir, provenanceName(version)), `${bundleLines(dir, version).join("\n")}\n`);
+/** A directory with the ten built files only: what the inventory job gathers, before anything is attested. */
+function builtDir(version = VERSION) {
   const dir = join(scratch(), "release-files");
   mkdirSync(dir);
-  for (const n of allNames(version)) writeFileSync(join(dir, n), `content of ${n}\n`);
+  for (const n of builtNames(version)) writeFileSync(join(dir, n), `content of ${n}\n`);
   return dir;
+}
+/** A directory with every file a release carries: the ten built files and a provenance file that names them. */
+function releaseDir(version = VERSION) {
+  const dir = builtDir(version);
+  writeProvenance(dir, version);
+  return dir;
+}
+/** The artifacts of the attest job as the next job downloads them: one folder per bundle, each with attestation.json. */
+function savedBundles(lines) {
+  const root = join(scratch(), "provenance-bundles");
+  lines.forEach((line, i) => { mkdirSync(join(root, `provenance-bundle-${i + 1}`), { recursive: true }); writeFileSync(join(root, `provenance-bundle-${i + 1}`, "attestation.json"), `${line}\n`); });
+  return root;
 }
 
 /** A fake GitHub: remembers the release, answers the calls release-publish.mjs makes, and records every call. */
@@ -81,8 +108,11 @@ function fakeGh({ existing = [], corrupt = null, failCreate = false, failPatch =
 }
 const callsOf = (calls, a, b) => calls.filter((c) => c[0] === a && c[1] === b);
 
-test("the expected file list is the contract: three binaries, three checksum files, two tarballs, two SBOMs", () => {
-  assert.deepEqual(allNames(VERSION), ["amo-linux-x64", "amo-darwin-arm64", "amo-windows-x64.exe", "SHA256SUMS-linux-x64.txt", "SHA256SUMS-darwin-arm64.txt", "SHA256SUMS-windows-x64.txt", "hybridcloudworks-migration-core-1.2.3.tgz", "hybridcloudworks-migration-ui-1.2.3.tgz", "amo-cli-1.2.3.cdx.json", "hybridcloudworks-migration-packages-1.2.3.cdx.json"]);
+test("the expected file list is the contract: three binaries, three checksum files, two tarballs, two SBOMs, one provenance file", () => {
+  assert.deepEqual(allNames(VERSION), [...builtNames(VERSION), "amo-1.2.3.intoto.jsonl"], "the provenance file is the eleventh, and the last");
+  assert.equal(provenanceName("0.4.4"), "amo-0.4.4.intoto.jsonl");
+  assert.ok(!attestationChecks(VERSION).some(([name]) => name.endsWith(".intoto.jsonl")), "the provenance file is the proof, not a subject of it");
+  assert.deepEqual(builtNames(VERSION), ["amo-linux-x64", "amo-darwin-arm64", "amo-windows-x64.exe", "SHA256SUMS-linux-x64.txt", "SHA256SUMS-darwin-arm64.txt", "SHA256SUMS-windows-x64.txt", "hybridcloudworks-migration-core-1.2.3.tgz", "hybridcloudworks-migration-ui-1.2.3.tgz", "amo-cli-1.2.3.cdx.json", "hybridcloudworks-migration-packages-1.2.3.cdx.json"]);
   assert.equal(attestedNames(VERSION).length, 5, "binaries and tarballs get provenance and an SBOM attestation");
   assert.deepEqual(provenanceOnlyNames(VERSION), ["SHA256SUMS-linux-x64.txt", "SHA256SUMS-darwin-arm64.txt", "SHA256SUMS-windows-x64.txt", "amo-cli-1.2.3.cdx.json", "hybridcloudworks-migration-packages-1.2.3.cdx.json"], "checksum files and SBOMs get provenance (follow-up F7)");
   assert.equal(attestationChecks(VERSION).length, 10, "every release file is bound to the workflow, ref and commit");
@@ -99,9 +129,138 @@ test("check-files: complete passes; a missing, extra or empty file is named", ()
   writeFileSync(join(dir, "amo-linux-x64"), "");
   const problems = checkFiles(dir, VERSION).join("\n");
   assert.match(problems, /amo-cli-1\.2\.3\.cdx\.json is missing/);
-  assert.match(problems, /stray\.txt is not one of the 10 files/);
+  assert.match(problems, /stray\.txt is not one of the 11 files/);
   assert.match(problems, /amo-linux-x64 is empty/);
   assert.match(checkFiles(join(dir, "nope"), VERSION).join("\n"), /is missing/);
+});
+
+test("check-files: the provenance file is required on a release, refused before it exists, and only under its exact name", async () => {
+  // the inventory job (--stage built) holds the ten built files and nothing else
+  const built = builtDir();
+  assert.deepEqual(checkFiles(built, VERSION, builtNames(VERSION)), []);
+  assert.match(checkFiles(built, VERSION).join("\n"), /amo-1\.2\.3\.intoto\.jsonl is missing/, "a release without its provenance file is refused");
+  assert.equal(await main(["check-files", "--stage", "built", "--dir", built, "--version", VERSION]), 0);
+  assert.equal(await main(["check-files", "--dir", built, "--version", VERSION]), 1, "the default is the whole release");
+  await assert.rejects(main(["check-files", "--stage", "draft", "--dir", built, "--version", VERSION]), /--stage is built/);
+  // a full release directory is refused by the inventory check: nothing may be there before it is attested
+  const full = releaseDir();
+  assert.deepEqual(checkFiles(full, VERSION), []);
+  assert.match(checkFiles(full, VERSION, builtNames(VERSION)).join("\n"), /amo-1\.2\.3\.intoto\.jsonl is not one of the 10 files/);
+  assert.equal(await main(["check-files", "--stage", "built", "--dir", full, "--version", VERSION]), 1);
+  // a wrong name (another version, another ending), an extra file and an empty file are each named
+  for (const wrong of ["amo-1.2.4.intoto.jsonl", "amo-1.2.3.intoto.json", "amo-1.2.3.sigstore.json", "provenance.intoto.jsonl"]) {
+    const dir = builtDir();
+    writeFileSync(join(dir, wrong), `${bundleLines(dir).join("\n")}\n`);
+    const problems = checkFiles(dir, VERSION).join("\n");
+    assert.match(problems, /amo-1\.2\.3\.intoto\.jsonl is missing/, wrong);
+    assert.ok(problems.includes(`${wrong} is not one of the 11 files`), wrong);
+  }
+  const two = releaseDir();
+  writeFileSync(join(two, "extra.intoto.jsonl"), "x");
+  assert.match(checkFiles(two, VERSION).join("\n"), /extra\.intoto\.jsonl is not one of the 11 files/);
+  const empty = builtDir();
+  writeFileSync(join(empty, provenanceName(VERSION)), "");
+  assert.match(checkFiles(empty, VERSION).join("\n"), /amo-1\.2\.3\.intoto\.jsonl is empty/);
+});
+
+test("the provenance file must be real: signed build-provenance bundles that name each built file by sha256, and nothing else", async () => {
+  const dir = releaseDir();
+  assert.deepEqual(await provenanceProblems(dir, VERSION), []);
+  const good = bundleLines(dir);
+  const file = join(dir, provenanceName(VERSION));
+  const withLines = async (lines) => { writeFileSync(file, lines.join("\n")); return (await provenanceProblems(dir, VERSION)).join("\n"); };
+  assert.match(await withLines(["   "]), /holds no bundle/, "a file with the right name and nothing in it");
+  assert.match(await withLines(["not json"]), /line 1 is not a JSON object/);
+  assert.match(await withLines([...good, "[]"]), /line 4 is not a JSON object/);
+  assert.match(await withLines([JSON.stringify({ mediaType: "text/plain" })]), /line 1 is not a Sigstore bundle/);
+  assert.match(await withLines([JSON.stringify({ mediaType: "application/vnd.dev.sigstore.bundle.v0.3+json" })]), /no signed in-toto statement/);
+  const unsigned = JSON.parse(good[0]);
+  unsigned.dsseEnvelope.signatures = [];
+  assert.match(await withLines([JSON.stringify(unsigned), good[1], good[2]]), /line 1 has no signature or no certificate/);
+  assert.match(await withLines([bundleLine([["amo-linux-x64", "a".repeat(64)]], { type: "something else" })]), /does not hold an in-toto statement/);
+  // an SBOM attestation is a real signed bundle, but it is not build provenance
+  assert.match(await withLines([...good, bundleLine([["amo-linux-x64", sha(join(dir, "amo-linux-x64"))]], { predicateType: SBOM })]), /line 4 is a "https:\/\/cyclonedx\.org\/bom" statement, not build provenance/);
+  assert.match(await withLines([bundleLine([])]), /names no file/);
+  assert.match(await withLines([bundleLine([["amo-linux-x64", "short"]])]), /without a name or a sha256/);
+  // one of the three bundles is missing: its files are named
+  const partial = await withLines([good[0], good[2]]);
+  assert.match(partial, /does not name hybridcloudworks-migration-core-1\.2\.3\.tgz/);
+  assert.match(partial, /does not name hybridcloudworks-migration-ui-1\.2\.3\.tgz/);
+  // the bundle of another build: right names, other bytes
+  assert.match(await withLines([bundleLine(expectedAssets(VERSION).binaries.map((n) => [n, "0".repeat(64)])), good[1], good[2]]), /names amo-linux-x64 with sha256 0{64}, but the file here has [0-9a-f]{64}/);
+  // a file the release does not carry
+  assert.match(await withLines([...good, bundleLine([["other-tool", "b".repeat(64)]])]), /names other-tool, which is not one of the 10 built files/);
+  // a built file changed after it was attested
+  await withLines(good);
+  writeFileSync(join(dir, "amo-cli-1.2.3.cdx.json"), "changed");
+  assert.match((await provenanceProblems(dir, VERSION)).join("\n"), /names amo-cli-1\.2\.3\.cdx\.json with sha256/);
+  rmSync(file);
+  assert.match((await provenanceProblems(dir, VERSION)).join("\n"), /amo-1\.2\.3\.intoto\.jsonl is missing/);
+  assert.equal(readProvenance(`${good.join("\n")}\n`).bundles, 3);
+  assert.equal(readProvenance(`${good.join("\n")}\n`).subjects.length, 10);
+});
+
+test("assemble-provenance: the three saved bundles become one file, one bundle per line; it replaces nothing and writes nothing it cannot vouch for", async () => {
+  const dir = builtDir();
+  const lines = bundleLines(dir);
+  // a bundle file as pretty-printed JSON would break "one bundle per line"; the saved files are one line each and are re-written compactly
+  assert.deepEqual(await assembleProvenance({ bundles: savedBundles(lines), dir, version: VERSION }), []);
+  const written = readFileSync(join(dir, provenanceName(VERSION)), "utf8");
+  assert.equal(written, `${lines.join("\n")}\n`, "binaries, packages, then checksum files and SBOMs, in the order of the artifact names");
+  assert.deepEqual(checkFiles(dir, VERSION), []);
+  assert.match((await assembleProvenance({ bundles: savedBundles(lines), dir, version: VERSION }))[0], /already exists; it is never replaced/);
+  // nothing saved, a folder that does not exist, or a saved file that is not a provenance bundle: no file is written
+  for (const [bundles, expected] of [[savedBundles([]), /is not a directory of saved bundles/], [join(scratch(), "nope"), /is not a directory/], [savedBundles(["{}"]), /is not a Sigstore bundle/], [savedBundles([lines[0], bundleLine([["amo-linux-x64", "c".repeat(64)]], { predicateType: SBOM })]), /not build provenance/]]) {
+    const target = builtDir();
+    const problems = await assembleProvenance({ bundles, dir: target, version: VERSION });
+    assert.match(problems.join("\n"), expected);
+    assert.ok(!existsSync(join(target, provenanceName(VERSION))), "no file is left behind");
+  }
+  const emptyRoot = join(scratch(), "empty");
+  mkdirSync(emptyRoot);
+  assert.match((await assembleProvenance({ bundles: emptyRoot, dir: builtDir(), version: VERSION })).join("\n"), /holds no bundle/);
+  // a bundle is missing (two of three saved): the file is written, and refused by name
+  const partial = builtDir();
+  assert.match((await assembleProvenance({ bundles: savedBundles([lines[0], lines[1]]), dir: partial, version: VERSION })).join("\n"), /does not name SHA256SUMS-linux-x64\.txt/);
+  // through the command line: the same bundles are accepted for the same bytes, and refused once a built file differs
+  assert.equal(await main(["assemble-provenance", "--bundles", savedBundles(lines), "--dir", builtDir(), "--version", VERSION]), 0);
+  const changed = builtDir();
+  writeFileSync(join(changed, "amo-darwin-arm64"), "another build");
+  assert.equal(await main(["assemble-provenance", "--bundles", savedBundles(lines), "--dir", changed, "--version", VERSION]), 1);
+  await assert.rejects(main(["assemble-provenance", "--dir", changed, "--version", VERSION]), /needs --bundles/);
+});
+
+test("verify-provenance: every built file is verified against the provenance file alone, with the strict flags", async () => {
+  const dir = releaseDir();
+  const { gh, calls, state } = fakeGh();
+  const digest = "e".repeat(40);
+  const args = { dir, version: VERSION, repo: REPO, workflow: WORKFLOW, sourceRef: `refs/tags/${TAG}`, sourceDigest: digest };
+  assert.deepEqual(await verifyProvenanceFile(args, gh, noPause), []);
+  assert.equal(calls.length, 10, "one check per built file");
+  for (const c of calls) {
+    assert.equal(c[c.indexOf("--bundle") + 1], join(dir, "amo-1.2.3.intoto.jsonl"));
+    assert.equal(c[c.indexOf("--predicate-type") + 1], PROVENANCE);
+    assert.equal(c[c.indexOf("--signer-workflow") + 1], `${REPO}/${WORKFLOW}`);
+    assert.equal(c[c.indexOf("--source-ref") + 1], `refs/tags/${TAG}`);
+    assert.equal(c[c.indexOf("--source-digest") + 1], digest);
+    assert.equal(c[c.indexOf("--signer-digest") + 1], digest);
+    assert.ok(c.includes("--deny-self-hosted-runners"));
+  }
+  assert.deepEqual(calls.map((c) => basename(c[2])), builtNames(VERSION));
+  assert.deepEqual(bundleVerifyCommand("f", "b.intoto.jsonl", "o/r", "w.yml", "r", "d").slice(0, 5), ["attestation", "verify", "f", "--bundle", "b.intoto.jsonl"]);
+  // gh refuses: retried, then reported per file
+  state.attestationFails = true;
+  const refused = await verifyProvenanceFile(args, gh, noPause);
+  assert.equal(refused.length, 10);
+  assert.match(refused[0], /amo-1\.2\.3\.intoto\.jsonl does not prove amo-linux-x64 came from \.github\/workflows\/release-cli\.yml on refs\/tags\/v1\.2\.3 at eeeeeeeeeeee: no matching attestation/);
+  assert.equal(calls.length, 10 + 30, "three tries per file");
+  // a file whose content is wrong is refused before gh is asked anything
+  const none = fakeGh();
+  writeFileSync(join(dir, provenanceName(VERSION)), "{}\n");
+  assert.match((await verifyProvenanceFile(args, none.gh, noPause)).join("\n"), /is not a Sigstore bundle/);
+  rmSync(join(dir, provenanceName(VERSION)));
+  assert.match((await verifyProvenanceFile(args, none.gh, noPause)).join("\n"), /amo-1\.2\.3\.intoto\.jsonl is missing/);
+  assert.equal(none.calls.length, 0);
 });
 
 test("attestations are verified for provenance and SBOM, bound to this workflow, this ref and this commit", () => {
@@ -156,7 +315,8 @@ test("publish: draft first, every file attached, checked, and only then made pub
   for (const flag of ["--draft", "--verify-tag", "--notes-file"]) assert.ok(create.includes(flag), flag);
   assert.ok(!create.includes("--generate-notes"), "one source of notes, no flag combination to get wrong on a real tag");
   assert.ok(!create.includes("--clobber") && !create.includes("--latest"));
-  assert.equal(create.filter((x) => allNames(VERSION).includes(basename(x))).length, 10, "all files in the one create call");
+  assert.equal(create.filter((x) => allNames(VERSION).includes(basename(x))).length, 11, "all files in the one create call");
+  assert.ok(create.some((x) => basename(x) === "amo-1.2.3.intoto.jsonl"), "the provenance file is attached in the same call, never uploaded later");
   const patch = callsOf(calls, "api", "--method")[0];
   assert.deepEqual(patch.slice(1, 4), ["--method", "PATCH", "repos/owner/repo/releases/7"]);
   assert.ok(patch.includes("draft=false"));
@@ -176,7 +336,10 @@ test("publish refuses a release that already exists (draft or public) and change
 test("publish never makes the release public when the draft is wrong", async () => {
   const cases = [
     [{ drop: "amo-cli-1.2.3.cdx.json" }, /asset amo-cli-1\.2\.3\.cdx\.json is not on the release/],
-    [{ extra: "surprise.bin" }, /surprise\.bin is on the release but is not one of the 10/],
+    [{ extra: "surprise.bin" }, /surprise\.bin is on the release but is not one of the 11/],
+    [{ extra: "amo-1.2.4.intoto.jsonl" }, /amo-1\.2\.4\.intoto\.jsonl is on the release but is not one of the 11/],
+    [{ drop: "amo-1.2.3.intoto.jsonl" }, /asset amo-1\.2\.3\.intoto\.jsonl is not on the release/],
+    [{ digest: "amo-1.2.3.intoto.jsonl" }, /amo-1\.2\.3\.intoto\.jsonl on the release has digest sha256:0{64}/],
     [{ digest: "amo-linux-x64" }, /amo-linux-x64 on the release has digest sha256:0{64}/],
     [{ state: "hybridcloudworks-migration-core-1.2.3.tgz" }, /in state "starter"/],
   ];
@@ -231,6 +394,27 @@ test("publish reports a failed create, a failed publish and incomplete input wit
   assert.equal(calls.length, 0, "no call to GitHub at all");
 });
 
+test("publish refuses, before any call to GitHub, a release without its provenance file or with one that is not about these files", async () => {
+  const refusals = [
+    [(dir) => rmSync(join(dir, "amo-1.2.3.intoto.jsonl")), /amo-1\.2\.3\.intoto\.jsonl is missing/],
+    [(dir) => writeFileSync(join(dir, "amo-1.2.3.intoto.jsonl"), ""), /amo-1\.2\.3\.intoto\.jsonl is empty/],
+    [(dir) => writeFileSync(join(dir, "amo-1.2.3.intoto.jsonl"), "placeholder\n"), /is not a JSON object/],
+    [(dir) => writeFileSync(join(dir, "amo-1.2.3.intoto.jsonl"), `${bundleLines(dir)[0]}\n`), /does not name hybridcloudworks-migration-core-1\.2\.3\.tgz/],
+    [(dir) => writeFileSync(join(dir, "amo-linux-x64"), "rebuilt after it was attested"), /names amo-linux-x64 with sha256/],
+    [(dir) => { rmSync(join(dir, "amo-1.2.3.intoto.jsonl")); writeFileSync(join(dir, "amo-1.2.4.intoto.jsonl"), `${bundleLines(dir).join("\n")}\n`); }, /amo-1\.2\.4\.intoto\.jsonl is not one of the 11 files/],
+    [(dir) => writeFileSync(join(dir, "second.intoto.jsonl"), `${bundleLines(dir).join("\n")}\n`), /second\.intoto\.jsonl is not one of the 11 files/],
+  ];
+  for (const [spoil, expected] of refusals) {
+    const dir = releaseDir();
+    spoil(dir);
+    const { gh, calls } = fakeGh();
+    const problems = await publish({ repo: REPO, tag: TAG, dir, workflow: WORKFLOW, changelog: changelogFile() }, gh, noPause);
+    assert.match(problems.join("\n"), expected);
+    assert.equal(problems.at(-1), "nothing was published");
+    assert.equal(calls.length, 0, "no call to GitHub at all");
+  }
+});
+
 test("verify-release: downloads the public release, compares files and digests, then verifies the attestations", async () => {
   const dir = releaseDir();
   const out = join(scratch(), "released");
@@ -238,8 +422,17 @@ test("verify-release: downloads the public release, compares files and digests, 
   state.source = allNames(VERSION).map((n) => join(dir, n));
   state.releases = [{ id: 7, tag_name: TAG, draft: false, assets: allNames(VERSION).map((n) => ({ name: n, state: "uploaded", digest: `sha256:${sha(join(dir, n))}` })) }];
   assert.deepEqual(await verifyRelease({ repo: REPO, tag: TAG, out, workflow: WORKFLOW, sourceRef: `refs/tags/${TAG}`, sourceDigest: "c".repeat(40) }, gh, noPause), []);
-  assert.equal(readdirSync(out).length, 10);
-  assert.equal(callsOf(calls, "attestation", "verify").length, 15);
+  assert.equal(readdirSync(out).length, 11);
+  assert.equal(callsOf(calls, "attestation", "verify").length, 25, "fifteen checks against GitHub's store, then ten against the downloaded provenance file");
+  assert.equal(callsOf(calls, "attestation", "verify").filter((c) => c.includes("--bundle")).length, 10);
+  // a public release without the provenance file (or with a stray one) fails the check
+  const before = fakeGh();
+  before.state.source = builtNames(VERSION).map((n) => join(dir, n));
+  before.state.releases = [{ id: 7, tag_name: TAG, draft: false, assets: builtNames(VERSION).map((n) => ({ name: n, state: "uploaded", digest: `sha256:${sha(join(dir, n))}` })) }];
+  const lacking = (await verifyRelease({ repo: REPO, tag: TAG, out: join(scratch(), "lacking"), workflow: WORKFLOW, sourceRef: "r", sourceDigest: "d" }, before.gh, noPause)).join("\n");
+  assert.match(lacking, /amo-1\.2\.3\.intoto\.jsonl is missing/);
+  assert.match(lacking, /asset amo-1\.2\.3\.intoto\.jsonl is not on the release/);
+  assert.equal(callsOf(before.calls, "attestation", "verify").length, 0);
   // a downloaded file that differs from the digest GitHub reports is caught before any attestation is trusted
   writeFileSync(join(dir, "amo-linux-x64"), "tampered");
   const tampered = await verifyRelease({ repo: REPO, tag: TAG, out: join(scratch(), "again"), workflow: WORKFLOW, sourceRef: "r", sourceDigest: "d" }, gh, noPause);
@@ -257,6 +450,7 @@ test("release notes say how to verify a download and name the SBOMs", () => {
   }
   assert.ok(notes.includes("https://github.com/owner/repo/blob/v1.2.3/docs/release/README.md"), "a link, not a bare path");
   assert.match(notes, /amo-cli-1\.2\.3\.cdx\.json/);
+  assert.ok(notes.includes(`gh attestation verify hybridcloudworks-migration-core-1.2.3.tgz --repo owner/repo --bundle amo-1.2.3.intoto.jsonl --source-ref refs/tags/v1.2.3 --signer-workflow owner/repo/${WORKFLOW} --deny-self-hosted-runners`), "the provenance file and how to use it");
   assert.match(notes, /https:\/\/github\.com\/owner\/repo\/blob\/v1\.2\.3\/CHANGELOG\.md/);
   assert.ok(notes.startsWith("## What changed in v1.2.3\n\nWhat 1.2.3 changes, in plain words."), "the page opens with the version's summary");
   assert.ok(!notes.includes("a change not released yet") && !notes.includes("Older."), "only this version's section");

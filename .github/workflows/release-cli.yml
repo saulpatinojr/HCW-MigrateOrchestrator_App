@@ -10,21 +10,26 @@
 #   sea          (contents: read)  the single-executable `amo` CLI for Linux, macOS and Windows with checksums, smoke tested.
 #   packages     (contents: read)  the two npm package tarballs (migration-core, migration-ui), the clean-consumer gate run on
 #                                  those very tarballs, and the CycloneDX SBOMs of the CLI and of the packages.
-#   inventory    (contents: read)  gathers every file into one artifact and checks that exactly the expected files exist.
+#   inventory    (contents: read)  gathers every built file into one artifact and checks that exactly the ten expected files exist.
 #   attest       (id-token and attestations: write, no repository write)  signed build provenance and signed CycloneDX SBOM
 #                                  attestations for every binary and tarball, and signed build provenance for the checksum files
-#                                  and the two SBOMs. Runs no repository script and has no checkout.
+#                                  and the two SBOMs. Runs no script at all and has no checkout. It also saves the three
+#                                  build-provenance bundles (the signed proof, as files) as workflow artifacts.
 #   verify-attestations (contents and attestations: read)  verifies them (this workflow file, this ref, this commit) with the
-#                                  repository's own script, in a job that cannot sign anything.
+#                                  repository's own script, in a job that cannot sign anything. It then writes the three saved
+#                                  bundles into one file, amo-<version>.intoto.jsonl (ADR-0035), checks that it names each of
+#                                  the ten files by sha256 and nothing else, and verifies every file against it alone.
 #   release      (contents: write; a tag only)  the ONLY job that touches the release: verifies the attestations again against
-#                                  the downloaded files, creates the release as a DRAFT with every file, checks that it holds
-#                                  exactly the expected files, and only then makes it public (scripts/release-publish.mjs).
+#                                  the downloaded files (GitHub's store, then the provenance file), creates the release as a
+#                                  DRAFT with every file, the provenance file included, checks that it holds exactly the
+#                                  expected files, and only then makes it public (scripts/release-publish.mjs).
 #   post-release (contents: read; a tag only)  downloads the PUBLIC release, checks the files and attestations again and
 #                                  re-runs `packages:verify` against the released tarballs.
 # The downstream edition (HCW-MigrateOrchestrator_AddOn) pins the tarballs by URL and integrity hash, so no registry stands
 # between a release and its adoption; npm trusted publishing (publish-npm.yml) stays optional.
 # Dry run: Actions, release, Run workflow, on the main branch only (any other ref fails at once). It takes the tag to be v +
-# the package version, runs the same checks as a tag, builds everything and keeps the files as a workflow artifact. It
+# the package version, runs the same checks as a tag, builds everything and keeps the files as a workflow artifact (with
+# "attest" ticked, the provenance file too, as the artifact release-provenance). It
 # publishes nothing: `release` and `post-release` run only for a pushed v* tag, so a manual run can never create a release,
 # whatever ref it names. "attest" is off by default because attestations are permanent entries in the public signing log;
 # tick it once to rehearse them too (they are then verified with the same strict flags, naming the branch instead of the tag).
@@ -155,7 +160,7 @@ jobs:
         run: |
           set -euo pipefail
           ls -l release-files
-          node scripts/release-publish.mjs check-files --dir release-files --version "$VERSION"
+          node scripts/release-publish.mjs check-files --stage built --dir release-files --version "$VERSION"
           { echo '### sha256'; echo; echo '```text'; (cd release-files && sha256sum -- *); echo '```'; } >> "$GITHUB_STEP_SUMMARY"
       - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
@@ -177,8 +182,10 @@ jobs:
       - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
         with: { name: release-files, path: release-files }
       # Build provenance, then the SBOM, for the binaries and for the tarballs, and build provenance for the checksum files and
-      # the two SBOMs themselves: five attestation steps in all.
+      # the two SBOMs themselves: five attestation steps in all. The three build-provenance steps have an id, because the
+      # signed bundle each one writes (output `bundle-path`) is saved below and attached to the release (ADR-0035).
       - uses: actions/attest@1e69f48acb82d1966a394da916b4c1698aa569d6 # v4.2.2
+        id: provenance-binaries
         with:
           subject-path: |
             release-files/amo-linux-x64
@@ -192,6 +199,7 @@ jobs:
             release-files/amo-windows-x64.exe
           sbom-path: release-files/amo-cli-${{ needs.check.outputs.version }}.cdx.json
       - uses: actions/attest@1e69f48acb82d1966a394da916b4c1698aa569d6 # v4.2.2
+        id: provenance-packages
         with:
           subject-path: release-files/hybridcloudworks-migration-*.tgz
       - uses: actions/attest@1e69f48acb82d1966a394da916b4c1698aa569d6 # v4.2.2
@@ -201,6 +209,7 @@ jobs:
       # The checksum files and the two SBOMs are subjects too (review of pull request 79, F7), so the bytes of the files a
       # consumer reads to check a download are bound to this workflow, this ref and this commit, not only checked by name and size.
       - uses: actions/attest@1e69f48acb82d1966a394da916b4c1698aa569d6 # v4.2.2
+        id: provenance-metadata
         with:
           subject-path: |
             release-files/SHA256SUMS-linux-x64.txt
@@ -208,6 +217,27 @@ jobs:
             release-files/SHA256SUMS-windows-x64.txt
             release-files/amo-cli-${{ needs.check.outputs.version }}.cdx.json
             release-files/hybridcloudworks-migration-packages-${{ needs.check.outputs.version }}.cdx.json
+      # Each bundle is saved as it was written, one artifact per step, with no script in between: this job still runs none.
+      # The next job, which cannot sign, turns the three into the one file a release carries and checks it.
+      # `overwrite` replaces only this run's own workflow artifact, so "Re-run failed jobs" works after a partial upload.
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: provenance-bundle-1-binaries
+          path: ${{ steps.provenance-binaries.outputs.bundle-path }}
+          if-no-files-found: error
+          overwrite: true
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: provenance-bundle-2-packages
+          path: ${{ steps.provenance-packages.outputs.bundle-path }}
+          if-no-files-found: error
+          overwrite: true
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: provenance-bundle-3-metadata
+          path: ${{ steps.provenance-metadata.outputs.bundle-path }}
+          if-no-files-found: error
+          overwrite: true
 
   # Runs the repository's own verification script, so it has no signing or attestation-write permission (review of pull request
   # 79, F6): it can only read the attestations it checks.
@@ -235,6 +265,29 @@ jobs:
         run: |
           node scripts/release-publish.mjs verify-attestations --dir release-files --version "$VERSION" --repo "$GH_REPO" \
             --workflow .github/workflows/release-cli.yml --source-ref "$SOURCE_REF" --source-digest "$SOURCE_DIGEST"
+      # The provenance file (ADR-0035): the three build-provenance bundles the attest job saved, one per line, in one file
+      # named amo-<version>.intoto.jsonl. It is written here, in a job that cannot sign, and refused unless it names each of
+      # the ten files by sha256 and no other file. Then every file is verified against it alone, with the same strict flags.
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with: { pattern: "provenance-bundle-*", path: provenance-bundles }
+      - name: Write the provenance file from the saved bundles and check what it names
+        env: { VERSION: "${{ needs.check.outputs.version }}" }
+        run: node scripts/release-publish.mjs assemble-provenance --bundles provenance-bundles --dir release-files --version "$VERSION"
+      - name: Verify every file against the provenance file alone (this workflow, this ref, this commit)
+        env:
+          GH_TOKEN: "${{ github.token }}"
+          GH_REPO: "${{ github.repository }}"
+          VERSION: "${{ needs.check.outputs.version }}"
+          SOURCE_REF: "${{ github.ref }}"
+          SOURCE_DIGEST: "${{ github.sha }}"
+        run: |
+          node scripts/release-publish.mjs verify-provenance --dir release-files --version "$VERSION" --repo "$GH_REPO" \
+            --workflow .github/workflows/release-cli.yml --source-ref "$SOURCE_REF" --source-digest "$SOURCE_DIGEST"
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: release-provenance
+          path: release-files/amo-${{ needs.check.outputs.version }}.intoto.jsonl
+          if-no-files-found: error
 
   release:
     needs: [check, inventory, attest, verify-attestations]
@@ -250,6 +303,8 @@ jobs:
         with: { node-version: 26, package-manager-cache: false }
       - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
         with: { name: release-files, path: release-files }
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with: { name: release-provenance, path: release-files }
       - name: Verify the attestations of the downloaded files (this workflow, this tag, this commit)
         env:
           GH_TOKEN: "${{ github.token }}"
@@ -259,6 +314,8 @@ jobs:
           SOURCE_DIGEST: "${{ github.sha }}"
         run: |
           node scripts/release-publish.mjs verify-attestations --dir release-files --version "$VERSION" --repo "$GH_REPO" \
+            --workflow .github/workflows/release-cli.yml --source-ref "$SOURCE_REF" --source-digest "$SOURCE_DIGEST"
+          node scripts/release-publish.mjs verify-provenance --dir release-files --version "$VERSION" --repo "$GH_REPO" \
             --workflow .github/workflows/release-cli.yml --source-ref "$SOURCE_REF" --source-digest "$SOURCE_DIGEST"
       - name: Create the release as a draft, check it holds exactly the expected files, then make it public
         env: { GH_TOKEN: "${{ github.token }}", GH_REPO: "${{ github.repository }}", TAG: "${{ github.ref_name }}" }
