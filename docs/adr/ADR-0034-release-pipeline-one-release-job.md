@@ -128,6 +128,13 @@ clearly right follow-ups; each is reversible by reverting the workflow change.
   permissions would still include `id-token: write` on a path that never needs it. `tests/release/release-workflows.test.mjs`
   pins the gate, the permissions and the absence of a login on the manual path, with mutation checks.
 
+## Amendment (2026-11-23): the build provenance is attached to the release
+
+A release carries an eleventh file, `amo-<version>.intoto.jsonl`: the three build-provenance bundles, one per line, written and
+checked by `verify-attestations` (which cannot sign) from what the `attest` job saved, and attached in the same draft as the other
+files. No permission changed and no key is stored. The decision and its reasons are in
+[ADR-0035](ADR-0035-build-provenance-attached-to-the-release.md).
+
 ## Amendment (2026-11-23): release notes come from CHANGELOG.md
 
 Every release page opens with "What changed": the summary of the version's `CHANGELOG.md` section (`## X.Y.Z — YYYY-MM-DD`)

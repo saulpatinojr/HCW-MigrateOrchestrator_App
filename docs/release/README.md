@@ -25,7 +25,7 @@ gets a package from a failed release run. Look at all of them after a tag.
 
 ## 1. What a release contains
 
-Ten files, nothing more. The workflow refuses to publish if one is missing, extra or empty.
+Eleven files, nothing more. The workflow refuses to publish if one is missing, extra or empty.
 
 | File | What it is |
 |---|---|
@@ -34,10 +34,12 @@ Ten files, nothing more. The workflow refuses to publish if one is missing, extr
 | `hybridcloudworks-migration-core-<version>.tgz`, `hybridcloudworks-migration-ui-<version>.tgz` | The two packages the downstream edition (`HCW-MigrateOrchestrator_AddOn`) installs. It pins them by address and hash, so these names must never change |
 | `amo-cli-<version>.cdx.json` | The SBOM (software bill of materials: the list of what is inside) of the command-line tool, in CycloneDX format |
 | `hybridcloudworks-migration-packages-<version>.cdx.json` | The SBOM of the two packages, as a consumer installs them |
+| `amo-<version>.intoto.jsonl` | The build provenance of the ten files above (the signed statements of which workflow built them, from which commit), one signed bundle per line. It is a copy of what GitHub's attestation store holds, so a download can be checked from the release's own files (section 3, step 5; ADR-0035) |
 
 Each of the three binaries and the two tarballs also has two signed attestations (build provenance and SBOM), and each checksum file and SBOM has one (build provenance), stored with GitHub (a statement, signed by
 GitHub, that "this file was built by this workflow from this commit"): one for how it was built and one for its SBOM.
 [About artifact attestations](https://docs.github.com/actions/security-for-github-actions/using-artifact-attestations/using-artifact-attestations-to-establish-provenance-for-builds).
+The eleventh file is made from the three build-provenance attestations, after they are checked, and is itself checked against the ten files before the release is created.
 
 ## 2. Rehearse first (publishes nothing)
 
@@ -54,19 +56,23 @@ It can never create a release: only a pushed tag does.
    Or in the browser: [Actions, release](https://github.com/saulpatinojr/HCW-MigrateOrchestrator_App/actions/workflows/release-cli.yml),
    Run workflow, Branch: `main`, leave "attest" unticked, Run workflow. (Any branch other than `main` stops at once with a clear message.)
 3. Wait for the run to turn green (about ten minutes; three operating systems build in parallel). Open the run: the summary lists
-   the sha256 of every file, and the `release-files` artifact holds the ten files.
+   the sha256 of every file, and the `release-files` artifact holds the ten built files (the eleventh, the provenance file, exists only when "attest" is ticked, because it is made from the signatures).
 4. Recommended once, before the first release you cut from a changed pipeline: run it again with "attest" ticked:
 
    ```bash
    gh workflow run release-cli.yml --repo saulpatinojr/HCW-MigrateOrchestrator_App --ref main -f attest=true
    ```
 
-   This signs the files and checks the signatures with the same strict command a real tag uses. It writes four permanent entries
-   to the public signing log, naming `refs/heads/main`. That is harmless but cannot be undone, which is why it is off by default.
+   This signs the files and checks the signatures with the same strict command a real tag uses. It writes five permanent entries
+   to the public signing log (one per signing step), naming `refs/heads/main`. That is harmless but cannot be undone, which is why it is off by default.
+   It also rehearses the provenance file: the `verify-attestations` job writes `amo-<version>.intoto.jsonl` from the three
+   build-provenance signatures, checks that it names each of the ten files, verifies every file against it alone, and keeps it
+   as the `release-provenance` artifact on the run page. If that job is green, the only part of the provenance file a real tag
+   still has to prove is attaching it to the release.
 
 What the green dry run tells you: the version check passes (including that `CHANGELOG.md` has a section with a summary for this
 version), all three binaries build and pass their smoke test, the two tarballs
-pass the clean-consumer gate, both SBOMs are generated, and exactly the ten expected files exist. If `main` still has the version
+pass the clean-consumer gate, both SBOMs are generated, and exactly the ten expected built files exist. If `main` still has the version
 of the last release, the run prints a warning that the tag already exists: a real tag would be refused until the version is raised.
 
 ### Rehearsing the appliance image (builds and scans, pushes nothing)
@@ -93,7 +99,8 @@ These happen only on a real tag, so the first real tag was also their first test
 | Not rehearsed | Why | What to look at on a real tag |
 |---|---|---|
 | The tag run itself starting, and the tag-only jobs `release` and `post-release` | A manual run is not a tag push, and those jobs are tag-only on purpose | The run lists eight jobs, all green |
-| Creating the draft release, uploading ten files, making it public | Needs `contents: write` and a real tag; a manual run must never have that | The release page lists exactly the ten files |
+| Creating the draft release, uploading eleven files, making it public | Needs `contents: write` and a real tag; a manual run must never have that | The release page lists exactly the eleven files, `amo-<version>.intoto.jsonl` among them |
+| The provenance file on a release: that GitHub reports a sha256 for it on the draft like for the other files, and that `post-release` verifies the downloaded copy with `gh attestation verify --bundle` | Only a real tag creates a release. Writing the file and verifying against it is rehearsed by the dry run with "attest" ticked, bound to `refs/heads/main` | `release` and `post-release` are green |
 | The attestation check bound to `refs/tags/<tag>` | The dry run, even with "attest" ticked, is bound to `refs/heads/main` | `attest`, `verify-attestations` and `release` jobs are green |
 | The released tarballs passing `packages:verify` | They exist only after publication | `post-release` is green |
 | `gh` flags on the real runner (`release create --draft --verify-tag`, `attestation verify --signer-workflow --signer-digest --source-ref --source-digest --deny-self-hosted-runners`) | They were run against a fake in the tests | No error annotation in `release` |
@@ -188,7 +195,7 @@ These happen only on a real tag, so the first real tag was also their first test
 
 4. **Watch the tag run** in [Actions](https://github.com/saulpatinojr/HCW-MigrateOrchestrator_App/actions/workflows/release-cli.yml).
    When all eight jobs are green, open the [release page](https://github.com/saulpatinojr/HCW-MigrateOrchestrator_App/releases) and
-   check it opens with "What changed in v<version>" and your summary, and lists the ten files from section 1.
+   check it opens with "What changed in v<version>" and your summary, and lists the eleven files from section 1.
 5. **Verify one download yourself** (optional but quick), with the same strict flags the pipeline uses. After downloading
    `hybridcloudworks-migration-core-<version>.tgz` from the release page into the current folder, bash:
 
@@ -205,7 +212,24 @@ These happen only on a real tag, so the first real tag was also their first test
    gh attestation verify $f --repo saulpatinojr/HCW-MigrateOrchestrator_App --predicate-type https://slsa.dev/provenance/v1 --source-ref "refs/tags/$tag" --signer-workflow saulpatinojr/HCW-MigrateOrchestrator_App/.github/workflows/release-cli.yml --deny-self-hosted-runners
    ```
 
-   Use `--predicate-type https://cyclonedx.org/bom` instead to check the SBOM attestation. It prints the workflow, the tag and the
+   Success: no line starting `Error:` (in a terminal the output says the verification succeeded; when its output is piped to a file, `gh` prints nothing and exits with 0).
+
+   The same check from the release's own files, without asking GitHub's attestation store: also download
+   `amo-<version>.intoto.jsonl` into the same folder and add `--bundle`. bash or PowerShell, after the lines above:
+
+   ```bash
+   gh attestation verify "$f" --repo saulpatinojr/HCW-MigrateOrchestrator_App --bundle "amo-${tag#v}.intoto.jsonl" --source-ref "refs/tags/$tag" --signer-workflow saulpatinojr/HCW-MigrateOrchestrator_App/.github/workflows/release-cli.yml --deny-self-hosted-runners
+   ```
+
+   ```powershell
+   gh attestation verify $f --repo saulpatinojr/HCW-MigrateOrchestrator_App --bundle ("amo-" + $tag.Substring(1) + ".intoto.jsonl") --source-ref "refs/tags/$tag" --signer-workflow saulpatinojr/HCW-MigrateOrchestrator_App/.github/workflows/release-cli.yml --deny-self-hosted-runners
+   ```
+
+   The short form is `gh attestation verify <file> --repo saulpatinojr/HCW-MigrateOrchestrator_App --bundle amo-<version>.intoto.jsonl`.
+   It works for any of the ten files. The file must keep its `.jsonl` ending: `gh` reads the format from it. Releases before
+   this change (up to `v0.4.3`) have no such file; use the first command for them.
+
+   Use `--predicate-type https://cyclonedx.org/bom` (without `--bundle`) instead to check the SBOM attestation. It prints the workflow, the tag and the
    commit that built the file. [`gh attestation verify`](https://cli.github.com/manual/gh_attestation_verify). The `amo` binaries
    have no `--version` option: identify a binary by its `SHA256SUMS-*.txt` file and its attestation, not by running it.
 6. **Tell the downstream edition.** `HCW-MigrateOrchestrator_AddOn` checks this repository's latest release every 6 hours (its
@@ -228,6 +252,7 @@ file as it was at the tagged commit and the files built by that run, so a fix me
 | `check` (version, ancestry, or "not the tip of main and `.github/workflows` differs") | Nothing built, nothing published; the tag exists | The tag is wrong and the ruleset blocks moving it. Fix `main`, raise the version, tag the next version |
 | `sea`, `packages` or `inventory` | Nothing published | Re-run failed jobs if it was temporary; otherwise fix `main` and ship the next version |
 | `attest` | Nothing published; some signatures may exist | Same. Signatures of a version that was never released are harmless |
+| `verify-attestations` (a signature does not verify, or the provenance file does not name every file) | Nothing published | Same. The message names the file and what is wrong with it |
 | `release`, before its last step | A **draft** release may exist (only repository writers see it) | Open the [Releases page](https://github.com/saulpatinojr/HCW-MigrateOrchestrator_App/releases), delete the draft (the tag stays), then re-run failed jobs if it was temporary, or ship the next version. The job refuses to touch an existing draft or release |
 | `post-release`, a temporary failure (a network or registry error while it downloads or installs react) | The release is public and the earlier jobs verified it | "Re-run failed jobs" |
 | `post-release`, a real failure (a file or digest differs from the release, an attestation does not verify, or `packages:verify` fails on a second try) | The release is public but something about the published files is wrong | Delete the release on the Releases page (downstream may have pinned its hashes, so tell them), fix `main`, ship the next version |
@@ -262,6 +287,6 @@ npm deprecate "@hybridcloudworks/migration-ui@0.3.2" "Do not use: published in e
 |---|---|
 | Workflow | [`release-cli.yml`](../../.github/workflows/release-cli.yml), [`publish-npm.yml`](../../.github/workflows/publish-npm.yml) |
 | Version and tag check | [`scripts/check-release-version.mjs`](../../scripts/check-release-version.mjs) |
-| Draft, check, publish; attestation checks; post-release download | [`scripts/release-publish.mjs`](../../scripts/release-publish.mjs) |
+| Draft, check, publish; attestation checks; the provenance file; post-release download | [`scripts/release-publish.mjs`](../../scripts/release-publish.mjs) |
 | SBOMs | [`scripts/generate-sbom.mjs`](../../scripts/generate-sbom.mjs) |
 | Tests | `tests/release/` (the scripts against a fake `gh`; the workflow rules) |

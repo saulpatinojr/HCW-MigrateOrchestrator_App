@@ -152,6 +152,50 @@ test("release-cli: provenance and CycloneDX SBOM attestations for the binaries a
   assert.match(script, /SBOM = "https:\/\/cyclonedx\.org\/bom"/);
 });
 
+test("release-cli: the build provenance is saved by the attest job, made into one file by a job that cannot sign, and released (ADR-0035)", () => {
+  const j = jobs(text(RELEASE));
+  const attest = j.attest;
+  const uses = steps(attest).filter((s) => /uses: actions\/attest@/.test(s));
+  // the three build-provenance steps (no sbom-path) have an id; the two SBOM steps have none, so their bundles are never saved
+  const ids = uses.map((s) => s.match(/^ {8}id: (\S+)$/m)?.[1] ?? null);
+  assert.deepEqual(ids, ["provenance-binaries", null, "provenance-packages", null, "provenance-metadata"]);
+  for (const [i, s] of uses.entries()) assert.equal(/sbom-path:/.test(s), ids[i] === null, "an id exactly on the steps without an SBOM");
+  const saved = steps(attest).filter((s) => /uses: actions\/upload-artifact@/.test(s));
+  assert.deepEqual(saved.map((s) => [stepInputs(s).name, stepInputs(s).path]), [
+    ["provenance-bundle-1-binaries", "${{ steps.provenance-binaries.outputs.bundle-path }}"],
+    ["provenance-bundle-2-packages", "${{ steps.provenance-packages.outputs.bundle-path }}"],
+    ["provenance-bundle-3-metadata", "${{ steps.provenance-metadata.outputs.bundle-path }}"],
+  ]);
+  for (const s of saved) assert.equal(stepInputs(s)["if-no-files-found"], "error");
+  assert.ok(attest.lastIndexOf("actions/attest@") < attest.indexOf("actions/upload-artifact@"), "saved after every attestation is made");
+  // keyless: no stored key and no secret anywhere in the workflow, and the signing job still has no repository write
+  assert.doesNotMatch(code(RELEASE), /secrets\.|cosign|gpg|private[-_ ]key/i);
+  assert.deepEqual(grants(attest), ["attestations: write", "contents: read", "id-token: write"]);
+  assert.doesNotMatch(attest, /^\s*run:/m, "the attest job still runs no script: the bundles are saved by the pinned upload action");
+
+  // the inventory holds the ten built files only: nothing may sit under the provenance name before the files are attested
+  assert.match(j.inventory, /release-publish\.mjs check-files --stage built --dir release-files --version "\$VERSION"/);
+
+  const verify = j["verify-attestations"];
+  const order = ["release-publish.mjs verify-attestations ", 'pattern: "provenance-bundle-*", path: provenance-bundles', 'release-publish.mjs assemble-provenance --bundles provenance-bundles --dir release-files --version "$VERSION"', "release-publish.mjs verify-provenance ", "name: release-provenance"].map((x) => verify.indexOf(x));
+  assert.ok(order.every((x) => x > 0) && order.every((x, i) => i === 0 || order[i - 1] < x), `store check, download, assemble, verify against the file, upload, in that order: ${order}`);
+  assert.match(verify, /verify-provenance .*--workflow \.github\/workflows\/release-cli\.yml --source-ref "\$SOURCE_REF" --source-digest "\$SOURCE_DIGEST"/s);
+  assert.match(verify, /path: release-files\/amo-\$\{\{ needs\.check\.outputs\.version \}\}\.intoto\.jsonl\n\s+if-no-files-found: error/);
+  assert.deepEqual(grants(verify), ["attestations: read", "contents: read"], "the job that writes the file cannot sign or write to the repository");
+  assert.doesNotMatch(verify, /merge-multiple/, "each saved bundle stays in its own folder (all three are named attestation.json)");
+
+  const release = j.release;
+  assert.match(release, /with: \{ name: release-provenance, path: release-files \}/, "the provenance file joins the ten files before anything is checked");
+  const steps3 = [release.indexOf("name: release-provenance"), release.indexOf("release-publish.mjs verify-attestations "), release.indexOf("release-publish.mjs verify-provenance "), release.indexOf("release-publish.mjs publish ")];
+  assert.ok(steps3.every((x) => x > 0) && steps3.every((x, i) => i === 0 || steps3[i - 1] < x), "download, verify both ways, then publish");
+  assert.ok(needs(release).includes("verify-attestations"), "the job that makes the file must have succeeded");
+  // only the release job, through the script, attaches anything: no job uploads to a release
+  assert.doesNotMatch(code(RELEASE), /gh release upload|upload-release-asset/);
+  const script = readFileSync("scripts/release-publish.mjs", "utf8");
+  assert.match(script, /provenanceName = \(version\) => `amo-\$\{version\}\.intoto\.jsonl`/, "the ending tools that grade a release look for");
+  assert.ok(allNames("0.3.1").includes("amo-0.3.1.intoto.jsonl") && allNames("0.3.1").length === 11);
+});
+
 test("release-cli: the SBOMs are generated in the packages job, and the gate runs on the packed tarballs", () => {
   const packages = jobs(text(RELEASE)).packages;
   assert.match(packages, /generate-sbom\.mjs cli --version "\$VERSION"/);
